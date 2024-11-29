@@ -33,6 +33,7 @@
 #include "lardataobj/RecoBase/SpacePoint.h"
 
 #include "larcore/Geometry/Geometry.h"
+#include "larcore/Geometry/WireReadout.h"
 
 #include "larcorealg/Geometry/Exceptions.h"
 
@@ -107,7 +108,8 @@ private:
     // Utilities
     art::ServiceHandle<art::TFileService> tfs;
 
-    const geo::Geometry* asGeo;
+    const geo::GeometryCore* asGeo;
+    const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
 
@@ -145,8 +147,8 @@ private:
 
 
     // Functions
-    geo::WireID GetWireID(geo::Point_t const& P, int plane);
-    raw::ChannelID_t GetChannel(geo::Point_t const& P, int plane);
+    geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
+    raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
 
     bool IsInVolume(double x, double y, double z, double eps);
     bool IsInVolume(float x, float y, float z, float eps);
@@ -155,8 +157,8 @@ private:
 
     bool IsUpright(recob::Track const& T);
 
-    int GetSection(unsigned int ch);
-    int GetPlane(unsigned int ch, int sec);
+    int GetSection(raw::ChannelID_t ch);
+    geo::View_t GetPlane(raw::ChannelID_t ch, int sec);
 
     bool Logging(bool cond, int tab, string msg, string succ, string fail);
     bool LogFail(bool cond, int tab, string msg, string fail);
@@ -177,6 +179,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
 
     // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
+    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
@@ -191,7 +194,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
                         instance    = prod[2],
                         type        = prod[3];
 
-        const auto  tag = art::InputTag(label,instance);
+        const art::InputTag tag = art::InputTag(label,instance);
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
@@ -312,7 +315,12 @@ void ana::Muchecks::analyze(art::Event const& e)
     } // end loop over tracks
 } // end analyze
 
-void ana::Muchecks::beginJob() {} // end beginJob
+void ana::Muchecks::beginJob() {
+    if (iLogLevel >= iFlagDetails) {
+        cout << "\033[94m" << "Michecks::beginJob: ============================================================" << "\033[0m" << endl;
+        cout << "\033[94m" << "End of Michecks::beginJob ======================================================" << "\033[0m" << endl;
+    }
+} // end beginJob
 
 
 void ana::Muchecks::endJob()
@@ -361,27 +369,28 @@ bool ana::Muchecks::IsUpright(recob::Track const& T) {
 }
 
 
-int ana::Muchecks::GetSection(unsigned int ch) {
-    return 4.*ch / asGeo->Nchannels();
+int ana::Muchecks::GetSection(raw::ChannelID_t ch) {
+    return int(4.*ch / asWire->Nchannels());
 }
-int ana::Muchecks::GetPlane(unsigned int ch, int sec) {
-    return (12.*ch / asGeo->Nchannels() - 3*sec);
+geo::View_t ana::Muchecks::GetPlane(raw::ChannelID_t ch, int sec) {
+    return static_cast<geo::View_t>(12.*ch / asWire->Nchannels() - 3*sec);
 }
-geo::WireID ana::Muchecks::GetWireID(geo::Point_t const& P, int plane) {
-    geo::TPCID tpc = asGeo->FindTPCAtPosition(P);
-    if (!tpc.isValid) return geo::WireID();
-    geo::WireID wire;
+geo::WireID ana::Muchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
+    geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
+    if (!tpcid.isValid) return geo::WireID();
+    geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
+    geo::WireID wireid;
     try {
-        wire = asGeo->NearestWireID(P, geo::PlaneID(tpc,2));
+        wireid = planegeo.NearestWireID(P);
     } catch (geo::InvalidWireError const& e) {
         return e.suggestedWireID();
     }
-    return wire;
+    return wireid;
 }
-raw::ChannelID_t ana::Muchecks::GetChannel(geo::Point_t const& P, int plane) {
-    geo::WireID wire = GetWireID(P, plane);
-    if (!wire.isValid) return raw::InvalidChannelID;
-    return asGeo->PlaneWireToChannel(wire);
+raw::ChannelID_t ana::Muchecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
+    geo::WireID wireid = GetWireID(P, plane);
+    if (!wireid.isValid) return raw::InvalidChannelID;
+    return asWire->PlaneWireToChannel(wireid);
 }
 
 

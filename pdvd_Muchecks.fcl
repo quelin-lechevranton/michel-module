@@ -1,12 +1,14 @@
-#include "services_refactored_pdune.fcl"
-#include "protodune_tools_dune.fcl"
+#include "services_dune.fcl"
+#include "services_vdcoldbox.fcl" 
+#include "tools_dune.fcl"	
 
 process_name: RunMuchecks
 
 services: {
     TFileService: { fileName: "pdvd_Muchecks_out.root" }
     TimeTracker: {}
-    ExptGeoHelperInterface:     @local::dune_geometry_helper
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
     DetectorPropertiesService:  @local::protodunevd_detproperties
     FileCatalogMetadata:        @local::art_file_catalog_mc
                                 @table::protodunevd_reco_services

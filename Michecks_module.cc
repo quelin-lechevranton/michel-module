@@ -33,6 +33,7 @@
 #include "lardataobj/RecoBase/SpacePoint.h"
 
 #include "larcore/Geometry/Geometry.h"
+#include "larcore/Geometry/WireReadout.h"
 
 #include "larcorealg/Geometry/Exceptions.h"
 
@@ -105,7 +106,8 @@ private:
     // Utilities
     art::ServiceHandle<art::TFileService> tfs;
 
-    const geo::Geometry* asGeo;
+    const geo::GeometryCore* asGeo;
+    const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
 
@@ -158,12 +160,12 @@ private:
 
     vector<vector<TH1F*>> h1E; 
     vector<TH2F*> h2Corr;
-    enum hEkeys {kTrue, kReco, kFull, kCylinder, kN};
+    enum hKeys {kTrue, kReco, kFull, kCylinder, kN};
 
 
     // Functions
-    geo::WireID GetWireID(geo::Point_t const& P, int plane);
-    raw::ChannelID_t GetChannel(geo::Point_t const& P, int plane);
+    geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
+    raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
 
     bool IsInVolume(double x, double y, double z, double eps);
     bool IsInVolume(float x, float y, float z, float eps);
@@ -172,8 +174,8 @@ private:
 
     bool IsUpright(recob::Track const& T);
 
-    int GetSection(unsigned int ch);
-    int GetPlane(unsigned int ch, int sec);
+    int GetSection(raw::ChannelID_t ch);
+    geo::View_t GetPlane(raw::ChannelID_t ch, int sec);
 
     bool Logging(bool cond, int tab, string msg, string succ, string fail);
 
@@ -194,6 +196,7 @@ ana::Michecks::Michecks(fhicl::ParameterSet const& p)
 
     // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
+    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
@@ -208,7 +211,7 @@ ana::Michecks::Michecks(fhicl::ParameterSet const& p)
                         instance    = prod[2],
                         type        = prod[3];
 
-        const auto  tag = art::InputTag(label,instance);
+        const art::InputTag tag = art::InputTag(label,instance);
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
@@ -219,11 +222,11 @@ ana::Michecks::Michecks(fhicl::ParameterSet const& p)
         else if (type == "recob::SpacePoint")       tag_spt = tag;
     }
 
-    int section_n = asGeo->Nchannels()/12;
+    int section_n = asWire->Nchannels()/12;
 
     // Binning of the Frame Channel-Tick for which plane and section
     vvbChan = vector<vector<Binning>>(3, vector<Binning>(4));
-    for (int plane=0; plane<3; plane++) {
+    for (geo::View_t plane : {geo::kU, geo::kV, geo::kW}) {
         for (int section=0; section<4; section++) {
             vvbChan[plane][section].n    = section_n;
             vvbChan[plane][section].min  = (3*section + plane) * section_n;
@@ -266,7 +269,7 @@ ana::Michecks::Michecks(fhicl::ParameterSet const& p)
     hTrueHits = vector<vector<TH2F*>>(3, vector<TH2F*>(4));
     hFullHits = vector<vector<TH2F*>>(3, vector<TH2F*>(4));
     hCylinderHits = vector<vector<TH2F*>>(3, vector<TH2F*>(4));
-    for (int plane=0; plane<3; plane++) {
+    for (geo::View_t plane : {geo::kU, geo::kV, geo::kW}) {
         for (int section=0; section<4; section++) {
             hHT[plane][section] = new TH2F(
                 Form("hHT_%c%d",'U'+plane,section),"",
@@ -296,7 +299,7 @@ ana::Michecks::Michecks(fhicl::ParameterSet const& p)
 
     // Initializing TGraph Channel-Tick for each plane and section
     // gMichelHits = vector<vector<TGraph*>>(3, vector<TGraph*>(4));
-    // for (int plane=0; plane<3; plane++) {
+    // for (geo::View_t plane : {geo::kU, geo::kV, geo::kW}) {
     //     for (int section=0; section<4; section++) {
             // gMichelHits[plane][section] = new TGraph();
     //     }
@@ -416,21 +419,16 @@ void ana::Michecks::analyze(art::Event const& e)
         vector<const recob::Hit*> hits_michel = truthUtil.GetMCParticleHits(clockData, *mcp_mich, e, tag_hit.label(), false);
 
         double RecoADC = 0;
-        float prev_SummedADC = 0;
         if (iLogLevel >= iFlagDetails) cout << "\t\t\tlooping over michel's " << hits_michel.size() << " hits...";
         for (recob::Hit const* hit : hits_michel) {
 
-            int plane = hit->View();
+            geo::View_t plane = hit->View();
             int section = GetSection(hit->Channel());
             // gMichelHits[plane][section]->AddPoint(hit->PeakTime(), hit->Channel());
             hTrueHits[plane][section]->Fill(hit->PeakTime(), hit->Channel());
 
             if (plane != 2) continue;
-
-            if (hit->SummedADC() == prev_SummedADC) continue;
-
-            RecoADC += hit->SummedADC(); 
-            prev_SummedADC = hit->SummedADC();
+            RecoADC += hit->HitSummedADC(); 
         } // end loop over michel hits
         if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
 
@@ -453,8 +451,6 @@ void ana::Michecks::analyze(art::Event const& e)
 
 
         double FullRecoADC = RecoADC;
-        prev_SummedADC = 0;
-
         if (iLogLevel >= iFlagDetails) cout << "\t\t\tlooping over michel's " << mcp_mich->NumberDaughters() << " daughters..." << endl;
         for (int i_dau=0; i_dau< mcp_mich->NumberDaughters(); i_dau++) {
             if (iLogLevel >= iFlagDetails) cout << "\t\t\tdau#" << i_dau+1 << "\r" << flush;
@@ -477,15 +473,13 @@ void ana::Michecks::analyze(art::Event const& e)
             for (recob::Hit const* hit : hits_dau) {
                 // if (hit->View() != 2) continue;
 
-                int plane = hit->View();
+                geo::View_t plane = hit->View();
                 int section = GetSection(hit->Channel());
                 hFullHits[plane][section]->Fill(hit->PeakTime(), hit->Channel());
 
                 if (plane != 2) continue;
-                if (hit->SummedADC() == prev_SummedADC) continue;
 
-                FullRecoADC += hit->SummedADC();
-                prev_SummedADC = hit->SummedADC();
+                FullRecoADC += hit->HitSummedADC();
             } // end loop over electron hits
             if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
         } // end loop over michel daughters
@@ -527,14 +521,14 @@ void ana::Michecks::analyze(art::Event const& e)
         
         // geo::WireID wire_mu_trk_end;
         // try {
-        //     wire_mu_trk_end = asGeo->NearestWireID(trk_end, geo::PlaneID(tpc_mu_trk_end,2));
+        //     wire_mu_trk_end = asWire->NearestWireID(trk_end, geo::PlaneID(tpc_mu_trk_end,2));
         // } catch (geo::InvalidWireError const& e) {
         //     if (iLogLevel >= iFlagDetails) cout << "\033[91m" << "Invalid Track Wire Error: " << e.what() << "\033[0m" << endl;
         //     wire_mu_trk_end = e.suggestedWireID();
         // }
         // geo::WireID wire_mu_mcp_end;
         // try {
-        //     wire_mu_mcp_end = asGeo->NearestWireID(geo::Point_t(mcp_mich->EndPosition().Vect()), geo::PlaneID(tpc_mu_mcp_end,2));
+        //     wire_mu_mcp_end = asWire->NearestWireID(geo::Point_t(mcp_mich->EndPosition().Vect()), geo::PlaneID(tpc_mu_mcp_end,2));
         // } catch (geo::InvalidWireError const& e) {
         //     if (iLogLevel >= iFlagDetails) cout << "\033[91m" << "Invalid MCP Wire Error: " << e.what() << "\033[0m" << endl;
         //     wire_mu_mcp_end = e.suggestedWireID();
@@ -548,12 +542,12 @@ void ana::Michecks::analyze(art::Event const& e)
         // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End Wire: " << "\033[0m" << wire_mu_trk_end.Wire << endl
         //                     << "\033[94m" << "\t\tMuon MCP End Wire: " << "\033[0m" << wire_mu_mcp_end.Wire << endl;
 
-        // raw::ChannelID_t ch_mu_trk_end = asGeo->PlaneWireToChannel(wire_mu_trk_end);
-        // raw::ChannelID_t ch_mu_mcp_end = asGeo->PlaneWireToChannel(wire_mu_mcp_end);
+        // raw::ChannelID_t ch_mu_trk_end = asWire->PlaneWireToChannel(wire_mu_trk_end);
+        // raw::ChannelID_t ch_mu_mcp_end = asWire->PlaneWireToChannel(wire_mu_mcp_end);
 
 
-        raw::ChannelID_t ch_mu_mcp_end = GetChannel(geo::Point_t(mcp_mich->EndPosition().Vect()), 2);
-        raw::ChannelID_t ch_mu_trk_end = GetChannel(trk_end, 2);
+        raw::ChannelID_t ch_mu_mcp_end = GetChannel(geo::Point_t(mcp_mich->EndPosition().Vect()), geo::kW);
+        raw::ChannelID_t ch_mu_trk_end = GetChannel(trk_end, geo::kW);
 
 
         if(Logging(
@@ -599,10 +593,9 @@ void ana::Michecks::analyze(art::Event const& e)
     vector<double> vCylinderRecoADC(vch_mu_end.size(), 0);
 
     if (iLogLevel >= iFlagDetails) cout << "\tlooping over all hits...";
-    float prev_summedADC = 0;
     for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
 
-        int plane = p_hit->View();
+        geo::View_t plane = p_hit->View();
         int section = GetSection(p_hit->Channel());
 
         hHT[plane][section]->Fill(p_hit->PeakTime(), p_hit->Channel());
@@ -628,9 +621,7 @@ void ana::Michecks::analyze(art::Event const& e)
 
             if (plane != 2) continue;
 
-            if (p_hit->SummedADC() == prev_summedADC) continue;
-            vCylinderRecoADC[i] += p_hit->SummedADC() * fADCtoE;
-            prev_summedADC = p_hit->SummedADC();
+            vCylinderRecoADC[i] += p_hit->HitSummedADC() * fADCtoE;
         } // end loop over muon ends
     } // end loop over hits
     if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
@@ -661,24 +652,23 @@ void ana::Michecks::beginJob()
     if (iLogLevel >= iFlagDetails) {
         geo::CryostatID cryoid{0};
         cout << "\033[94m" << "Michecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
-             << "Number of channels: " << asGeo->Nchannels() << endl
+             << "Number of channels: " << asWire->Nchannels() << endl
              << "Number of ticks: " << "???" << endl
              << "Cryostat coordinates: " << asGeo->Cryostat(cryoid).Min() << " - " << asGeo->Cryostat(cryoid).Max() << endl
              << "\tvolume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << endl;
-        geo::TPCID tpc0{cryoid, 0}, tpcN{cryoid, asGeo->NTPC(cryoid)-1};
-        cout << "\tactive coordinates: " << asGeo->TPC(tpc0).Min() << " - " << asGeo->TPC(tpcN).Max() << endl
-             << "\tactive volume: " << (asGeo->TPC(tpc0).Max() - asGeo->TPC(tpcN).Min()).X() << " x " << (asGeo->TPC(tpc0).Max() - asGeo->TPC(tpcN).Min()).Y() << " x " << (asGeo->TPC(tpc0).Max() - asGeo->TPC(tpcN).Min()).Z() << endl
+        geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+        cout << "\tactive coordinates: " << asGeo->TPC(tpcid0).Min() << " - " << asGeo->TPC(tpcidN).Max() << endl
+             << "\tactive volume: " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).X() << " x " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).Y() << " x " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).Z() << endl
              << "TPCs:" << endl; 
-        for (unsigned int i_tpc=0; i_tpc < asGeo->NTPC(); i_tpc++) {
-            geo::TPCID tpcid{cryoid, i_tpc};
-            cout << "\tTPC#" << i_tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << endl
+        for (unsigned int tpc=0; tpc < asGeo->NTPC(); tpc++) {
+            geo::TPCID tpcid{cryoid, tpc};
+            cout << "\tTPC#" << tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << endl
                  << "\t\tvolume: " << asGeo->TPC(tpcid).Width() << " x " << asGeo->TPC(tpcid).Height() << " x " << asGeo->TPC(tpcid).Length() << endl
                  << "\t\tactive volume: " << asGeo->TPC(tpcid).ActiveWidth() << " x " << asGeo->TPC(tpcid).ActiveHeight() << " x " << asGeo->TPC(tpcid).ActiveLength() << endl
                  << "\t\tPlanes:";
-            for (unsigned int i_plane=0; i_plane < asGeo->Nplanes(); i_plane++) {
-                geo::PlaneID planeid{tpcid, i_plane};
-                vector<string> plane_names = {"U","V","W"};
-                cout << "\t" << plane_names[i_plane] << " #Wires: " << asGeo->Nwires(planeid);
+            for (unsigned int plane=0; plane < asWire->Nplanes(); plane++) {
+                geo::PlaneID planeid{tpcid, plane};
+                cout << "\t" << 'U'+plane << " #Wires: " << asWire->Nwires(planeid);
             } // end loop over Planes
             cout << endl;
         } // end loop over TPCs
@@ -734,7 +724,7 @@ void ana::Michecks::endJob()
 
 
     vector<TCanvas*> cPlanes(3);
-    for (int plane=0; plane<3; plane++) {
+    for (geo::View_t plane : {geo::kU, geo::kV, geo::kW}) {
         cPlanes[plane] = new TCanvas(Form("c%c",'U'+plane),Form("%c Plane",'U'+plane));
 
         if (iLogLevel >= iFlagDetails) cout << "plane#" << plane << "\r" << flush;
@@ -794,7 +784,7 @@ void ana::Michecks::endJob()
     for (raw::ChannelID_t ch : vchMuonEnd) {
         if (ch == raw::InvalidChannelID) continue;
         int section = GetSection(ch);
-        int plane = GetPlane(ch, section);
+        geo::View_t plane = GetPlane(ch, section);
 
         cPlanes[plane]->cd(section+1);
         
@@ -808,7 +798,7 @@ void ana::Michecks::endJob()
         lplus->Draw();
     }
 
-    for (int plane=0; plane<3; plane++) {
+    for (geo::View_t plane : {geo::kU, geo::kV, geo::kW}) {
         cPlanes[plane]->Write();
     }
 
@@ -846,10 +836,10 @@ void ana::Michecks::endJob()
 
 bool ana::Michecks::IsInVolume(double x, double y, double z, double eps) {
     geo::CryostatID cryoid{0};
-    geo::TPCID tpc0{cryoid, 0}, tpcN{cryoid, asGeo->NTPC(cryoid)-1};
-    return (x-eps > asGeo->TPC(tpc0).MinX() and x+eps < asGeo->TPC(tpcN).MaxX() and
-            y-eps > asGeo->TPC(tpc0).MinY() and y+eps < asGeo->TPC(tpcN).MaxY() and
-            z-eps > asGeo->TPC(tpc0).MinZ() and z+eps < asGeo->TPC(tpcN).MaxZ());   
+    geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+    return (x-eps > asGeo->TPC(tpcid0).MinX() and x+eps < asGeo->TPC(tpcidN).MaxX() and
+            y-eps > asGeo->TPC(tpcid0).MinY() and y+eps < asGeo->TPC(tpcidN).MaxY() and
+            z-eps > asGeo->TPC(tpcid0).MinZ() and z+eps < asGeo->TPC(tpcidN).MaxZ());   
 }
 bool ana::Michecks::IsInVolume(float x, float y, float z, float eps) {
     return IsInVolume(double(x), double(y), double(z), double(eps));
@@ -865,27 +855,28 @@ bool ana::Michecks::IsUpright(recob::Track const& T) {
 }
 
 
-int ana::Michecks::GetSection(unsigned int ch) {
-    return 4.*ch / asGeo->Nchannels();
+int ana::Michecks::GetSection(raw::ChannelID_t ch) {
+    return int(4.*ch / asWire->Nchannels());
 }
-int ana::Michecks::GetPlane(unsigned int ch, int sec) {
-    return (12.*ch / asGeo->Nchannels() - 3*sec);
+geo::View_t ana::Michecks::GetPlane(raw::ChannelID_t ch, int sec) {
+    return static_cast<geo::View_t>(12.*ch / asWire->Nchannels() - 3*sec);
 }
-geo::WireID ana::Michecks::GetWireID(geo::Point_t const& P, int plane) {
-    geo::TPCID tpc = asGeo->FindTPCAtPosition(P);
-    if (!tpc.isValid) return geo::WireID();
-    geo::WireID wire;
+geo::WireID ana::Michecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
+    geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
+    if (!tpcid.isValid) return geo::WireID();
+    geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
+    geo::WireID wireid;
     try {
-        wire = asGeo->NearestWireID(P, geo::PlaneID(tpc,2));
+        wireid = planegeo.NearestWireID(P);
     } catch (geo::InvalidWireError const& e) {
         return e.suggestedWireID();
     }
-    return wire;
+    return wireid;
 }
-raw::ChannelID_t ana::Michecks::GetChannel(geo::Point_t const& P, int plane) {
-    geo::WireID wire = GetWireID(P, plane);
-    if (!wire.isValid) return raw::InvalidChannelID;
-    return asGeo->PlaneWireToChannel(wire);
+raw::ChannelID_t ana::Michecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
+    geo::WireID wireid = GetWireID(P, plane);
+    if (!wireid.isValid) return raw::InvalidChannelID;
+    return asWire->PlaneWireToChannel(wireid);
 }
 
 
