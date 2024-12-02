@@ -1,0 +1,47 @@
+#include "services_dune.fcl"
+#include "services_vdcoldbox.fcl" 
+#include "tools_dune.fcl"	
+
+process_name: RunMitrees
+
+services: {
+    TFileService: { fileName: "pdvd_Mitrees_out.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::protodunevd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::protodunevd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "Mitrees"
+            Products:       [
+                ["SingleGen",  "generator",     "",       "simb::MCTruth"],
+                ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
+                ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
+                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
+                ["Reco",       "hitpdune",      "",       "recob::Hit"],
+                ["Reco",       "pandora",       "",       "recob::Cluster"],
+                ["Reco",       "pandoraTrack",  "",       "recob::Track"],
+                ["Reco",       "pandora",       "",       "recob::SpacePoint"]
+            ]
+
+            LogLevel:       2
+            
+            MichelTimeRadius: 10.
+            MichelSpaceRadius: 20.
+            LengthCut: 20.
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}

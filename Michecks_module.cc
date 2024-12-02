@@ -134,11 +134,12 @@ private:
                     tag_trk,
                     tag_spt;
 
-    // Variables
+    // Input Variables
     float fMichelTimeRadius, // in µs
           fMichelSpaceRadius, // in cm
           fTrackLengthCut; // in cm
 
+    // Output Variables
     vector<vector<ana::Binning>> vvbChan;
     ana::Binning bTick, bE;
 
@@ -427,7 +428,7 @@ void ana::Michecks::analyze(art::Event const& e)
             // gMichelHits[plane][section]->AddPoint(hit->PeakTime(), hit->Channel());
             hTrueHits[plane][section]->Fill(hit->PeakTime(), hit->Channel());
 
-            if (plane != 2) continue;
+            if (plane != geo::kW) continue;
             RecoADC += hit->HitSummedADC(); 
         } // end loop over michel hits
         if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
@@ -464,7 +465,7 @@ void ana::Michecks::analyze(art::Event const& e)
 
             if (Logging(
                 abs(mcp_dau->PdgCode()) != 11 && abs(mcp_dau->PdgCode()) != 22,
-                4, "is electron...", "yes", "no")
+                4, "is electron or photon...", "yes", "no")
             ) continue;
             
             vector<const recob::Hit*> hits_dau = truthUtil.GetMCParticleHits(clockData, *mcp_dau, e, tag_hit.label(), false);
@@ -477,7 +478,7 @@ void ana::Michecks::analyze(art::Event const& e)
                 int section = GetSection(hit->Channel());
                 hFullHits[plane][section]->Fill(hit->PeakTime(), hit->Channel());
 
-                if (plane != 2) continue;
+                if (plane != geo::kW) continue;
 
                 FullRecoADC += hit->HitSummedADC();
             } // end loop over electron hits
@@ -600,7 +601,7 @@ void ana::Michecks::analyze(art::Event const& e)
 
         hHT[plane][section]->Fill(p_hit->PeakTime(), p_hit->Channel());
 
-        // if (plane != 2) continue;
+        // if (plane != geo::kW) continue;
 
         vector<art::Ptr<recob::Track>> vp_trk = fmp_hit2trk.at(p_hit.key());
 
@@ -619,7 +620,7 @@ void ana::Michecks::analyze(art::Event const& e)
 
             hCylinderHits[plane][section]->Fill(p_hit->PeakTime(), p_hit->Channel());
 
-            if (plane != 2) continue;
+            if (plane != geo::kW) continue;
 
             vCylinderRecoADC[i] += p_hit->HitSummedADC() * fADCtoE;
         } // end loop over muon ends

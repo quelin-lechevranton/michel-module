@@ -136,9 +136,16 @@ private:
                     tag_trk,
                     tag_spt;
 
-    // Variables
+    // Input Variables
     float fTrackLengthCut; // in cm
     float fMichelSpaceRadius; // in cm
+
+    // Output Variables
+    TH1F* hMuStartX;
+    TH1F* hMuEndX;
+    TH1F* hMuUpStartX;
+    TH1F* hMuUpEndX;
+
 
 
     vector<vector<int>> viCounters;
@@ -205,9 +212,14 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::SpacePoint")       tag_spt = tag;
     }
 
-
     // Initialize counters
     viCounters = vector<vector<int>>(kN, vector<int>(2, 0));
+
+    // Initialize histograms
+    hMuStartX = new TH1F("hMuStartX", ";Muon Start X (cm);#", 100, -350, 350);
+    hMuEndX = new TH1F("hMuEndX", ";Muon End X (cm);#", 100, -350, 350);
+    hMuUpStartX = new TH1F("hMuUpStartX", ";Muon Start X (cm);#", 100, -350, 350);
+    hMuUpEndX = new TH1F("hMuUpEndX", ";Muon End X (cm);#", 100, -350, 350);
 }
 
 void ana::Muchecks::analyze(art::Event const& e)
@@ -242,7 +254,7 @@ void ana::Muchecks::analyze(art::Event const& e)
         viCounters[kMuon][anti]++;
 
         if (Logging(
-            !IsInVolume(mcp->EndPosition(), fMichelSpaceRadius),
+            !IsInVolume(mcp->EndPosition(), 0.),
             2, "ends inside...", "yes", "no")
         ) {
             if (Logging(
@@ -253,6 +265,17 @@ void ana::Muchecks::analyze(art::Event const& e)
         }
         
         viCounters[kInside][anti]++;
+
+        hMuStartX->Fill(p_trk->Start().X());
+        hMuEndX->Fill(p_trk->End().X());
+
+        if (IsUpright(*p_trk)) {
+            hMuUpStartX->Fill(p_trk->Start().X());
+            hMuUpEndX->Fill(p_trk->End().X());
+        } else {
+            hMuUpStartX->Fill(p_trk->End().X());
+            hMuUpEndX->Fill(p_trk->Start().X());
+        }
 
         if (Logging(
             mcp->EndProcess() != "Decay",
@@ -343,6 +366,18 @@ void ana::Muchecks::endJob()
         for (int k=0; k<kN; k++) cout << "|" << viCounters[k][anti] << "\t" << fixed << setprecision(2) << 100.*viCounters[k][anti]/viCounters[kMuon][anti] << "%\t";
         cout << endl;
     }
+
+    TCanvas* c = tfs->make<TCanvas>("c","Muon");
+    c->Divide(2,2);
+    c->cd(1);
+    hMuStartX->Draw();
+    c->cd(2);
+    hMuEndX->Draw();
+    c->cd(3);
+    hMuUpStartX->Draw();
+    c->cd(4);
+    hMuUpEndX->Draw();
+    c->Write();
 
     if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "End of Muchecks::endJob ========================================================" << "\033[0m" << endl;
 } // end endJob
