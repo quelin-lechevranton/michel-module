@@ -145,14 +145,15 @@ private:
     TTree* tTree;
     size_t iNMichel;
     vector<bool> vbIsPositron;
-    vector<float> vfTrueE, vfRecoADC, vfFullRecoADC, vfCylinderRecoADC;
+    vector<float> vfTrueE, vfRecoADC, vfFullRecoADC, vfSphereADC;
 
     size_t iNHit, iNHitMCP, iNHitMCPdau, iNHitSphere;
-    vector<int> vchan, vchanMCP, vchanMCPdau, vchanSphere;
-    vector<float> vtick, vtickMCP, vtickMCPdau, vtickSphere;
+    vector<unsigned int> viChan, viChanMCP, viChanMCPdau, viChanSphere;
+    vector<float> vfTick, vfTickMCP, vfTickMCPdau, vfTickSphere;
+    vector<float> vfADC;
 
     // Functions
-    void reset(TTree* t);
+    void reset();
 
     geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
     raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
@@ -216,28 +217,30 @@ ana::Mitrees::Mitrees(fhicl::ParameterSet const& p)
 
 
     tTree = tfs->make<TTree>("Tree","");
-    tTree->Branch("NMichel", &iNMichel, "NMichel/i");
-    tTree->Branch("IsPositron", &vbIsPositron, "IsPositron[NMichel]/O");
+    tTree->Branch("NMichel", &iNMichel);
+    tTree->Branch("IsPositron", &vbIsPositron);
 
-    tTree->Branch("TrueE", &vfTrueE, "TrueE[NMichel]/F");
-    tTree->Branch("RecoADC", &vfRecoADC, "RecoADC[NMichel]/F");
-    tTree->Branch("FullRecoADC", &vfFullRecoADC, "FullRecoADC[NMichel]/F");
-    tTree->Branch("CylinderRecoADC", &vfCylinderRecoADC, "CylinderRecoADC[NMichel]/F");
+    tTree->Branch("TrueE", &vfTrueE);
+    tTree->Branch("RecoADC", &vfRecoADC);
+    tTree->Branch("FullRecoADC", &vfFullRecoADC);
+    tTree->Branch("SphereADC", &vfSphereADC);
 
-    tTree->Branch("NHit", &iNHit, "NHit/i");
-    tTree->Branch("NHitMCP", &iNHitMCP, "NHitMCP/i");
-    tTree->Branch("NHitMCPdau", &iNHitMCPdau, "NHitMCPdau/i");
-    tTree->Branch("NHitSphere", &iNHitSphere, "NHitSphere/i");
+    tTree->Branch("NHit", &iNHit);
+    tTree->Branch("NHitMCP", &iNHitMCP);
+    tTree->Branch("NHitMCPdau", &iNHitMCPdau);
+    tTree->Branch("NHitSphere", &iNHitSphere);
 
-    tTree->Branch("Chan", &vchan, "Chan[NHit]/I");
-    tTree->Branch("ChanMCP", &vchanMCP, "ChanMCP[NHitMCP]/I");
-    tTree->Branch("ChanMCPdau", &vchanMCPdau, "ChanMCPdau[NHitMCPdau]/I");
-    tTree->Branch("ChanSphere", &vchanSphere, "ChanSphere[NHitSphere]/I");
+    tTree->Branch("Chan", &viChan);
+    tTree->Branch("ChanMCP", &viChanMCP);
+    tTree->Branch("ChanMCPdau", &viChanMCPdau);
+    tTree->Branch("ChanSphere", &viChanSphere);
 
-    tTree->Branch("Tick", &vtick, "Tick[NHit]/F");
-    tTree->Branch("TickMCP", &vtickMCP, "TickMCP[NHitMCP]/F");
-    tTree->Branch("TickMCPdau", &vtickMCPdau, "TickMCPdau[NHitMCPdau]/F");
-    tTree->Branch("TickSphere", &vtickSphere, "TickSphere[NHitSphere]/F");
+    tTree->Branch("Tick", &vfTick);
+    tTree->Branch("TickMCP", &vfTickMCP);
+    tTree->Branch("TickMCPdau", &vfTickMCPdau);
+    tTree->Branch("TickSphere", &vfTickSphere);
+
+    tTree->Branch("ADC", &vfADC);
 }
 
 void ana::Mitrees::analyze(art::Event const& e)
@@ -245,7 +248,7 @@ void ana::Mitrees::analyze(art::Event const& e)
     auto const clockData = asDetClocks->DataFor(e);
     // auto const detProp = asDetProp->DataFor(e,clockData);
 
-    reset(tTree);
+    reset();
 
     if (iLogLevel >= iFlagDetails) cout << "evt#" << e.id().event() << "\r" << flush;
 
@@ -282,7 +285,7 @@ void ana::Mitrees::analyze(art::Event const& e)
         int anti = mcp->PdgCode() < 0;
         if (Logging(
             mcp->NumberDaughters() == 0,
-            2, Form("looping over mu%s daughters...",anti ? "+" : "-"), "", "none")
+            2, Form("looping over \003[93mmu%s\003[0m daughters...",anti ? "+" : "-"), "", "none")
         ) continue;
 
         int i_dau = mcp->NumberDaughters() - 1;
@@ -315,6 +318,7 @@ void ana::Mitrees::analyze(art::Event const& e)
 
         vbIsPositron.push_back(mcp_mich->PdgCode() < 0);
         vfTrueE.push_back((mcp_mich->E() - mcp_mich->Mass())*1e3);
+        if (iLogLevel >= iFlagDetails) cout << "\t\t\tTrueE: " << "\033[93m" << vfTrueE.back() << " MeV" << "\033[0m" << endl;
 
         vector<const recob::Hit*> hits_michel = truthUtil.GetMCParticleHits(clockData, *mcp_mich, e, tag_hit.label(), false);
 
@@ -323,14 +327,16 @@ void ana::Mitrees::analyze(art::Event const& e)
         for (recob::Hit const* hit : hits_michel) {
 
             if (hit->View() != geo::kW) continue;
-            RecoADC += hit->HitSummedADC(); 
+            // RecoADC += hit->HitSummedADC(); 
+            RecoADC += hit->Integral();
             iNHitMCP++;
-            vchanMCP.push_back(hit->Channel());
-            vtickMCP.push_back(hit->PeakTime());
+            viChanMCP.push_back(hit->Channel());
+            vfTickMCP.push_back(hit->PeakTime());
         } // end loop over michel hits
         if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
 
         vfRecoADC.push_back(RecoADC*fADCtoE);
+        if (iLogLevel >= iFlagDetails) cout << "\t\t\tRecoADC: " << "\033[93m" << RecoADC << " ~ " << vfRecoADC.back() << " MeV" << "\033[0m" << endl;
 
         float FullRecoADC = RecoADC;
         if (iLogLevel >= iFlagDetails) cout << "\t\t\tlooping over michel's " << mcp_mich->NumberDaughters() << " daughters..." << endl;
@@ -344,27 +350,32 @@ void ana::Mitrees::analyze(art::Event const& e)
                 4, "id to mcp...", "done", "failed")
             ) continue;
 
+            const int pdg = mcp_dau->PdgCode();
             if (Logging(
-                abs(mcp_dau->PdgCode()) != 11 && abs(mcp_dau->PdgCode()) != 22,
-                4, "is electron or photon...", "yes", "no")
+                abs(pdg) != 11 && abs(pdg) != 22,
+                4, "is electron or photon...",
+                Form("%s", abs(pdg)==22 ? "photon" : (pdg>0 ? "elec" : "posi")), "no")
             ) continue;
             
             vector<const recob::Hit*> hits_dau = truthUtil.GetMCParticleHits(clockData, *mcp_dau, e, tag_hit.label(), false);
 
-            if (iLogLevel >= iFlagDetails) cout << "\t\t\t\tlooping over electron's " << hits_dau.size() << " hits...";
+            if (iLogLevel >= iFlagSpecial && abs(pdg)==22 && hits_dau.size() > 0) cout << "\t\t\t\tphoton with " << hits_dau.size() << " hits" << endl;
+
+            if (iLogLevel >= iFlagDetails) cout << "\t\t\t\tlooping over " << hits_dau.size() << " hits...";
             for (recob::Hit const* hit : hits_dau) {
 
                 if (hit->View() != geo::kW) continue;
-                FullRecoADC += hit->HitSummedADC();
+                // FullRecoADC += hit->HitSummedADC();
+                FullRecoADC += hit->Integral();
                 iNHitMCPdau++;
-                vchanMCPdau.push_back(hit->Channel());
-                vtickMCPdau.push_back(hit->PeakTime());
+                viChanMCPdau.push_back(hit->Channel());
+                vfTickMCPdau.push_back(hit->PeakTime());
             } // end loop over electron hits
             if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
         } // end loop over michel daughters
 
         vfFullRecoADC.push_back(FullRecoADC*fADCtoE);
-
+        if (iLogLevel >= iFlagDetails) cout << "\t\t\tFullRecoADC: " << "\033[93m" << FullRecoADC << " ~ " << vfFullRecoADC.back() << " MeV" << "\033[0m" << endl;
 
         geo::Point_t trk_end_pt, trk_start_pt;
         if (IsUpright(*p_trk)) {
@@ -401,14 +412,14 @@ void ana::Mitrees::analyze(art::Event const& e)
         //     2, "mu end channel is valid...", "yes", "no")
         // ) {vch_mu_end.push_back(raw::InvalidChannelID); continue;}
 
-        // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End Channel: " << "\033[0m" << ch_mu_trk_end << endl
-        //                     << "\033[94m" << "\t\tMichel End Channel: " << "\033[0m" << ch_mu_mcp_end << endl;
+        // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "\t\tMuon Track End Channel: " << "\033[0m" << ch_mu_trk_end << endl
+        //                     << "\033[93m" << "\t\tMichel End Channel: " << "\033[0m" << ch_mu_mcp_end << endl;
 
         vch_mu_end.push_back(ch_mu_trk_end);
         vf_mu_end_tick.push_back(trk_end_tick);
     } // end loop over tracks
 
-    vfCylinderRecoADC = vector<float>(vch_mu_end.size(), 0);
+    vfSphereADC = vector<float>(vch_mu_end.size(), 0);
 
     auto const & vh_hit = e.getValidHandle<vector<recob::Hit>>(tag_hit);
     vector<art::Ptr<recob::Hit>> vp_hit;
@@ -422,8 +433,8 @@ void ana::Mitrees::analyze(art::Event const& e)
         if (p_hit->View() != geo::kW) continue;
 
         iNHit++;
-        vchan.push_back(p_hit->Channel());
-        vtick.push_back(p_hit->PeakTime());
+        viChan.push_back(p_hit->Channel());
+        vfTick.push_back(p_hit->PeakTime());
 
         vector<art::Ptr<recob::Track>> vp_trk = fmp_hit2trk.at(p_hit.key());
 
@@ -441,10 +452,12 @@ void ana::Mitrees::analyze(art::Event const& e)
             if (abs(int(p_hit->Channel() - vch_mu_end[i])) > fMichelSpaceRadius / fChannelPitch) continue;
             if (abs(int(p_hit->PeakTime() - vf_mu_end_tick[i])) > fMichelTimeRadius / fSamplingRate) continue;
 
-            vfCylinderRecoADC[i] += p_hit->HitSummedADC() * fADCtoE;
+            // vfSphereADC[i] += p_hit->HitSummedADC() * fADCtoE;
+            vfSphereADC[i] += p_hit->Integral() * fADCtoE;
             iNHitSphere++;
-            vchanSphere.push_back(p_hit->Channel());
-            vtickSphere.push_back(p_hit->PeakTime());
+            viChanSphere.push_back(p_hit->Channel());
+            vfTickSphere.push_back(p_hit->PeakTime());
+            vfADC.push_back(p_hit->HitSummedADC());
         } // end loop over muon ends
     } // end loop over hits
     if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
@@ -462,13 +475,13 @@ void ana::Mitrees::beginJob()
 void ana::Mitrees::endJob()
 {
 
-    // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "Mitrees::endJob: Plotting section =============================================" << "\033[0m" << endl;
+    // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "Mitrees::endJob: Plotting section =============================================" << "\033[0m" << endl;
 
-    // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "End of Mitrees::endJob ========================================================" << "\033[0m" << endl;
+    // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "End of Mitrees::endJob ========================================================" << "\033[0m" << endl;
 } // end endJob
 
 
-void ana::Mitrees::reset(TTree* t)
+void ana::Mitrees::reset()
 {
     if (iLogLevel >= iFlagDetails) cout << "resetting...";
 
@@ -478,22 +491,22 @@ void ana::Mitrees::reset(TTree* t)
     vfTrueE.clear();
     vfRecoADC.clear();
     vfFullRecoADC.clear();
-    vfCylinderRecoADC.clear();
+    vfSphereADC.clear();
 
     iNHit = 0;
     iNHitMCP = 0;
     iNHitMCPdau = 0;
     iNHitSphere = 0;
 
-    vchan.clear();
-    vchanMCP.clear();
-    vchanMCPdau.clear();
-    vchanSphere.clear();
+    viChan.clear();
+    viChanMCP.clear();
+    viChanMCPdau.clear();
+    viChanSphere.clear();
 
-    vtick.clear();
-    vtickMCP.clear();
-    vtickMCPdau.clear();
-    vtickSphere.clear();
+    vfTick.clear();
+    vfTickMCP.clear();
+    vfTickMCPdau.clear();
+    vfTickSphere.clear();
 
     if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
 }

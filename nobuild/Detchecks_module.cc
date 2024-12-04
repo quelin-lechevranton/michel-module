@@ -149,7 +149,7 @@ void ana::Detchecks::beginJob()
 
     if (iLogLevel >= iFlagDetails) {
         geo::CryostatID cryoid{0};
-        cout << "\033[94m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
+        cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
              << "Number of channels: " << asWire->Nchannels() << endl
              << "Number of ticks: " << "???" << endl
              << "Cryostat coordinates: " << asGeo->Cryostat(cryoid).Min() << " - " << asGeo->Cryostat(cryoid).Max() << endl
@@ -170,7 +170,7 @@ void ana::Detchecks::beginJob()
             } // end loop over Planes
             cout << endl;
         } // end loop over TPCs
-        cout << "\033[94m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << endl;
+        cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << endl;
     }
 } // end beginJob
 

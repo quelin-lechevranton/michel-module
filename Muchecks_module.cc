@@ -250,7 +250,7 @@ void ana::Muchecks::analyze(art::Event const& e)
             2, "is muon...", "yes", "no")
         ) continue;
 
-        int anti = mcp->PdgCode() > 0 ? 0 : 1;
+        int anti = mcp->PdgCode() < 0;
         viCounters[kMuon][anti]++;
 
         if (Logging(
@@ -340,8 +340,8 @@ void ana::Muchecks::analyze(art::Event const& e)
 
 void ana::Muchecks::beginJob() {
     if (iLogLevel >= iFlagDetails) {
-        cout << "\033[94m" << "Michecks::beginJob: ============================================================" << "\033[0m" << endl;
-        cout << "\033[94m" << "End of Michecks::beginJob ======================================================" << "\033[0m" << endl;
+        cout << "\033[93m" << "Michecks::beginJob: ============================================================" << "\033[0m" << endl;
+        cout << "\033[93m" << "End of Michecks::beginJob ======================================================" << "\033[0m" << endl;
     }
 } // end beginJob
 
@@ -349,7 +349,7 @@ void ana::Muchecks::beginJob() {
 void ana::Muchecks::endJob()
 {
 
-    if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "Muchecks::endJob: Plotting section =============================================" << "\033[0m" << endl;
+    if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "Muchecks::endJob: Plotting section =============================================" << "\033[0m" << endl;
 
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -379,7 +379,7 @@ void ana::Muchecks::endJob()
     hMuUpEndX->Draw();
     c->Write();
 
-    if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "End of Muchecks::endJob ========================================================" << "\033[0m" << endl;
+    if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "End of Muchecks::endJob ========================================================" << "\033[0m" << endl;
 } // end endJob
 
 

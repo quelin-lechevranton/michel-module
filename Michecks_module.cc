@@ -408,7 +408,7 @@ void ana::Michecks::analyze(art::Event const& e)
         // double TrueE = mcp_mich->E()*1e3;
         double TrueE = (mcp_mich->E() - mcp_mich->Mass())*1e3;
 
-        int anti = mcp_mich->PdgCode() > 0 ? 0 : 1;
+        int anti = mcp_mich->PdgCode() < 0;
         if (iLogLevel >= iFlagSpecial) cout << "\tMichel pdg: " << mcp_mich->PdgCode() << endl;
         vAnti.push_back(anti);
 
@@ -463,9 +463,11 @@ void ana::Michecks::analyze(art::Event const& e)
                 4, "id to mcp...", "done", "failed")
             ) continue;
 
+            const int pdg = mcp_dau->PdgCode();
             if (Logging(
-                abs(mcp_dau->PdgCode()) != 11 && abs(mcp_dau->PdgCode()) != 22,
-                4, "is electron or photon...", "yes", "no")
+                abs(pdg) != 11 && abs(pdg) != 22,
+                4, "is electron or photon...",
+                Form("%s", abs(pdg)==22 ? "photon" : (pdg>0 ? "elec" : "posi")), "no")
             ) continue;
             
             vector<const recob::Hit*> hits_dau = truthUtil.GetMCParticleHits(clockData, *mcp_dau, e, tag_hit.label(), false);
@@ -505,8 +507,8 @@ void ana::Michecks::analyze(art::Event const& e)
 
 
 
-        // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End Point: " << "\033[0m" << trk_end << endl
-        //                     << "\033[94m" << "\t\tMuon MCP End Point: " << "\033[0m" << "(" << mcp_mich->EndPosition().X() << ", " << mcp_mich->EndPosition().Y() << ", " << mcp_mich->EndPosition().Z() << ")" << endl;
+        // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "\t\tMuon Track End Point: " << "\033[0m" << trk_end << endl
+        //                     << "\033[93m" << "\t\tMuon MCP End Point: " << "\033[0m" << "(" << mcp_mich->EndPosition().X() << ", " << mcp_mich->EndPosition().Y() << ", " << mcp_mich->EndPosition().Z() << ")" << endl;
 
         // geo::TPCID tpc_mu_trk_end = asGeo->FindTPCAtPosition(trk_end);
         // geo::TPCID tpc_mu_mcp_end = asGeo->FindTPCAtPosition(geo::Point_t(mcp_mich->EndPosition().Vect()));
@@ -517,8 +519,8 @@ void ana::Michecks::analyze(art::Event const& e)
         //     2, "mu end tpc is valid...", "yes", "no")
         // ) {vch_mu_end.push_back(raw::InvalidChannelID); continue;}
 
-        // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End TPC: " << "\033[0m" << tpc_mu_trk_end.TPC << endl
-        //                     << "\033[94m" << "\t\tMuon MCP End TPC: " << "\033[0m" << tpc_mu_mcp_end.TPC << endl;
+        // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "\t\tMuon Track End TPC: " << "\033[0m" << tpc_mu_trk_end.TPC << endl
+        //                     << "\033[93m" << "\t\tMuon MCP End TPC: " << "\033[0m" << tpc_mu_mcp_end.TPC << endl;
         
         // geo::WireID wire_mu_trk_end;
         // try {
@@ -540,8 +542,8 @@ void ana::Michecks::analyze(art::Event const& e)
         //     2, "muon end wire is valid...", "yes", "no")
         // ) {vch_mu_end.push_back(raw::InvalidChannelID); continue;}
 
-        // if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End Wire: " << "\033[0m" << wire_mu_trk_end.Wire << endl
-        //                     << "\033[94m" << "\t\tMuon MCP End Wire: " << "\033[0m" << wire_mu_mcp_end.Wire << endl;
+        // if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "\t\tMuon Track End Wire: " << "\033[0m" << wire_mu_trk_end.Wire << endl
+        //                     << "\033[93m" << "\t\tMuon MCP End Wire: " << "\033[0m" << wire_mu_mcp_end.Wire << endl;
 
         // raw::ChannelID_t ch_mu_trk_end = asWire->PlaneWireToChannel(wire_mu_trk_end);
         // raw::ChannelID_t ch_mu_mcp_end = asWire->PlaneWireToChannel(wire_mu_mcp_end);
@@ -556,8 +558,8 @@ void ana::Michecks::analyze(art::Event const& e)
             2, "mu end channel is valid...", "yes", "no")
         ) {vch_mu_end.push_back(raw::InvalidChannelID); continue;}
 
-        if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "\t\tMuon Track End Channel: " << "\033[0m" << ch_mu_trk_end << endl
-                            << "\033[94m" << "\t\tMichel End Channel: " << "\033[0m" << ch_mu_mcp_end << endl;
+        if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "\t\tMuon Track End Channel: " << "\033[0m" << ch_mu_trk_end << endl
+                            << "\033[93m" << "\t\tMichel End Channel: " << "\033[0m" << ch_mu_mcp_end << endl;
 
         vch_mu_end.push_back(ch_mu_trk_end);
 
@@ -652,7 +654,7 @@ void ana::Michecks::beginJob()
 
     if (iLogLevel >= iFlagDetails) {
         geo::CryostatID cryoid{0};
-        cout << "\033[94m" << "Michecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
+        cout << "\033[93m" << "Michecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
              << "Number of channels: " << asWire->Nchannels() << endl
              << "Number of ticks: " << "???" << endl
              << "Cryostat coordinates: " << asGeo->Cryostat(cryoid).Min() << " - " << asGeo->Cryostat(cryoid).Max() << endl
@@ -673,7 +675,7 @@ void ana::Michecks::beginJob()
             } // end loop over Planes
             cout << endl;
         } // end loop over TPCs
-        cout << "\033[94m" << "End of Michecks::beginJob ======================================================" << "\033[0m" << endl;
+        cout << "\033[93m" << "End of Michecks::beginJob ======================================================" << "\033[0m" << endl;
     }
 } // end beginJob
 
@@ -681,7 +683,7 @@ void ana::Michecks::beginJob()
 void ana::Michecks::endJob()
 {
 
-    if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "Michecks::endJob: Plotting section =============================================" << "\033[0m" << endl;
+    if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "Michecks::endJob: Plotting section =============================================" << "\033[0m" << endl;
 
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -831,7 +833,7 @@ void ana::Michecks::endJob()
     cCorr->Write();
             
 
-    if (iLogLevel >= iFlagDetails) cout << "\033[94m" << "End of Michecks::endJob ========================================================" << "\033[0m" << endl;
+    if (iLogLevel >= iFlagDetails) cout << "\033[93m" << "End of Michecks::endJob ========================================================" << "\033[0m" << endl;
 } // end endJob
 
 
