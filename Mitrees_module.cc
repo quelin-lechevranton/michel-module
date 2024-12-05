@@ -62,6 +62,8 @@
 #include <vector>
 #include <string>
 #include <iterator>
+#include <unordered_map>
+#include <utility>
 
 using std::cerr;
 using std::cout;
@@ -69,6 +71,8 @@ using std::endl;
 using std::flush;
 using std::vector;
 using std::string;
+// using std::unordered_map;
+// using std::pair;
 using std::min;
 using std::max;
 
@@ -152,16 +156,19 @@ private:
     vector<float> vfTick, vfTickMCP, vfTickMCPdau, vfTickSphere;
     vector<float> vfADC;
 
+    vector<long int> viFromMichel;
+
     // Functions
     void reset();
 
     geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
     raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
+    vector<art::Ptr<recob::Hit>> GetHits(detinfo::DetectorClocksData const& clockData, simb::MCParticle const& mpc, vector<art::Ptr<recob::Hit>> const& vp_hit);
+    simb::MCParticle const* GetMCParticle(detinfo::DetectorClocksData const& clockData, art::Ptr<recob::Track> const& p_trk, art::FindManyP<recob::Hit> const& fmp_trk2hit);
 
-    bool IsInVolume(double x, double y, double z, double eps);
+    bool IsInVolume(double x, double y, double z, float eps);
     bool IsInVolume(float x, float y, float z, float eps);
-    bool IsInVolume(TLorentzVector const& V, float eps);
-    bool IsInVolume(geo::Point_t const& P);
+    template<class Vec> bool IsInVolume(Vec const& V, float eps);
 
     bool IsUpright(recob::Track const& T);
 
@@ -258,15 +265,34 @@ void ana::Mitrees::analyze(art::Event const& e)
         
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
 
+    auto const & vh_hit = e.getValidHandle<vector<recob::Hit>>(tag_hit);
+    vector<art::Ptr<recob::Hit>> vp_hit;
+    art::fill_ptr_vector(vp_hit, vh_hit);
+
+    viFromMichel = vector<long int>(vp_hit.size(), -1);
+
+    art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
+
     vector<raw::ChannelID_t> vch_mu_end;
     vector<float> vf_mu_end_tick;
 
+    cout << "\033[93m" << "looping over hits..." << "\033[0m" << endl;
+    long unsigned int i_hit=0;
+    for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        if (p_hit.key() != i_hit++) cerr << "\033[91m" << "ERROR: p_hit.key() != i_hit" << "\033[0m" << endl;
+    }
+
+    cout << "\033[93m" << "looping over trk..." << "\033[0m" << endl;
     if (iLogLevel >= iFlagDetails) cout << "\tlooping over " << vp_trk.size() << " tracks..." << endl;
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
 
         if (iLogLevel >= iFlagDetails) cout << "\ttrk#" << p_trk->ID()+1 << "\r" << flush;
 
         simb::MCParticle const * mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
+        simb::MCParticle const * mcp2 = GetMCParticle(clockData, p_trk, fmp_trk2hit);
+
+        if (mcp->TrackId() != mcp2->TrackId()) cerr << "\033[91m" << "ERROR: mcp->TrackId() != mcp2->TrackId()" << "\033[0m" << " delta: " << (int) mcp2->TrackId() - (int) mcp->TrackId() << endl;
+
         if (Logging(
             !mcp, 
             2, "trk to mcp...", "done", "failed")
@@ -322,16 +348,32 @@ void ana::Mitrees::analyze(art::Event const& e)
 
         vector<const recob::Hit*> hits_michel = truthUtil.GetMCParticleHits(clockData, *mcp_mich, e, tag_hit.label(), false);
 
-        float RecoADC = 0;
-        if (iLogLevel >= iFlagDetails) cout << "\t\t\tlooping over michel's " << hits_michel.size() << " hits...";
-        for (recob::Hit const* hit : hits_michel) {
+        vector<art::Ptr<recob::Hit>> vp_hit_michel = GetHits(clockData, *mcp_mich, vp_hit);
 
-            if (hit->View() != geo::kW) continue;
+        vector<art::Ptr<recob::Hit>> vp_hit_michel2 = bt_serv->TrackIdToHits_Ps(clockData, mcp_mich->TrackId(), vp_hit);
+
+        cout << "\033[93m" << "from michel..." << "\033[0m" << endl;
+        if (hits_michel.size() != vp_hit_michel.size()) cerr << "\033[91m" << "ERROR: hits_michel.size() != vp_hit_michel.size()" << "\033[0m" << " delta" << (int) vp_hit_michel.size() - (int) hits_michel.size() << endl;
+        if (vp_hit_michel.size() != vp_hit_michel2.size()) cerr << "\033[91m" << "ERROR: vp_hit_michel.size() != vp_hit_michel2.size()" << "\033[0m" << " delta=" << (int) vp_hit_michel2.size() - (int) vp_hit_michel.size() << endl;
+
+        for (unsigned int i=0; i<hits_michel.size(); i++) {
+            if (hits_michel[i] != vp_hit_michel[i].get()) cerr << "\033[91m" << "ERROR: hits_michel[i] != vp_hit_michel[i]" << "\033[0m" << " index=" << (int) i << endl;
+            if (vp_hit_michel[i] != vp_hit_michel2[i]) cerr << "\033[91m" << "ERROR: vp_hit_michel[i] != vp_hit_michel2[i]" << "\033[0m" << " index=" << (int) i << endl;
+        }
+
+        float RecoADC = 0;
+        if (iLogLevel >= iFlagDetails) cout << "\t\t\tlooping over michel's " << vp_hit_michel.size() << " hits...";
+        for (art::Ptr<recob::Hit> const& p_hit : vp_hit_michel) {
+
+            if (p_hit->View() != geo::kW) continue;
+
+            viFromMichel[p_hit.key()] = iNMichel;
+
             // RecoADC += hit->HitSummedADC(); 
-            RecoADC += hit->Integral();
+            RecoADC += p_hit->Integral();
             iNHitMCP++;
-            viChanMCP.push_back(hit->Channel());
-            vfTickMCP.push_back(hit->PeakTime());
+            viChanMCP.push_back(p_hit->Channel());
+            vfTickMCP.push_back(p_hit->PeakTime());
         } // end loop over michel hits
         if (iLogLevel >= iFlagDetails) cout << "\033[92m" << " done" << "\033[0m" << endl;
 
@@ -421,11 +463,6 @@ void ana::Mitrees::analyze(art::Event const& e)
 
     vfSphereADC = vector<float>(vch_mu_end.size(), 0);
 
-    auto const & vh_hit = e.getValidHandle<vector<recob::Hit>>(tag_hit);
-    vector<art::Ptr<recob::Hit>> vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
-
-    art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
 
     if (iLogLevel >= iFlagDetails) cout << "looping over all hits...";
     for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -513,26 +550,6 @@ void ana::Mitrees::reset()
 
 
 
-bool ana::Mitrees::IsInVolume(double x, double y, double z, double eps) {
-    geo::CryostatID cryoid{0};
-    geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
-    return (x-eps > asGeo->TPC(tpcid0).MinX() and x+eps < asGeo->TPC(tpcidN).MaxX() and
-            y-eps > asGeo->TPC(tpcid0).MinY() and y+eps < asGeo->TPC(tpcidN).MaxY() and
-            z-eps > asGeo->TPC(tpcid0).MinZ() and z+eps < asGeo->TPC(tpcidN).MaxZ());   
-}
-bool ana::Mitrees::IsInVolume(float x, float y, float z, float eps) {
-    return IsInVolume(double(x), double(y), double(z), double(eps));
-}
-bool ana::Mitrees::IsInVolume(TLorentzVector const& V, float eps) {
-    return IsInVolume(V.X(), V.Y(), V.Z(), double(eps));
-}
-bool ana::Mitrees::IsInVolume(geo::Point_t const& P) {
-    return IsInVolume(P.X(), P.Y(), P.Z(), 0.);
-}
-bool ana::Mitrees::IsUpright(recob::Track const& T) {
-    return T.Start().X() > T.End().X();
-}
-
 
 int ana::Mitrees::GetSection(raw::ChannelID_t ch) {
     return int(4.*ch / asWire->Nchannels());
@@ -558,6 +575,77 @@ raw::ChannelID_t ana::Mitrees::GetChannel(geo::Point_t const& P, geo::View_t pla
     return asWire->PlaneWireToChannel(wireid);
 }
 
+// https://github.com/DUNE/protoduneana/blob/develop/protoduneana/Utilities/ProtoDUNETruthUtils.cxx#L105
+vector<art::Ptr<recob::Hit>> ana::Mitrees::GetHits(detinfo::DetectorClocksData const& clockData, simb::MCParticle const& mpc, vector<art::Ptr<recob::Hit>> const& vp_hit) {
+    vector<art::Ptr<recob::Hit>> vp_mcp_hit;
+    for (art::Ptr<recob::Hit> const& p_hit : vp_hit ) {
+        for (sim::TrackIDE const& tid : bt_serv->HitToTrackIDEs(clockData, p_hit)) {
+            // if (tid.trackID == mpc.TrackId()) {
+            // if (pi_serv->TrackIdToParticle_P(tid.trackID) == &mpc) {
+            if (pi_serv->TrackIdToParticle_P(tid.trackID) == pi_serv->TrackIdToParticle_P(mpc.TrackId())) {
+                vp_mcp_hit.push_back(p_hit);
+            }
+        }
+    }
+    return vp_mcp_hit;
+}
+
+// https://github.com/DUNE/protoduneana/blob/develop/protoduneana/Utilities/ProtoDUNETruthUtils.cxx#L610
+// https://github.com/DUNE/protoduneana/blob/develop/protoduneana/Utilities/ProtoDUNETruthUtils.cxx#L407
+// https://github.com/DUNE/protoduneana/blob/develop/protoduneana/Utilities/ProtoDUNETrackUtils.cxx#L95
+// https://github.com/DUNE/protoduneana/blob/develop/protoduneana/Utilities/ProtoDUNETruthUtils.cxx#L238
+simb::MCParticle const* ana::Mitrees::GetMCParticle(detinfo::DetectorClocksData const& clockData, art::Ptr<recob::Track> const& p_trk, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
+    vector<art::Ptr<recob::Hit>> vp_hit = fmp_trk2hit.at(p_trk.key());
+    // int i_max_ide_energy = 0;
+    // float max_ide_energy = 0;
+    std::unordered_map<simb::MCParticle const*, float> um_mcp_energy;
+    for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        for (sim::TrackIDE const& tid : bt_serv->HitToTrackIDEs(clockData, p_hit)) {
+            um_mcp_energy[pi_serv->TrackIdToParticle_P(tid.trackID)] += tid.energy;
+            
+            // if (tid.energy > max_ide_energy) {
+            //     max_ide_energy = tid.energy;
+            //     i_max_ide_energy = tid.trackID;
+            // }
+        }
+    }
+    float max_energy = 0;
+    simb::MCParticle const* max_mcp = nullptr;
+    for (std::pair<simb::MCParticle const*, float> p : um_mcp_energy) {
+        if (p.second > max_energy) {
+            max_energy = p.second;
+            max_mcp = p.first;
+        }
+    }
+    return max_mcp;
+}
+
+bool ana::Mitrees::IsInVolume(double x, double y, double z, float eps) {
+    geo::CryostatID cryoid{0};
+    geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+    return (x-eps > asGeo->TPC(tpcid0).MinX() and x+eps < asGeo->TPC(tpcidN).MaxX() and
+            y-eps > asGeo->TPC(tpcid0).MinY() and y+eps < asGeo->TPC(tpcidN).MaxY() and
+            z-eps > asGeo->TPC(tpcid0).MinZ() and z+eps < asGeo->TPC(tpcidN).MaxZ());   
+}
+bool ana::Mitrees::IsInVolume(float x, float y, float z, float eps) {
+    return IsInVolume(double(x), double(y), double(z), double(eps));
+}
+template<class Vec>
+bool ana::Mitrees::IsInVolume(Vec const& V, float eps) {
+    return IsInVolume(V.X(), V.Y(), V.Z(), eps);
+}
+// bool ana::Mitrees::IsInVolume(TLorentzVector const& V, float eps) {
+//     return IsInVolume(V.X(), V.Y(), V.Z(), double(eps));
+// }
+// bool ana::Mitrees::IsInVolume(geo::Point_t const& P) {
+//     return IsInVolume(P.X(), P.Y(), P.Z(), 0.);
+// }
+bool ana::Mitrees::IsUpright(recob::Track const& T) {
+    return T.Start().X() > T.End().X();
+}
+
+
+
 
 bool ana::Mitrees::Logging(bool cond, int tab, string msg, string succ, string fail) {
     if (iLogLevel >= iFlagDetails) {
@@ -567,11 +655,6 @@ bool ana::Mitrees::Logging(bool cond, int tab, string msg, string succ, string f
         else cout << "\033[91m" << fail << "\033[0m" << endl;
     }
     return cond;
-}
-
-// Upper triangle of a symmetric matrix
-int ana::Mitrees::iCorr(int n, int i, int j) {
-    return j - 1 + i*n - (i*(i+3))/2;
 }
 
 DEFINE_ART_MODULE(ana::Mitrees)

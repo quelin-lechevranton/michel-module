@@ -35,7 +35,7 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"]
             ]
 
-            LogLevel:       2
+            LogLevel:       1
             
             MichelTimeRadius: 10.
             MichelSpaceRadius: 20.
