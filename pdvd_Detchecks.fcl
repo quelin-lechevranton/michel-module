@@ -1,0 +1,32 @@
+#include "services_dune.fcl"
+#include "services_vdcoldbox.fcl" 
+#include "tools_dune.fcl"	
+
+process_name: RunDetchecks
+
+services: {
+    TFileService: { fileName: "pdvd_Detchecks_out.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::protodunevd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::protodunevd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "Detchecks"
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}

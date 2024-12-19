@@ -35,11 +35,13 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"]
             ]
 
-            LogLevel:       2
+            LogLevel:       1
             
-            MichelTimeRadius: 10.
-            MichelSpaceRadius: 20.
-            LengthCut: 20.
+            MichelTimeRadius: 150.
+            MichelSpaceRadius: 60.
+            TrackLengthCut: 20.
+
+            NEventDiagnostic: 40
         }
     }
     ana: [ checks ]

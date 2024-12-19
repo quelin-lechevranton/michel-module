@@ -37,8 +37,9 @@ physics: {
 
             LogLevel:  2
             
-            LengthCut: 20.
+            TrackLengthCut: 20.
             MichelSpaceRadius: 20.
+            MichelTimeRadius: 50.
         }
     }
     ana: [ checks ]

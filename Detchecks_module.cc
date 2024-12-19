@@ -119,14 +119,11 @@ private:
 
 
 ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p},
-    iLogLevel(p.get<int>("LogLevel")),
-    vvsProducts(p.get<vector<vector<string>>>("Products")),
+    : EDAnalyzer{p}
+    // iLogLevel(p.get<int>("LogLevel")),
 
-    fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
-    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
-
-    fTrackLengthCut(p.get<float>("LengthCut")) // in cm
+    // fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
+    // fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
 {
 
     // Basic Utilities
@@ -144,34 +141,66 @@ void ana::Detchecks::analyze(art::Event const& e)
 
 void ana::Detchecks::beginJob()
 {
-    // auto const clockData = asDetClocks->DataForJob();
-    // auto const detProp = asDetProp->DataForJob(clockData);
+    auto const clockData = asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(clockData);
 
-    if (iLogLevel >= iFlagDetails) {
-        geo::CryostatID cryoid{0};
-        cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
-             << "Number of channels: " << asWire->Nchannels() << endl
-             << "Number of ticks: " << "???" << endl
-             << "Cryostat coordinates: " << asGeo->Cryostat(cryoid).Min() << " - " << asGeo->Cryostat(cryoid).Max() << endl
-             << "\tvolume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << endl;
-        geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
-        cout << "\tactive coordinates: " << asGeo->TPC(tpcid0).Min() << " - " << asGeo->TPC(tpcidN).Max() << endl
-             << "\tactive volume: " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).X() << " x " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).Y() << " x " << (asGeo->TPC(tpcid0).Max() - asGeo->TPC(tpcidN).Min()).Z() << endl
-             << "TPCs:" << endl; 
-        for (unsigned int tpc=0; tpc < asGeo->NTPC(); tpc++) {
-            geo::TPCID tpcid{cryoid, tpc};
-            cout << "\tTPC#" << tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << endl
-                 << "\t\tvolume: " << asGeo->TPC(tpcid).Width() << " x " << asGeo->TPC(tpcid).Height() << " x " << asGeo->TPC(tpcid).Length() << endl
-                 << "\t\tactive volume: " << asGeo->TPC(tpcid).ActiveWidth() << " x " << asGeo->TPC(tpcid).ActiveHeight() << " x " << asGeo->TPC(tpcid).ActiveLength() << endl
-                 << "\t\tPlanes:";
-            for (unsigned int plane=0; plane < asWire->Nplanes(); plane++) {
-                geo::PlaneID planeid{tpcid, plane};
-                cout << "\t" << 'U'+plane << " #Wires: " << asWire->Nwires(planeid);
-            } // end loop over Planes
-            cout << endl;
-        } // end loop over TPCs
-        cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << endl;
+    geo::CryostatID cryoid{0};
+    cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
+        << "Number of channels: " << asWire->Nchannels() << endl
+        << "Number of ticks: " << detProp.ReadOutWindowSize() << endl
+        << "Channel pitch: " << "(0.5)" << " cm/channel" << endl
+        << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << endl
+        << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << endl;
+
+    cout << "Cryostat:" << endl
+        << "\t" << "coordinates: " << asGeo->Cryostat(cryoid).Min() 
+                                    << " - " << asGeo->Cryostat(cryoid).Max() 
+                                    << endl
+        << "\t" << "volume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << endl;
+
+    geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+    cout << "\t" << "active coordinates: " << asGeo->TPC(tpcid0).Min() 
+                                    << " - " << asGeo->TPC(tpcidN).Max() 
+                                    << endl
+        << "\t" << "active volume: "  << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).X() 
+                                    << " x " << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).Y() 
+                                    << " x " << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).Z() 
+                                    << endl
+        << "TPCs:" << endl; 
+    for (unsigned int tpc=0; tpc < asGeo->NTPC(); tpc++) {
+        geo::TPCID tpcid{cryoid, tpc};
+        cout << "\t" << "TPC#" << tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << endl
+                << "\t\t" << "volume: " << asGeo->TPC(tpcid).Width() << " x " << asGeo->TPC(tpcid).Height() << " x " << asGeo->TPC(tpcid).Length() << endl
+                << "\t\t" << "active volume: " << asGeo->TPC(tpcid).ActiveWidth() << " x " << asGeo->TPC(tpcid).ActiveHeight() << " x " << asGeo->TPC(tpcid).ActiveLength() << endl
+                << "\t\t" << "Planes:";
+        for (unsigned int plane=0; plane < asWire->Nplanes(); plane++) {
+            geo::PlaneID planeid{tpcid, plane};
+            cout << "\t" << char('U'+plane) << " #Wires: " << asWire->Nwires(planeid);
+        } // end loop over Planes
+        cout << endl;
+
+        geo::PlaneID collectionid{tpcid, geo::kW};
+        unsigned int minchan = asWire->Nchannels();
+        unsigned int maxchan = 0;
+        for (unsigned int wire=0; wire < asWire->Nwires(collectionid); wire++) {
+            geo::WireID wireid{collectionid, wire};
+            if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID) continue;
+            unsigned int chan = asWire->PlaneWireToChannel(wireid);
+            if (chan < minchan) minchan = chan;
+            if (chan > maxchan) maxchan = chan;
+        } // end loop over Wires
+        cout << "\t\t" << "W plane Channel range: " << minchan << " - " << maxchan << endl;
+        cout << endl;
+    } // end loop over TPCs
+
+    int p = -1;
+    for (unsigned int chan=0; chan < asWire->Nchannels(); chan++) {
+        int plane = asWire->View(raw::ChannelID_t(chan));
+        if (plane == p) continue;
+        cout << "Channel#" << chan << " onward is from " << char('U'+plane) << " plane" << endl;
+        p = plane;
     }
+    cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << endl;
 } // end beginJob
 
 
