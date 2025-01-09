@@ -23,14 +23,14 @@
 #include "larsim/MCCheater/ParticleInventoryService.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
-#include "nusimdata/SimulationBase/MCTruth.h"
-#include "nusimdata/SimulationBase/MCParticle.h"
-#include "lardataobj/Simulation/SimEnergyDeposit.h"
+// #include "nusimdata/SimulationBase/MCTruth.h"
+// #include "nusimdata/SimulationBase/MCParticle.h"
+// #include "lardataobj/Simulation/SimEnergyDeposit.h"
 
-#include "lardataobj/RecoBase/Hit.h"
-#include "lardataobj/RecoBase/Wire.h"
-#include "lardataobj/RecoBase/Track.h"
-#include "lardataobj/RecoBase/SpacePoint.h"
+// #include "lardataobj/RecoBase/Hit.h"
+// #include "lardataobj/RecoBase/Wire.h"
+// #include "lardataobj/RecoBase/Track.h"
+// #include "lardataobj/RecoBase/SpacePoint.h"
 
 #include "larcore/Geometry/Geometry.h"
 #include "larcore/Geometry/WireReadout.h"
@@ -38,40 +38,21 @@
 #include "larcorealg/Geometry/Exceptions.h"
 
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
-#include "lardata/ArtDataHelper/TrackUtils.h"
 
 // ProtoDUNE includes
-#include "protoduneana/Utilities/ProtoDUNETrackUtils.h"
-#include "protoduneana/Utilities/ProtoDUNETruthUtils.h"
-#include "protoduneana/Utilities/ProtoDUNEPFParticleUtils.h"
+// #include "protoduneana/Utilities/ProtoDUNETrackUtils.h"
+// #include "protoduneana/Utilities/ProtoDUNETruthUtils.h"
+// #include "protoduneana/Utilities/ProtoDUNEPFParticleUtils.h"
 
 // ROOT includes
-#include "TLorentzVector.h"
-#include "TTree.h"
-#include "TCanvas.h"
-#include "TH1F.h"
-#include "TH2F.h"
-#include "TLine.h"
-#include "TGraph.h"
-#include "TGraph2D.h"
-#include "TEllipse.h"
+
 
 // std includes
 #include <iostream>
 #include <sstream>
-#include <vector>
-#include <string>
-#include <iterator>
-
-using std::cerr;
-using std::cout;
-using std::endl;
-using std::flush;
-using std::vector;
-using std::string;
-using std::min;
-using std::max;
-
+// #include <vector>
+// #include <string>
+// #include <iterator>
 
 namespace ana {
   class Detchecks;
@@ -115,6 +96,9 @@ private:
     float fADCtoE = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
     float fChannelPitch = 0.5; // cm/channel
 
+    geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
+    raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
+
 };
 
 
@@ -145,39 +129,41 @@ void ana::Detchecks::beginJob()
     auto const detProp = asDetProp->DataForJob(clockData);
 
     geo::CryostatID cryoid{0};
-    cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << endl
-        << "Number of channels: " << asWire->Nchannels() << endl
-        << "Number of ticks: " << detProp.ReadOutWindowSize() << endl
-        << "Channel pitch: " << "(0.5)" << " cm/channel" << endl
-        << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << endl
-        << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << endl;
+    std::cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << std::endl
+        << "Detector name: " << asGeo->DetectorName() << std::endl
+        << "Number of channels: " << asWire->Nchannels() << std::endl
+        << "Number of ticks: " << detProp.ReadOutWindowSize() << std::endl
+        << "Channel pitch: " << "(0.5)" << " cm/channel" << std::endl
+        << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << std::endl
+        << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << std::endl;
 
-    cout << "Cryostat:" << endl
+    std::cout << "Cryostat:" << std::endl
         << "\t" << "coordinates: " << asGeo->Cryostat(cryoid).Min() 
                                     << " - " << asGeo->Cryostat(cryoid).Max() 
-                                    << endl
-        << "\t" << "volume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << endl;
+                                    << std::endl
+        << "\t" << "volume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << std::endl;
 
-    geo::TPCID tpcid0{cryoid, 0}, tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
-    cout << "\t" << "active coordinates: " << asGeo->TPC(tpcid0).Min() 
-                                    << " - " << asGeo->TPC(tpcidN).Max() 
-                                    << endl
-        << "\t" << "active volume: "  << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).X() 
-                                    << " x " << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).Y() 
-                                    << " x " << (asGeo->TPC(tpcidN).Max() - asGeo->TPC(tpcid0).Min()).Z() 
-                                    << endl
-        << "TPCs:" << endl; 
+    geo::TPCID tpcid0{cryoid, 0};
+    geo::TPCID tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+
+    geo::TPCGeo tpcgeo0 = asGeo->TPC(tpcid0);
+    geo::TPCGeo tpcgeoN = asGeo->TPC(tpcidN);
+    std::cout << "\t" << "active coordinates: " << tpcgeo0.Min() << " - " << tpcgeoN.Max() << std::endl;
+    geo::Vector_t diag = tpcgeoN.Max() - tpcgeo0.Min();
+    std::cout << "\t" << "active volume: "  << diag.X() << " x " << diag.Y() << " x " << diag.Z() << std::endl;
+
+    std::cout << "TPCs:" << std::endl; 
     for (unsigned int tpc=0; tpc < asGeo->NTPC(); tpc++) {
         geo::TPCID tpcid{cryoid, tpc};
-        cout << "\t" << "TPC#" << tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << endl
-                << "\t\t" << "volume: " << asGeo->TPC(tpcid).Width() << " x " << asGeo->TPC(tpcid).Height() << " x " << asGeo->TPC(tpcid).Length() << endl
-                << "\t\t" << "active volume: " << asGeo->TPC(tpcid).ActiveWidth() << " x " << asGeo->TPC(tpcid).ActiveHeight() << " x " << asGeo->TPC(tpcid).ActiveLength() << endl
+        std::cout << "\t" << "TPC#" << tpc << "\tcoordinates: " << asGeo->TPC(tpcid).Min() << " - " << asGeo->TPC(tpcid).Max() << std::endl
+                << "\t\t" << "volume: " << asGeo->TPC(tpcid).Width() << " x " << asGeo->TPC(tpcid).Height() << " x " << asGeo->TPC(tpcid).Length() << std::endl
+                << "\t\t" << "active volume: " << asGeo->TPC(tpcid).ActiveWidth() << " x " << asGeo->TPC(tpcid).ActiveHeight() << " x " << asGeo->TPC(tpcid).ActiveLength() << std::endl
                 << "\t\t" << "Planes:";
         for (unsigned int plane=0; plane < asWire->Nplanes(); plane++) {
             geo::PlaneID planeid{tpcid, plane};
-            cout << "\t" << char('U'+plane) << " #Wires: " << asWire->Nwires(planeid);
+            std::cout << "\t" << char('U'+plane) << " #Wires: " << asWire->Nwires(planeid);
         } // end loop over Planes
-        cout << endl;
+        std::cout << std::endl;
 
         geo::PlaneID collectionid{tpcid, geo::kW};
         unsigned int minchan = asWire->Nchannels();
@@ -189,18 +175,88 @@ void ana::Detchecks::beginJob()
             if (chan < minchan) minchan = chan;
             if (chan > maxchan) maxchan = chan;
         } // end loop over Wires
-        cout << "\t\t" << "W plane Channel range: " << minchan << " - " << maxchan << endl;
-        cout << endl;
+        std::cout << "\t\t" << "W plane Channel range: " << minchan << " - " << maxchan << std::endl;
+        std::cout << std::endl;
     } // end loop over TPCs
+
+    std::cout << "----------------------TEST----------------------" << std::endl;
 
     int p = -1;
     for (unsigned int chan=0; chan < asWire->Nchannels(); chan++) {
         int plane = asWire->View(raw::ChannelID_t(chan));
         if (plane == p) continue;
-        cout << "Channel#" << chan << " onward is from " << char('U'+plane) << " plane" << endl;
+        std::cout << "Channel#" << chan << " onward is from " << char('U'+plane) << " plane" << std::endl;
         p = plane;
     }
-    cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << endl;
+
+    std::cout << "----------------------TEST----------------------" << std::endl;
+
+    geo::WireID wireid{geo::PlaneID{tpcid0, geo::kW}, 0};
+    geo::WireID wireid1{geo::PlaneID{tpcid0, geo::kW}, 1};
+    geo::WireGeo const wiregeo = asWire->Wire(wireid);
+    geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
+
+    std::cout << "channel: " << asWire->PlaneWireToChannel(wireid) << " " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
+    std::cout << "\t" << "pitch: " << geo::WireGeo::WirePitch(wiregeo, wiregeo1) << std::endl;
+    std::cout << "=====================" << std::endl;
+    std::cout << wiregeo.WireInfo() << std::endl;
+
+    std::vector<double> pitch;
+    for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
+        geo::TPCID tpcid{cryoid, tpc};
+        geo::PlaneID planeid{tpcid, geo::kW};
+
+        for (unsigned int wire=0; wire<asWire->Nwires(planeid)-1; wire++) {
+            geo::WireID wireid{planeid, wire};
+            geo::WireID wireid1{planeid, wire+1};
+            if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID || asWire->PlaneWireToChannel(wireid1) == raw::InvalidChannelID) {
+                std::cerr << "\033[91m" << "ERROR: Invalid channel for collection wire " << wire << " in TPC " << tpc << "\033[0m" << std::endl;
+                continue;
+            }
+            geo::WireGeo const wiregeo = asWire->Wire(wireid);
+            geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
+            pitch.push_back(geo::WireGeo::WirePitch(wiregeo, wiregeo1));
+        }
+    }
+
+    std::cout << "----------------------TEST----------------------" << std::endl;
+
+    std::sort(pitch.begin(), pitch.end());
+    pitch.erase(std::unique(pitch.begin(), pitch.end()), pitch.end());
+    for (double p : pitch) {
+        std::cout << "collection pitch: " << p << std::endl;
+    }
+
+    std::cout << "----------------------TEST----------------------" << std::endl;
+
+    geo::BoxBoundedGeo::Coord_t y0 = tpcgeo0.Min().Y();
+    geo::BoxBoundedGeo::Coord_t yN = tpcgeoN.Max().Y();
+    geo::BoxBoundedGeo::Coord_t z0 = tpcgeo0.Min().Z();
+    geo::BoxBoundedGeo::Coord_t zN = tpcgeoN.Max().Z();
+
+    const unsigned int n = 10;
+    const double dy = (yN - y0) / n;
+    const double dz = (zN - z0) / n;
+
+    for (unsigned int i=0; i<=n; i++) {
+        for (unsigned int j=0; j<=n; j++) {
+            double y = y0 + j*dy;
+            double z = z0 + i*dz;
+
+            geo::Point_t pt_low = {-50, y, z};
+            geo::Point_t pt_upp = {50, y, z};
+
+            raw::ChannelID_t ch_low = GetChannel(pt_low, geo::kW);
+            raw::ChannelID_t ch_upp = GetChannel(pt_upp, geo::kW);
+
+            std::cout << "(Y,Z)=(" << y << "," << z << ")" << "\r" << std::flush;
+            std::cout << std::string(4,'\t') << "LOW: ch: " << ch_low << "\r" << std::flush;
+            std::cout << std::string(7,'\t') << "UPP: ch: " << ch_upp << std::endl;
+        }
+    }
+        
+
+    std::cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << std::endl;
 } // end beginJob
 
 
@@ -209,5 +265,22 @@ void ana::Detchecks::endJob()
 
 } // end endJob
 
+geo::WireID ana::Detchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
+    geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
+    if (!tpcid.isValid) return geo::WireID();
+    geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
+    geo::WireID wireid;
+    try {
+        wireid = planegeo.NearestWireID(P);
+    } catch (geo::InvalidWireError const& e) {
+        return e.suggestedWireID();
+    }
+    return wireid;
+}
+raw::ChannelID_t ana::Detchecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
+    geo::WireID wireid = GetWireID(P, plane);
+    if (!wireid.isValid) return raw::InvalidChannelID;
+    return asWire->PlaneWireToChannel(wireid);
+}
 
 DEFINE_ART_MODULE(ana::Detchecks)

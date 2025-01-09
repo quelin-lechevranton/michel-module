@@ -524,7 +524,7 @@ void ana::Michecks::analyze(art::Event const& e)
             if (!Log(mcp_dau, kDetails, 2, "id to mcp...", "done", "failed")
             ) continue;
 
-            if (!Log(abs(mcp_dau->PdgCode()) == 11 || mcp_dau->Process() != "Decay", kDetails, 2, "is michel...", "yes", "no")
+            if (!Log(abs(mcp_dau->PdgCode()) == 11 && mcp_dau->Process() == "Decay", kDetails, 2, "is michel...", "yes", "no")
             ) continue;
 
             if (!Log(IsInVolume(mcp_dau->Position(0), fMichelSpaceRadius), kDetails, 2, "is inside...", "yes", "no")
