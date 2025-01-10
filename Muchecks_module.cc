@@ -152,9 +152,11 @@ private:
                     tag_spt;
 
     // Input Variables
-    // float fMichelTimeRadius, // in µs
     float fMichelSpaceRadius; // in cm
     float fTrackLengthCut; // in cm
+    float fMichelTimeRadius; // in µs
+    float fMichelTickRadius; // in ticks
+    int fMichelChannelRadius; // in channels
 
     bool fKeepOutside,
          fKeepNonDecaying;
@@ -229,6 +231,8 @@ private:
     ana::Binning binTick;
     std::vector<ana::Binning> binChan; //[section]
     std::vector<ana::Binning> chanTPC; //[tpc]
+
+    std::map<int, float> mapChanZ;
 
     // Functions
     void resetEvent();
@@ -379,6 +383,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
         binChan[s].min = asWire->PlaneWireToChannel(geo::WireID{planeid1, 0});
         binChan[s].max = asWire->PlaneWireToChannel(geo::WireID{palenid2, asWire->Nwires(palenid2)-1});
         binChan[s].n = binChan[s].max - binChan[s].min + 1;
+        
         if (iLogLevel >= kDetails) std::cout << "S#" << s << " channel range: " << binChan[s].min << " - " << binChan[s].max << std::endl;
     }
 
@@ -389,14 +394,23 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
         chanTPC[tpc].min = asWire->PlaneWireToChannel(geo::WireID{planeid, 0});
         chanTPC[tpc].max = asWire->PlaneWireToChannel(geo::WireID{planeid, asWire->Nwires(planeid)-1});
         chanTPC[tpc].n = chanTPC[tpc].max - chanTPC[tpc].min + 1;
+
         if (iLogLevel >= kDetails) std::cout << "TPC#" << tpc << " channel range: " << chanTPC[tpc].min << " - " << chanTPC[tpc].max << std::endl;
+
+        for (unsigned int w=0; w<asWire->Nwires(planeid); w++) {
+            geo::WireID const wireid = geo::WireID{planeid, w};
+            geo::WireGeo const wiregeo = asWire->Wire(wireid);
+            mapChanZ[asWire->PlaneWireToChannel(wireid)] = wiregeo.GetStart().Z();
+
+            if (iLogLevel >= kDetails) std::cout << "\t" << "Channel#" << asWire->PlaneWireToChannel(wireid) << " Z: " << wiregeo.GetStart().Z() << std::endl;
+        }
     }
 
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
-    float fMichelTimeRadius = fMichelSpaceRadius / fDriftVelocity;
-    float fMichelTickRadius = fMichelTimeRadius / fSamplingRate;
-    int fMichelChannelRadius = int(fMichelSpaceRadius / fChannelPitch);
+    fMichelTimeRadius = fMichelSpaceRadius / fDriftVelocity;
+    fMichelTickRadius = fMichelTimeRadius / fSamplingRate;
+    fMichelChannelRadius = int(fMichelSpaceRadius / fChannelPitch);
 
     if (iLogLevel >= kDetails) {
         std::cout << "fMichelSpaceRadius: " << fMichelSpaceRadius << " cm" << std::endl;
@@ -423,8 +437,8 @@ void ana::Muchecks::analyze(art::Event const& e)
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
-    float fMichelTickRadius = fMichelTimeRadius / fSamplingRate;
-    int fMichelChannelRadius = int(fMichelSpaceRadius / fChannelPitch);
+    fMichelTickRadius = fMichelTimeRadius / fSamplingRate;
+    fMichelChannelRadius = int(fMichelSpaceRadius / fChannelPitch);
 
     auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     std::vector<art::Ptr<recob::Hit>> vp_hit;
