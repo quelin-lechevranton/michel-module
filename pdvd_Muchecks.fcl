@@ -35,7 +35,7 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"]
             ]
 
-            LogLevel: 3
+            LogLevel: 2
             
             TrackLengthCut: 40.
             MichelSpaceRadius: 20.
