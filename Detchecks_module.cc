@@ -27,7 +27,8 @@
 // #include "nusimdata/SimulationBase/MCParticle.h"
 // #include "lardataobj/Simulation/SimEnergyDeposit.h"
 
-// #include "lardataobj/RecoBase/Hit.h"
+#include "larcoreobj/SimpleTypesAndConstants/RawTypes.h"
+#include "lardataobj/RecoBase/Hit.h"
 // #include "lardataobj/RecoBase/Wire.h"
 // #include "lardataobj/RecoBase/Track.h"
 // #include "lardataobj/RecoBase/SpacePoint.h"
@@ -254,7 +255,6 @@ void ana::Detchecks::beginJob()
             std::cout << std::string(7,'\t') << "UPP: ch: " << ch_upp << std::endl;
         }
     }
-        
 
     std::cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << std::endl;
 } // end beginJob

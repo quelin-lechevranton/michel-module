@@ -276,6 +276,9 @@ private:
     geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
     raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
 
+    bool IsInUpperVolume(raw::ChannelID_t ch);
+    bool IsInLowerVolume(raw::ChannelID_t ch);
+
     bool IsInVolume(double x, double y, double z, float eps);
     bool IsInUpperVolume(double x, double y, double z, float eps);
     bool IsInLowerVolume(double x, double y, double z, float eps);
@@ -550,73 +553,60 @@ void ana::Muchecks::analyze(art::Event const& e)
 
 
         // tacking min of ticks in lower volume and max of ticks in upper volume
-        float TickUpMax = 0;
-        float TickLowMin = detProp.ReadOutWindowSize();
-        int ChanUpMax = -1;
-        int ChanLowMin = -1;
+        float TickUpMax = 0, TickLowMin = detProp.ReadOutWindowSize();
+        recob::Hit const *HitUpMax = nullptr, *HitLowMin = nullptr;
+        // recob::Hit const* HitLowMin = new recob::Hit(raw::TDCtick_t(0), raw::TDCtick_t(0), raw::InvalidChannelID, detProp.ReadOutWindowSize(), 0., 0., 0., 0., 0., 0., 0., 0., 0, 0, 0., 0, geo::View_t(0), geo::SigType_t(0), geo::WireID());
 
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             if (p_hit_muon->View() != geo::kW) continue;
 
-            // upper volume (section 2 and 3) 
-            if (p_hit_muon->Channel() > binChan[1].max) {
-                if (p_hit_muon->PeakTime() > TickUpMax) {
-                    TickUpMax = p_hit_muon->PeakTime();
-                    ChanUpMax = p_hit_muon->Channel();
-                }
+            if (IsInUpperVolume(p_hit_muon->Channel()) && p_hit_muon->PeakTime() > TickUpMax) {
+                TickUpMax = p_hit_muon->PeakTime();
+                HitUpMax = p_hit_muon.get();
             }
 
-            // lower volume (section 0 and 1)
-            if (p_hit_muon->Channel() < binChan[2].min) {
-                if (p_hit_muon->PeakTime() < TickLowMin) {
-                    TickLowMin = p_hit_muon->PeakTime();
-                    ChanLowMin = p_hit_muon->Channel();
-                }
+            if (IsInLowerVolume(p_hit_muon->Channel()) && p_hit_muon->PeakTime() < TickLowMin) {
+                TickLowMin = p_hit_muon->PeakTime();
+                HitLowMin = p_hit_muon.get();
             }
         }
 
 
         if (iLogLevel >= kDetails) {
-            if (ChanUpMax == -1) std::cout << "\t" << "\033[91m" << "no hit in upper volume" << "\033[0m" << std::endl;
+            if (HitUpMax->Channel() == raw::InvalidChannelID) std::cout << "\t" << "\033[91m" << "no hit in upper volume" << "\033[0m" << std::endl;
             else {
-                std::cout << "\t" << "up max channel: " << "\033[93m" << ChanUpMax << "\033[0m" << std::endl;
-                std::cout << "\t" << "up max tick: " << "\033[93m" << TickUpMax << "\033[0m" << std::endl;
+                std::cout << "\t" << "up max channel: " << "\033[93m" << HitUpMax->Channel() << "\033[0m" << std::endl;
+                std::cout << "\t" << "up max tick: " << "\033[93m" << HitUpMax->PeakTime() << "\033[0m" << std::endl;
             }
             std::cout << "\t" << "------------------------------------------------" << std::endl;
-            if (ChanLowMin == -1) std::cout << "\t" << "\033[91m" << "no hit in lower volume" << "\033[0m" << std::endl;
+            if (HitLowMin->Channel() == raw::InvalidChannelID) std::cout << "\t" << "\033[91m" << "no hit in lower volume" << "\033[0m" << std::endl;
             else {
-                std::cout << "\t" << "low min channel: " << "\033[93m" << ChanLowMin << "\033[0m" << std::endl;
-                std::cout << "\t" << "low min tick: " << "\033[93m" << TickLowMin << "\033[0m" << std::endl;
+                std::cout << "\t" << "low min channel: " << "\033[93m" << HitLowMin->Channel() << "\033[0m" << std::endl;
+                std::cout << "\t" << "low min tick: " << "\033[93m" << HitLowMin->PeakTime() << "\033[0m" << std::endl;
             }
             std::cout << "\t" << "------------------------------------------------" << std::endl;
         }
 
 
         // Muon End is 
-        if (ChanLowMin == -1) {
-            // if no hit in lower volume, muon end is in upper volume
-
-            // if no hit at all, continue
-            if (ChanUpMax == -1) continue;
-
-            else {
-                MuonEnd = GetHit(ChanUpMax, TickUpMax, 0);
-            }
-        } else {
-            // if there is hit in lower volume, muon end is in lower volume
-            MuonEnd = GetHit(ChanLowMin, TickLowMin, 0);
-        }
+        // if no hit in lower volume, muon end is in upper volume
+        // if no hit at all, continue
+        // if there is hit in lower volume, muon end is in lower volume
+        if (HitLowMin->Channel() == raw::InvalidChannelID) {
+            if (HitUpMax->Channel() == raw::InvalidChannelID) continue;
+            else MuonEnd = GetHit(*HitUpMax);
+        } else MuonEnd = GetHit(*HitLowMin); 
 
         // getting track end point
-        geo::Point_t end;
-        if (IsUpright(*p_trk)) end = p_trk->End();
-        else end = p_trk->Start();
+        geo::Point_t EndPoint;
+        if (IsUpright(*p_trk)) EndPoint = p_trk->End();
+        else EndPoint = p_trk->Start();
 
         // three fiducial checks
         bool isInWindow = IsInsideWindow(MuonEnd.tick, fMichelTickRadius);
         bool isInVolumeZ = IsInsideZ(MuonEnd.Z, fMichelSpaceRadius);
         // dummy X to put it in upper volume, only check Y and Z
-        bool isInVolumeYZ = IsInUpperVolume(50., end.Y(), end.Z(), fMichelSpaceRadius);
+        bool isInVolumeYZ = IsInUpperVolume(50., EndPoint.Y(), EndPoint.Z(), fMichelSpaceRadius);
 
         Log(isInWindow, kDetails, 1, Form("is in window (±%.1f ticks)...", fMichelTickRadius), "yes", "no");
         Log(isInVolumeZ, kDetails, 1, Form("is in volumeZ (±%.1f cm)...", fMichelSpaceRadius), "yes", "no");
@@ -951,22 +941,18 @@ ana::Hit ana::Muchecks::GetHit(int c, float t, float a) {
 ana::Hit ana::Muchecks::GetHit(recob::Hit const& hit) {
     return ana::Hit(GetSlice(hit.Channel()), mapChanZ[hit.Channel()], hit.Channel(), hit.PeakTime(), hit.Integral());
 }
-
 unsigned int ana::Muchecks::GetSlice(int ch) {
-    for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
-        if (chanTPC[tpc].min <= ch and ch <= chanTPC[tpc].max) {
-            unsigned int slice = tpc/4 * 2 + tpc % 2;
-            return slice;
-        }
-    }
-    std::cerr << "Error: channel " << ch << " not in any slice" << std::endl;
-    return 8;
+    std::vector<geo::WireID> wids = asWire->ChannelToWire(ch);
+    if (wids.size() == 0) return 8;
+    geo::TPCID::TPCID_t tpc = wids.at(0).TPC;
+    if (tpc == geo::TPCID::InvalidID) return 8;
+    return (unsigned int) (tpc/4 * 2 + tpc % 2);
 }
 size_t ana::Muchecks::GetSection(int ch) {
     return int(4.*ch / asWire->Nchannels());
 }
 geo::View_t ana::Muchecks::GetPlane(raw::ChannelID_t ch, int sec) {
-    return static_cast<geo::View_t>(12.*ch / asWire->Nchannels() - 3*sec);
+    return geo::View_t(12.*ch / asWire->Nchannels() - 3*sec);
 }
 geo::WireID ana::Muchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
     geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
@@ -985,6 +971,17 @@ raw::ChannelID_t ana::Muchecks::GetChannel(geo::Point_t const& P, geo::View_t pl
     if (!wireid.isValid) return raw::InvalidChannelID;
     return asWire->PlaneWireToChannel(wireid);
 }
+
+
+bool ana::Muchecks::IsInUpperVolume(raw::ChannelID_t ch) {
+    if (ch == raw::InvalidChannelID) return false;
+    return ch > binChan[1].max;
+}
+bool ana::Muchecks::IsInLowerVolume(raw::ChannelID_t ch) {
+    if (ch == raw::InvalidChannelID) return false;
+    return ch < binChan[2].min;
+}
+    
 
 bool ana::Muchecks::IsInLowerVolume(double x, double y, double z, float eps) {
     geo::CryostatID cryoid{0};
@@ -1030,7 +1027,6 @@ double ana::Muchecks::Dist(TLorentzVector u, TLorentzVector v) {
     double Z = u.Z() - v.Z();
     return X*X + Y*Y + Z*Z;
 }
-
 bool ana::Muchecks::IsInsideWindow(float tick, float eps) {
     return binTick.min + eps < tick and tick < binTick.max - eps;
 }
