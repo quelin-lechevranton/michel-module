@@ -573,13 +573,13 @@ void ana::Muchecks::analyze(art::Event const& e)
 
 
         if (iLogLevel >= kDetails) {
-            if (HitUpMax->Channel() == raw::InvalidChannelID) std::cout << "\t" << "\033[91m" << "no hit in upper volume" << "\033[0m" << std::endl;
+            if (!HitUpMax) std::cout << "\t" << "\033[91m" << "no hit in upper volume" << "\033[0m" << std::endl;
             else {
                 std::cout << "\t" << "up max channel: " << "\033[93m" << HitUpMax->Channel() << "\033[0m" << std::endl;
                 std::cout << "\t" << "up max tick: " << "\033[93m" << HitUpMax->PeakTime() << "\033[0m" << std::endl;
             }
             std::cout << "\t" << "------------------------------------------------" << std::endl;
-            if (HitLowMin->Channel() == raw::InvalidChannelID) std::cout << "\t" << "\033[91m" << "no hit in lower volume" << "\033[0m" << std::endl;
+            if (!HitLowMin) std::cout << "\t" << "\033[91m" << "no hit in lower volume" << "\033[0m" << std::endl;
             else {
                 std::cout << "\t" << "low min channel: " << "\033[93m" << HitLowMin->Channel() << "\033[0m" << std::endl;
                 std::cout << "\t" << "low min tick: " << "\033[93m" << HitLowMin->PeakTime() << "\033[0m" << std::endl;
@@ -592,8 +592,8 @@ void ana::Muchecks::analyze(art::Event const& e)
         // if no hit in lower volume, muon end is in upper volume
         // if no hit at all, continue
         // if there is hit in lower volume, muon end is in lower volume
-        if (HitLowMin->Channel() == raw::InvalidChannelID) {
-            if (HitUpMax->Channel() == raw::InvalidChannelID) continue;
+        if (!HitLowMin) {   
+            if (!HitUpMax) continue;
             else MuonEnd = GetHit(*HitUpMax);
         } else MuonEnd = GetHit(*HitLowMin); 
 
