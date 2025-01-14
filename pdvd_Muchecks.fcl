@@ -5,7 +5,7 @@
 process_name: RunMuchecks
 
 services: {
-    TFileService: { fileName: "pdvd_Muchecks_out.root" }
+    TFileService: { fileName: "pdvd_Muchecks_out_100_r20.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -35,11 +35,10 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"]
             ]
 
-            LogLevel: 2
+            LogLevel: 0
             
             TrackLengthCut: 40.
             MichelSpaceRadius: 20.
-            # MichelTimeRadius: 100.
 
             KeepOutside: true
             KeepNonDecaying: true

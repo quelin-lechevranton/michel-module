@@ -109,16 +109,23 @@ namespace ana {
             channel(c),
             tick(t), 
             adc(a) {}
+        
+        friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
+            os << "sl:" << hit.slice << " Z:" << hit.Z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
+            return os;
+        }
     };
     struct Hits {
+        unsigned int N;
         std::vector<unsigned int> slice;
         std::vector<float> Z;
         std::vector<int> channel;
         std::vector<float> tick;
         std::vector<float> adc;
 
-        Hits() : slice(), Z(), channel(), tick(), adc() {}
+        Hits() : N(0), slice(), Z(), channel(), tick(), adc() {}
         void push_back(Hit const& hit) {
+            N++;
             slice.push_back(hit.slice);
             Z.push_back(hit.Z);
             channel.push_back(hit.channel);
@@ -126,6 +133,7 @@ namespace ana {
             adc.push_back(hit.adc);
         }
         void clear() {
+            N = 0;
             slice.clear();
             Z.clear();
             channel.clear();
@@ -209,7 +217,6 @@ private:
 
     size_t iEvent=0;
 
-    size_t EventNHit;
     ana::Hits EventHits; //[hit]
 
     size_t EventNMuon;
@@ -217,6 +224,7 @@ private:
 
     // enum Tag { kMCP, kDaughters, kSphere, kTrue, kNTag };
     TTree* tMuon;
+    std::vector<TBranch*> brMuon, brMichel;
 
     size_t iMuon=0;
 
@@ -229,22 +237,21 @@ private:
     size_t MuonNTrackPoint;
     std::vector<float> MuonTrackPointX, MuonTrackPointY, MuonTrackPointZ;
 
+    float MuonEndPointY, MuonEndPointZ;
+
     ana::Hit MuonEnd;
     int MuonEndIsInWindow;
     int MuonEndIsInVolumeZ;
     int MuonEndIsInVolumeYZ;
 
-    size_t MuonNHit;
     ana::Hits MuonHits; //[hit]
 
     float MichelTrackLength;
     float MichelTrueEnergy;
     float MichelHitEnergy;
 
-    size_t MichelNHit;
     ana::Hits MichelHits; //[hit]
 
-    size_t SphereNHit;
     ana::Hits SphereHits; //[hit]
     float SphereEnergy;
 
@@ -266,9 +273,10 @@ private:
     // Functions
     void resetEvent();
     void resetMuon();
+    void resetMichel();
     bool Log(bool cond, int flag, int tab, std::string msg, std::string succ, std::string fail);
 
-    size_t GetSection(int ch);
+    unsigned int GetSection(int ch);
     unsigned int GetSlice(int ch);
     ana::Hit GetHit(int ch, float t, float a);
     ana::Hit GetHit(recob::Hit const& hit);
@@ -307,7 +315,6 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
     iLogLevel(p.get<int>("LogLevel")),
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
 
-    // fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
     fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
 
     fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
@@ -315,7 +322,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
     fKeepOutside(p.get<bool>("KeepOutside")),
     fKeepNonDecaying(p.get<bool>("KeepNonDecaying"))
 {
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::Muchecks: =============================================================" << "\033[0m" << std::endl;
+    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::Muchecks: ============================================================" << "\033[0m" << std::endl;
     // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -353,7 +360,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
     tEvent = tfs->make<TTree>("Event","");
 
     tEvent->Branch("iEvent", &iEvent);
-    tEvent->Branch("NHit", &EventNHit);
+    tEvent->Branch("NHit", &EventHits.N);
     tEvent->Branch("HitSlice", &EventHits.slice);
     tEvent->Branch("HitZ", &EventHits.Z);
     tEvent->Branch("HitChannel", &EventHits.channel);
@@ -365,62 +372,65 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
 
     tMuon = tfs->make<TTree>("Muon","");
 
-    tMuon->Branch("iEvent", &iEvent);
-    tMuon->Branch("iMuon", &iMuon);
+    brMuon.push_back(tMuon->Branch("iEvent", &iEvent));
+    brMuon.push_back(tMuon->Branch("iMuon", &iMuon));
 
-    tMuon->Branch("IsAnti", &MuonIsAnti);
-    tMuon->Branch("DoesDecay", &MuonDoesDecay);
-    tMuon->Branch("HasMichel", &MuonHasMichel);
+    brMuon.push_back(tMuon->Branch("IsAnti", &MuonIsAnti));
+    brMuon.push_back(tMuon->Branch("TrackLength", &MuonTrackLength));
+    brMuon.push_back(tMuon->Branch("DoesDecay", &MuonDoesDecay));
+    brMuon.push_back(tMuon->Branch("HasMichel", &MuonHasMichel));
 
-    tMuon->Branch("TrackLength", &MuonTrackLength);
+    brMuon.push_back(tMuon->Branch("NHit", &MuonHits.N));
+    brMuon.push_back(tMuon->Branch("HitSlice", &MuonHits.slice));
+    brMuon.push_back(tMuon->Branch("HitZ", &MuonHits.Z));
+    brMuon.push_back(tMuon->Branch("HitChannel", &MuonHits.channel));
+    brMuon.push_back(tMuon->Branch("HitTick", &MuonHits.tick));
+    brMuon.push_back(tMuon->Branch("HitADC", &MuonHits.adc));
 
-    tMuon->Branch("NTrackPoint", &MuonNTrackPoint);
-    tMuon->Branch("TrackPointX", &MuonTrackPointX);
-    tMuon->Branch("TrackPointY", &MuonTrackPointY);
-    tMuon->Branch("TrackPointZ", &MuonTrackPointZ);
+    brMuon.push_back(tMuon->Branch("NTrackPoint", &MuonNTrackPoint));
+    brMuon.push_back(tMuon->Branch("TrackPointX", &MuonTrackPointX));
+    brMuon.push_back(tMuon->Branch("TrackPointY", &MuonTrackPointY));
+    brMuon.push_back(tMuon->Branch("TrackPointZ", &MuonTrackPointZ));
 
-    tMuon->Branch("EndSlice", &MuonEnd.slice);
-    tMuon->Branch("EndZ", &MuonEnd.Z);
-    tMuon->Branch("EndChannel", &MuonEnd.channel);
-    tMuon->Branch("EndTick", &MuonEnd.tick);
+    brMuon.push_back(tMuon->Branch("EndPointY", &MuonEndPointY));
+    brMuon.push_back(tMuon->Branch("EndPointZ", &MuonEndPointZ));
 
-    tMuon->Branch("EndIsInWindow", &MuonEndIsInWindow);
-    tMuon->Branch("EndIsInVolumeZ", &MuonEndIsInVolumeZ);
-    tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ);
+    brMuon.push_back(tMuon->Branch("EndHitSlice", &MuonEnd.slice));
+    brMuon.push_back(tMuon->Branch("EndHitZ", &MuonEnd.Z));
+    brMuon.push_back(tMuon->Branch("EndHitChannel", &MuonEnd.channel));
+    brMuon.push_back(tMuon->Branch("EndHitTick", &MuonEnd.tick));
 
-    tMuon->Branch("NHit", &MuonNHit);
-    tMuon->Branch("HitSlice", &MuonHits.slice);
-    tMuon->Branch("HitZ", &MuonHits.Z);
-    tMuon->Branch("HitChannel", &MuonHits.channel);
-    tMuon->Branch("HitTick", &MuonHits.tick);
-    tMuon->Branch("HitADC", &MuonHits.adc);
+    brMuon.push_back(tMuon->Branch("EndIsInWindow", &MuonEndIsInWindow));
+    brMuon.push_back(tMuon->Branch("EndIsInVolumeZ", &MuonEndIsInVolumeZ));
+    brMuon.push_back(tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ));
 
-    tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
-    tMuon->Branch("MichelTrackLength", &MichelTrackLength);
-    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
 
-    tMuon->Branch("MichelNHit", &MichelNHit);
-    tMuon->Branch("MichelHitSlice", &MichelHits.slice);
-    tMuon->Branch("MichelHitZ", &MichelHits.Z);
-    tMuon->Branch("MichelHitChannel", &MichelHits.channel);
-    tMuon->Branch("MichelHitTick", &MichelHits.tick);
-    tMuon->Branch("MichelHitADC", &MichelHits.adc);
+    brMichel.push_back(tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy));
+    brMichel.push_back(tMuon->Branch("MichelTrackLength", &MichelTrackLength));
+    brMichel.push_back(tMuon->Branch("MichelHitEnergy", &MichelHitEnergy));
 
-    tMuon->Branch("SphereNHit", &SphereNHit);
-    tMuon->Branch("SphereHitSlice", &SphereHits.slice);
-    tMuon->Branch("SphereHitZ", &SphereHits.Z);
-    tMuon->Branch("SphereHitChannel", &SphereHits.channel);
-    tMuon->Branch("SphereHitTick", &SphereHits.tick);
-    tMuon->Branch("SphereHitADC", &SphereHits.adc);
+    brMichel.push_back(tMuon->Branch("MichelNHit", &MichelHits.N));
+    brMichel.push_back(tMuon->Branch("MichelHitSlice", &MichelHits.slice));
+    brMichel.push_back(tMuon->Branch("MichelHitZ", &MichelHits.Z));
+    brMichel.push_back(tMuon->Branch("MichelHitChannel", &MichelHits.channel));
+    brMichel.push_back(tMuon->Branch("MichelHitTick", &MichelHits.tick));
+    brMichel.push_back(tMuon->Branch("MichelHitADC", &MichelHits.adc));
 
-    tMuon->Branch("SphereEnergy", &SphereEnergy);
 
-    tMuon->Branch("SphereTruePositive", &SphereTruePositive);
-    tMuon->Branch("SphereFalsePositive", &SphereFalsePositive);
+    brMichel.push_back(tMuon->Branch("SphereNHit", &SphereHits.N));
+    brMichel.push_back(tMuon->Branch("SphereHitSlice", &SphereHits.slice));
+    brMichel.push_back(tMuon->Branch("SphereHitZ", &SphereHits.Z));
+    brMichel.push_back(tMuon->Branch("SphereHitChannel", &SphereHits.channel));
+    brMichel.push_back(tMuon->Branch("SphereHitTick", &SphereHits.tick));
+    brMichel.push_back(tMuon->Branch("SphereHitADC", &SphereHits.adc));
 
-    tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive);
-    tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive);
+    brMichel.push_back(tMuon->Branch("SphereEnergy", &SphereEnergy));
 
+    brMichel.push_back(tMuon->Branch("SphereTruePositive", &SphereTruePositive));
+    brMichel.push_back(tMuon->Branch("SphereFalsePositive", &SphereFalsePositive));
+
+    brMichel.push_back(tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive));
+    brMichel.push_back(tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive));
 
     // Diagnostic Variables
     binTick.n = detProp.ReadOutWindowSize()/4;
@@ -477,15 +487,14 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
     }
 
 
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Muchecks::Muchecks =======================================================" << "\033[0m" << std::endl;
+    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Muchecks::Muchecks ======================================================" << "\033[0m" << std::endl;
 }
 
 void ana::Muchecks::analyze(art::Event const& e)
 {
 
     if (iLogLevel >= kBasics) {
-        std::cout << "\033[93m" << "Muchecks::analyze: Initialization evt#" << iEvent << "\r" << std::flush;
-        std::cout << std::string(5,'\t') << " ======================================" << "\033[0m" << std::endl;
+        std::cout << "\033[93m" << "Muchecks::analyze: Initialization evt#" << std::setw(5) << iEvent << " ====================================" << "\033[0m" << std::endl;
     }
 
     auto const clockData = asDetClocks->DataFor(e);
@@ -513,19 +522,18 @@ void ana::Muchecks::analyze(art::Event const& e)
     for (recob::Hit const& hit : *vh_hit) {
         if (hit.View() != geo::kW) continue;
 
-        EventNHit++;
         EventHits.push_back(GetHit(hit));
     } // end loop over hits
 
 
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Searching for muons' end ====================================" << "\033[0m" << std::endl;
+    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Analyzing Muons =============================================" << "\033[0m" << std::endl;
 
 
     std::vector<ana::Hit> MuonsEnd;
     std::vector<size_t> MuonsTrkID;
     std::vector<simb::MCParticle const*> MichelsMCP;
     std::vector<simb::MCParticle const*> MuonsMCP;
-
+    std::vector<std::vector<const recob::Hit*>> tpMichelHitAll;
 
 
     if (iLogLevel >= kInfos) std::cout << "looping over " << vp_trk.size() << " tracks..." << std::endl;
@@ -587,6 +595,7 @@ void ana::Muchecks::analyze(art::Event const& e)
             std::cout << "\t" << "------------------------------------------------" << std::endl;
         }
 
+        resetMuon();
 
         // Muon End is 
         // if no hit in lower volume, muon end is in upper volume
@@ -602,24 +611,63 @@ void ana::Muchecks::analyze(art::Event const& e)
         if (IsUpright(*p_trk)) EndPoint = p_trk->End();
         else EndPoint = p_trk->Start();
 
+        MuonEndPointY = EndPoint.Y();
+        MuonEndPointZ = EndPoint.Z();
+
         // three fiducial checks
-        bool isInWindow = IsInsideWindow(MuonEnd.tick, fMichelTickRadius);
-        bool isInVolumeZ = IsInsideZ(MuonEnd.Z, fMichelSpaceRadius);
+        MuonEndIsInWindow = IsInsideWindow(MuonEnd.tick, fMichelTickRadius);
+        MuonEndIsInVolumeZ = IsInsideZ(MuonEnd.Z, fMichelSpaceRadius);
         // dummy X to put it in upper volume, only check Y and Z
-        bool isInVolumeYZ = IsInUpperVolume(50., EndPoint.Y(), EndPoint.Z(), fMichelSpaceRadius);
+        MuonEndIsInVolumeYZ = IsInUpperVolume(50., EndPoint.Y(), EndPoint.Z(), fMichelSpaceRadius);
 
-        Log(isInWindow, kDetails, 1, Form("is in window (±%.1f ticks)...", fMichelTickRadius), "yes", "no");
-        Log(isInVolumeZ, kDetails, 1, Form("is in volumeZ (±%.1f cm)...", fMichelSpaceRadius), "yes", "no");
-        Log(isInVolumeYZ, kDetails, 1, Form("is in volumeYZ (±%.1f cm)...", fMichelSpaceRadius), "yes", "no");
+        Log(MuonEndIsInWindow, kDetails, 1, Form("is in window (±%.1f ticks)...", fMichelTickRadius), "yes", "no");
+        Log(MuonEndIsInVolumeZ, kDetails, 1, Form("is in volumeZ (±%.1f cm)...", fMichelSpaceRadius), "yes", "no");
+        Log(MuonEndIsInVolumeYZ, kDetails, 1, Form("is in volumeYZ (±%.1f cm)...", fMichelSpaceRadius), "yes", "no");
 
-        if (!fKeepOutside && !isInWindow && !isInVolumeZ && !isInVolumeYZ) continue;
+        if (!fKeepOutside && !MuonEndIsInWindow && !MuonEndIsInVolumeZ && !MuonEndIsInVolumeYZ) continue;
+
+
 
         // from now on, we keep the muon
     
         EventNMuon++;
+        EventiMuon.push_back(iMuon);
+
+        // some properties of the muon
+        MuonIsAnti = int(mcp->PdgCode() < 0);
+        MuonTrackLength = p_trk->Length();
+        MuonDoesDecay = mcp->EndProcess() == "Decay";
+
+
+        // getting all muon hits
+        for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
+            if (p_hit_muon->View() != geo::kW) continue;
+
+            MuonHits.push_back(GetHit(*p_hit_muon));
+        }
+        // getting track points
+        for (size_t i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
+            if (!p_trk->HasValidPoint(i_tpt)) continue;
+
+            MuonNTrackPoint++;
+            MuonTrackPointX.push_back(p_trk->LocationAtPoint(i_tpt).X());
+            MuonTrackPointY.push_back(p_trk->LocationAtPoint(i_tpt).Y());
+            MuonTrackPointZ.push_back(p_trk->LocationAtPoint(i_tpt).Z());
+        }
+
+        if (iLogLevel >= kInfos) std::cout << "\t" << "mu" << (MuonIsAnti ? "+" : "-") << "\033[93m" << " #" << EventNMuon << " (" << iMuon << ")" << "\033[0m" << " found" << std::endl;
+
+        if (iLogLevel >= kInfos) {
+            std::cout << "\t" << "muon end hit: " << "\033[93m" << MuonEnd << "\033[0m" << std::endl;
+            std::cout << "\t" << "muon end point: " << "YZ:" << "\033[93m(" << MuonEndPointY << "," << MuonEndPointZ << ")\033[0m" << std::endl;
+        }
+
+
         MuonsMCP.push_back(mcp);    
         MuonsEnd.push_back(MuonEnd);
         MuonsTrkID.push_back(p_trk->ID());
+
+
 
         // looking at daughters to find a michel
         int i_dau = mcp->NumberDaughters() - 1;
@@ -642,32 +690,48 @@ void ana::Muchecks::analyze(art::Event const& e)
         if (i_dau == -1) {
             // loop over daughters ended without finding a michel
             if (iLogLevel >= kDetails) std::cout << "\t" << "no michel found" << std::endl;
+
+            MuonHasMichel = kNoMichel;
+
             MichelsMCP.push_back(nullptr);
+            tpMichelHitAll.push_back({});
         }
         else {
             // loop over daughters ended with a michel at the index i_dau
-            if (iLogLevel >= kDetails) std::cout << "\t" << "michel found at i_dau=" << i_dau << std::endl;
-            MichelsMCP.push_back(pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau)));
+            if (iLogLevel >= kDetails) std::cout << "\t" << "michel found" << std::endl;
+
+            simb::MCParticle const * mcp_michel = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));
+
+            if (Log(IsInVolume(mcp_michel->Position(0), fMichelSpaceRadius), kInfos, 1, "michel is inside...", "yes", "no")
+            ) {
+                MuonHasMichel = kHasMichelInside; 
+            } else { 
+                MuonHasMichel = kHasMichelOutside;
+            }
+
+            MichelsMCP.push_back(mcp_michel);
+            tpMichelHitAll.push_back(truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label()));
         }
+
+        for (TBranch * b : brMuon) b->Fill();
+        iMuon++;
     } // end loop over tracks
 
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Michel Hits =================================================" << "\033[0m" << std::endl;
+    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Searching Michel Hits in Sphere =============================" << "\033[0m" << std::endl;
 
     std::vector<int> visited;
-        
     
     // retrieving hits associated to michels MCParticles
-    std::vector<std::vector<const recob::Hit*>> tpMichelHitAll;
-    for (const simb::MCParticle * mcp_michel : MichelsMCP) {
-        if (!mcp_michel) {
-            tpMichelHitAll.push_back({});
-            continue;
-        }
-        tpMichelHitAll.push_back(truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label()));
-    }
+    // for (const simb::MCParticle * mcp_michel : MichelsMCP) {
+    //     if (!mcp_michel) {
+    //         tpMichelHitAll.push_back({});
+    //         continue;
+    //     }
+    //     tpMichelHitAll.push_back(truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label()));
+    // }
 
     std::vector<int> tpSphereNHit(EventNMuon, 0);
-    std::vector<ana::Hits> tpSphereHit(EventNMuon);
+    std::vector<ana::Hits> tpSphereHits(EventNMuon);
     std::vector<float> tpSphereEnergy(EventNMuon, 0);
     
     std::vector<size_t> tpSphereTruePositive(EventNMuon, 0);
@@ -709,8 +773,7 @@ void ana::Muchecks::analyze(art::Event const& e)
                 tpSphereEnergyFalsePositive[m] += p_hit->Integral();
             }
 
-            tpSphereNHit[m]++;
-            tpSphereHit[m].push_back(GetHit(*p_hit));
+            tpSphereHits[m].push_back(GetHit(*p_hit));
 
             // avoiding double counting
             if (p_hit->ROISummedADC() != tp_prev[m]) {
@@ -721,72 +784,77 @@ void ana::Muchecks::analyze(art::Event const& e)
     }
     tp_prev.clear();
 
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Filling Muon Tree ===========================================" << "\033[0m" << std::endl;
+    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Filling Michel Branches =====================================" << "\033[0m" << std::endl;
 
-    // filling the muon tree
+    // filling the michel tree
     for (size_t m=0; m<EventNMuon; m++) {
 
-        resetMuon();
+        resetMichel();
 
-        EventiMuon.push_back(iMuon);
+        // EventiMuon.push_back(iMuon);
 
-        MuonEnd = MuonsEnd[m];
+        // MuonEnd = MuonsEnd[m];
 
         // getting track end point
-        const art::Ptr<recob::Track> & p_trk = vp_trk[MuonsTrkID[m]];
-        geo::Point_t end;
-        if (IsUpright(*p_trk)) end = p_trk->End();
-        else end = p_trk->Start();
+        // const art::Ptr<recob::Track> & p_trk = vp_trk[MuonsTrkID[m]];
+        // geo::Point_t end;
+        // if (IsUpright(*p_trk)) end = p_trk->End();
+        // else end = p_trk->Start();
 
         // three fiducial checks
-        MuonEndIsInWindow = IsInsideWindow(MuonEnd.tick, fMichelTickRadius);
-        MuonEndIsInVolumeZ = IsInsideZ(MuonEnd.Z, fMichelSpaceRadius);
-        MuonEndIsInVolumeYZ = IsInUpperVolume(50., end.Y(), end.Z(), fMichelSpaceRadius);
+        // MuonEndIsInWindow = IsInsideWindow(MuonEnd.tick, fMichelTickRadius);
+        // MuonEndIsInVolumeZ = IsInsideZ(MuonEnd.Z, fMichelSpaceRadius);
+        // MuonEndIsInVolumeYZ = IsInUpperVolume(50., end.Y(), end.Z(), fMichelSpaceRadius);
 
-        std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
+        // std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         // getting all muon hits
-        for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
-            if (p_hit_muon->View() != geo::kW) continue;
+        // for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
+        //     if (p_hit_muon->View() != geo::kW) continue;
 
-            MuonNHit++;
-            MuonHits.push_back(GetHit(*p_hit_muon));
-        }
+        //     MuonNHit++;
+        //     MuonHits.push_back(GetHit(*p_hit_muon));
+        // }
 
-        if (iLogLevel >= kInfos) std::cout << "\t" << "mu" << (MuonIsAnti ? "+" : "-") << "\033[93m" << " #" << EventNMuon << " (" << iMuon << ")" << "\033[0m" << " found" << std::endl;
+        // if (iLogLevel >= kInfos) std::cout << "\t" << "mu" << (MuonIsAnti ? "+" : "-") << "\033[93m" << " #" << EventNMuon << " (" << iMuon << ")" << "\033[0m" << " found" << std::endl;
 
-        if (iLogLevel >= kInfos) std::cout << "\t" << "muon end @ Z:" << "\033[93m" << MuonEnd.Z << "\033[0m" 
-            << " tick:" << "\033[93m" << MuonEnd.tick << "\033[0m"
-            << " YZ:" << "\033[93m(" << end.Y() << "," << end.Z() << ")\033[0m" << std::endl;
+        // if (iLogLevel >= kInfos) std::cout << "\t" << "muon end @ Z:" << "\033[93m" << MuonEnd.Z << "\033[0m" 
+        //     << " tick:" << "\033[93m" << MuonEnd.tick << "\033[0m"
+        //     << " YZ:" << "\033[93m(" << end.Y() << "," << end.Z() << ")\033[0m" << std::endl;
 
         // some properties of the muon
-        MuonIsAnti = int(MuonsMCP[m]->PdgCode() < 0);
-        MuonTrackLength = p_trk->Length();
-        MuonDoesDecay = MuonsMCP[m]->EndProcess() == "Decay";
+        // MuonIsAnti = int(MuonsMCP[m]->PdgCode() < 0);
+        // MuonTrackLength = p_trk->Length();
+        // MuonDoesDecay = MuonsMCP[m]->EndProcess() == "Decay";
 
         // getting track points
-        for (size_t i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
-            if (!p_trk->HasValidPoint(i_tpt)) continue;
-            MuonTrackPointX.push_back(p_trk->LocationAtPoint(i_tpt).X());
-            MuonTrackPointY.push_back(p_trk->LocationAtPoint(i_tpt).Y());
-            MuonTrackPointZ.push_back(p_trk->LocationAtPoint(i_tpt).Z());
-            MuonNTrackPoint++;
-        }
+        // for (size_t i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
+        //     if (!p_trk->HasValidPoint(i_tpt)) continue;
+        //     MuonTrackPointX.push_back(p_trk->LocationAtPoint(i_tpt).X());
+        //     MuonTrackPointY.push_back(p_trk->LocationAtPoint(i_tpt).Y());
+        //     MuonTrackPointZ.push_back(p_trk->LocationAtPoint(i_tpt).Z());
+        //     MuonNTrackPoint++;
+        // }
 
         simb::MCParticle const * mcp_michel = MichelsMCP[m];
 
-        // checking if the muon has a michel
         if (!mcp_michel) {
-            MuonHasMichel = kNoMichel;
+            for (TBranch * b : brMichel) b->Fill();
             continue;
         }
+
+        // checking if the muon has a michel
+        // if (!mcp_michel) {
+        //     MuonHasMichel = kNoMichel;
+        //     continue;
+        // }
         // checking if the michel MCParticle is inside the detector
-        if (Log(IsInVolume(mcp_michel->Position(0), fMichelSpaceRadius), kInfos, 1, "michel is inside...", "yes", "no")
-        ) {
-            MuonHasMichel = kHasMichelInside; 
-        } else { 
-            MuonHasMichel = kHasMichelOutside;
-        }
+        // if (Log(IsInVolume(mcp_michel->Position(0), fMichelSpaceRadius), kInfos, 1, "michel is inside...", "yes", "no")
+        // ) {
+        //     MuonHasMichel = kHasMichelInside; 
+        // } else { 
+        //     MuonHasMichel = kHasMichelOutside;
+        // }
 
         recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
 
@@ -814,8 +882,8 @@ void ana::Muchecks::analyze(art::Event const& e)
         for (const recob::Hit* hit_michel : tpMichelHitAll[m]) {
             if (hit_michel->View() != geo::kW) continue;
 
-            MichelNHit++;
             MichelHits.push_back(GetHit(*hit_michel));
+
             if (hit_michel->ROISummedADC() != prev) {
                 MichelHitEnergy += hit_michel->ROISummedADC();
                 prev = hit_michel->ROISummedADC();
@@ -824,17 +892,16 @@ void ana::Muchecks::analyze(art::Event const& e)
         MichelHitEnergy *= fADCtoE;
 
         if (iLogLevel >= kInfos) {
-            if (MichelNHit == 0) std::cout << "\t" << "\033[91m" << "no hit in michel" << "\033[0m" << std::endl;
+            if (MichelHits.N == 0) std::cout << "\t" << "\033[91m" << "no hit in michel" << "\033[0m" << std::endl;
             else {
-                std::cout << "\t" << "michel hits: " << "\033[93m" << MichelNHit << "\033[0m" << std::endl;
+                std::cout << "\t" << "michel hits: " << "\033[93m" << MichelHits.N << "\033[0m" << std::endl;
                 std::cout << "\t" << "michel hit energy: " << "\033[93m" << MichelHitEnergy << "\033[0m" << std::endl;
             }
             std::cout << "\t" << "michel end process: " << "\033[93m" << mcp_michel->EndProcess() << "\033[0m" << std::endl;
         }
 
         // getting all the hits selected within the michel sphere
-        SphereNHit = tpSphereNHit[m];
-        SphereHits = tpSphereHit[m];
+        SphereHits = tpSphereHits[m];
         SphereEnergy = tpSphereEnergy[m] * fADCtoE;
 
         SphereTruePositive = tpSphereTruePositive[m];
@@ -843,19 +910,41 @@ void ana::Muchecks::analyze(art::Event const& e)
         SphereEnergyTruePositive = tpSphereEnergyTruePositive[m] * fADCtoE;
         SphereEnergyFalsePositive = tpSphereEnergyFalsePositive[m] * fADCtoE;
 
+        prev = 0;
+        float ene = std::accumulate(SphereHits.adc.begin(), SphereHits.adc.end(), 0, [&prev](float sum, float adc) {
+            if (adc != prev) {
+                prev = adc;
+                return sum + adc;
+            }
+            return sum;
+        }) * fADCtoE;
+
         if (iLogLevel >= kInfos) {
-            std::cout << "\t" << "michel sphere hits: " << "\033[93m" << SphereNHit << "\033[0m" << std::endl;
+            std::cout << "\t" << "michel sphere hits: " << "\033[93m" << SphereHits.N << "\033[0m" << std::endl;
             std::cout << "\t" << "michel sphere energy: " << "\033[93m" << SphereEnergy << " MeV" << "\033[0m" << std::endl;
+            std::cout << "\t" << "michel sphere energy2: " << "\033[93m" << ene << " MeV" << "\033[0m" << std::endl;
             std::cout << "\t" << "michel sphere true positive: " << "\033[93m" << SphereTruePositive << "\033[0m" << std::endl;
             std::cout << "\t" << "michel sphere false positive: " << "\033[93m" << SphereFalsePositive << "\033[0m" << std::endl;
             std::cout << "\t" << "michel sphere energy true positive: " << "\033[93m" << SphereEnergyTruePositive << " MeV" << "\033[0m" << std::endl;
             std::cout << "\t" << "michel sphere energy false positive: " << "\033[93m" << SphereEnergyFalsePositive << " MeV" << "\033[0m" << std::endl;
         }
 
-        tMuon->Fill();
-        iMuon++;
+        // tMuon->Fill();
+        // iMuon++;
+        for (TBranch * b : brMichel) b->Fill();
     } // end loop over michels
 
+    unsigned int nEntries = brMuon.front()->GetEntries();
+
+    // sanity check all branches should have the same number of entries
+    for (TBranch * b : brMuon) {
+        if (b->GetEntries() != nEntries) std::cout << "\033[91m" << "wrong number of entries in " << b->GetName() << "\033[0m" << std::endl;
+    }
+    for (TBranch * b : brMichel) {
+        if (b->GetEntries() != nEntries) std::cout << "\033[91m" << "wrong number of entries in " << b->GetName() << "\033[0m" << std::endl;
+    }
+
+    tMuon->SetEntries(nEntries);
     tEvent->Fill();
     iEvent++;
 
@@ -885,7 +974,6 @@ void ana::Muchecks::endJob()
 void ana::Muchecks::resetEvent() {
     if (iLogLevel >= kDetails) std::cout << "resetting event branches...";
 
-    EventNHit = 0;
     EventHits.clear();
 
     EventNMuon = 0;
@@ -896,22 +984,36 @@ void ana::Muchecks::resetEvent() {
 void ana::Muchecks::resetMuon() {
     if (iLogLevel >= kDetails) std::cout << "\t" << "resetting muon branches...";
 
+    MuonIsAnti = 0;
+    MuonTrackLength = 0;
+    MuonDoesDecay = 0;
+    MuonHasMichel = 0;
+
+    MuonHits.clear();
+
     MuonNTrackPoint = 0;
     MuonTrackPointX.clear();
     MuonTrackPointY.clear();
     MuonTrackPointZ.clear();
 
-    MuonNHit = 0;
-    MuonHits.clear();
+    MuonEnd = ana::Hit();
+
+    MuonEndIsInWindow = false;
+    MuonEndIsInVolumeZ = false;
+    MuonEndIsInVolumeYZ = false;
+
+
+    if (iLogLevel >= kDetails) std::cout << "\033[92m" << " done" << "\033[0m" << std::endl;
+}
+void ana::Muchecks::resetMichel() {
+    if (iLogLevel >= kDetails) std::cout << "\t" << "resetting michel branches...";
 
     MichelTrueEnergy = 0;
     MichelTrackLength = 0;
 
-    MichelNHit = 0;
     MichelHits.clear();
     MichelHitEnergy = 0;
 
-    SphereNHit = 0;
     SphereHits.clear();
     SphereEnergy = 0;
 
@@ -939,7 +1041,12 @@ ana::Hit ana::Muchecks::GetHit(int c, float t, float a) {
     return ana::Hit(s, z, c, t, a);
 }
 ana::Hit ana::Muchecks::GetHit(recob::Hit const& hit) {
-    return ana::Hit(GetSlice(hit.Channel()), mapChanZ[hit.Channel()], hit.Channel(), hit.PeakTime(), hit.Integral());
+    return ana::Hit(
+        GetSlice(hit.Channel()), 
+        mapChanZ[hit.Channel()], 
+        hit.Channel(), 
+        hit.PeakTime(), 
+        hit.Integral());
 }
 unsigned int ana::Muchecks::GetSlice(int ch) {
     std::vector<geo::WireID> wids = asWire->ChannelToWire(ch);
@@ -948,8 +1055,8 @@ unsigned int ana::Muchecks::GetSlice(int ch) {
     if (tpc == geo::TPCID::InvalidID) return 8;
     return (unsigned int) (tpc/4 * 2 + tpc % 2);
 }
-size_t ana::Muchecks::GetSection(int ch) {
-    return int(4.*ch / asWire->Nchannels());
+unsigned int ana::Muchecks::GetSection(int ch) {
+    return (unsigned int) (4.*ch / asWire->Nchannels());
 }
 geo::View_t ana::Muchecks::GetPlane(raw::ChannelID_t ch, int sec) {
     return geo::View_t(12.*ch / asWire->Nchannels() - 3*sec);
