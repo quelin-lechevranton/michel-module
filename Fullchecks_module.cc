@@ -390,7 +390,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
-            bool from_another_track = from_track && muon_endpoints.at(m).track_key != p_trk->key();
+            bool from_another_track = from_track && muon_endpoints.at(m).track_key != p_trk.key();
 
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
