@@ -159,35 +159,18 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         tMuon->Branch("iMuon", &iMuon),
         tMuon->Branch("iMuonInEvent", &EventNMuon),
 
-        tMuon->Branch("MuonIsAnti", &MuonIsAnti),
-        tMuon->Branch("MuonEndProcess", &MuonEndProcess),
-        tMuon->Branch("MuonHasMichel", &MuonHasMichel),
+        tMuon->Branch("IsAnti", &MuonIsAnti),
+        tMuon->Branch("EndProcess", &MuonEndProcess),
+        tMuon->Branch("HasMichel", &MuonHasMichel),
 
-        tMuon->Branch("MuonTrackLength", &MuonTrackLength),
-        tMuon->Branch("MuonEndIsInWindowT", &MuonEndIsInWindowT),
-        tMuon->Branch("MuonEndIsInVolumeYZ", &MuonEndIsInVolumeYZ),
+        tMuon->Branch("TrackLength", &MuonTrackLength),
+        tMuon->Branch("EndIsInWindowT", &MuonEndIsInWindowT),
+        tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ),
 
-        tMuon->Branch("MuonTrackPoints", &MuonTrackPoints.N),
-        tMuon->Branch("MuonTrackPointX", &MuonTrackPoints.x),
-        tMuon->Branch("MuonTrackPointY", &MuonTrackPoints.y),
-        tMuon->Branch("MuonTrackPointZ", &MuonTrackPoints.z),
-
-        tMuon->Branch("MuonEndTrackPointX", &MuonEndTrackPoint.x),
-        tMuon->Branch("MuonEndTrackPointY", &MuonEndTrackPoint.y),
-        tMuon->Branch("MuonEndTrackPointZ", &MuonEndTrackPoint.z),
-
-        tMuon->Branch("MuonHits", &MuonHits.N),
-        tMuon->Branch("MuonHitSlice", &MuonHits.slice),
-        tMuon->Branch("MuonHitZ", &MuonHits.z),
-        tMuon->Branch("MuonHitChannel", &MuonHits.channel),
-        tMuon->Branch("MuonHitTick", &MuonHits.tick),
-        tMuon->Branch("MuonHitADC", &MuonHits.adc),
-
-        tMuon->Branch("MuonEndHitSlice", &MuonEndHit.slice),
-        tMuon->Branch("MuonEndHitZ", &MuonEndHit.z),
-        tMuon->Branch("MuonEndHitChannel", &MuonEndHit.channel),
-        tMuon->Branch("MuonEndHitTick", &MuonEndHit.tick),
-        tMuon->Branch("MuonEndHitADC", &MuonEndHit.adc)
+        POINTS_BRANCHES(tMuon, "Track", MuonTrackPoints),
+        POINT_BRANCHES(tMuon, "EndTrack", MuonEndTrackPoint),
+        HITS_BRANCHES(tMuon, "", MuonHits),
+        HIT_BRANCHES(tMuon, "End", MuonEndHit)
     };
 
     brMichel = {
@@ -201,26 +184,9 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive),
         tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive),
 
-        tMuon->Branch("MichelHits", &MichelHits.N),
-        tMuon->Branch("MichelHitSlice", &MichelHits.slice),
-        tMuon->Branch("MichelHitZ", &MichelHits.z),
-        tMuon->Branch("MichelHitChannel", &MichelHits.channel),
-        tMuon->Branch("MichelHitTick", &MichelHits.tick),
-        tMuon->Branch("MichelHitADC", &MichelHits.adc),
-
-        tMuon->Branch("SphereHits", &SphereHits.N),
-        tMuon->Branch("SphereHitSlice", &SphereHits.slice),
-        tMuon->Branch("SphereHitZ", &SphereHits.z),
-        tMuon->Branch("SphereHitChannel", &SphereHits.channel),
-        tMuon->Branch("SphereHitTick", &SphereHits.tick),
-        tMuon->Branch("SphereHitADC", &SphereHits.adc),
-
-        tMuon->Branch("NearbyHits", &NearbyHits.N),
-        tMuon->Branch("NearbyHitSlice", &NearbyHits.slice),
-        tMuon->Branch("NearbyHitZ", &NearbyHits.z),
-        tMuon->Branch("NearbyHitChannel", &NearbyHits.channel),
-        tMuon->Branch("NearbyHitTick", &NearbyHits.tick),
-        tMuon->Branch("NearbyHitADC", &NearbyHits.adc)
+        HITS_BRANCHES(tMuon, "Michel", MichelHits),
+        HITS_BRANCHES(tMuon, "Sphere", SphereHits),
+        HITS_BRANCHES(tMuon, "Nearby", NearbyHits)
     };
 }
 

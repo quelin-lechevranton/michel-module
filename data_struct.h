@@ -27,36 +27,32 @@
 #include <TBranch.h>
 
 
-#define HIT_BRANCHES(t, h, pre) \
+#define HIT_BRANCHES(t, pre, h) \
     t->Branch(pre "NHit", &h.N), \
-    t->Branch(pre "HitView", &h.view), \
     t->Branch(pre "HitSlice", &h.slice), \
     t->Branch(pre "HitZ", &h.z), \
     t->Branch(pre "HitChannel", &h.channel), \
     t->Branch(pre "HitTick", &h.tick), \
     t->Branch(pre "HitADC", &h.adc)
 
-#define HITS_BRANCHES(t, h, pre) \
+#define HITS_BRANCHES(t, pre, h) \
     t->Branch(pre "NHit", &h.N), \
-    t->Branch(pre "HitView", &h.view), \
     t->Branch(pre "HitSlice", &h.slice), \
     t->Branch(pre "HitZ", &h.z), \
     t->Branch(pre "HitChannel", &h.channel), \
     t->Branch(pre "HitTick", &h.tick), \
     t->Branch(pre "HitADC", &h.adc)
 
-#define POINT_BRANCHES(t, p, pre) \
+#define POINT_BRANCHES(t, pre, p) \
     t->Branch(pre "PointX", &p.x), \
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
 
-#define POINTS_BRANCHES(t, p, pre) \
+#define POINTS_BRANCHES(t, pre, p) \
     t->Branch(pre "NPoint", &p.N), \
     t->Branch(pre "PointX", &p.x), \
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
-
-
 
 
 
