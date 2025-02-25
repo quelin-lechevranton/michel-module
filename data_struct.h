@@ -61,10 +61,13 @@ namespace ana {
     template<typename T>
     struct bounds {
         T min, max;
-        bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::min()) {}
+        bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
         bounds(T m, T M) : min(m), max(M) {}
         bool isInside(T x, float r=0) { 
             return min+r <= x && x <= max-r;
+        }
+        friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
+            return os << "[" << b.min << ", " << b.max << "]";
         }
     };
 
@@ -79,6 +82,9 @@ namespace ana {
         }
         bool isInside(TLorentzVector const& v, float r=0) {
             return isInside(v.X(), v.Y(), v.Z(), r);
+        }
+        friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
+            return os << b.x << "x" << b.y << "x" << b.z;
         }
     };
 
@@ -137,8 +143,7 @@ namespace ana {
             tick(hit.PeakTime()),
             adc(hit.Integral()) {}
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
-            os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
-            return os;
+            return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
     };
     struct Hits {
@@ -180,6 +185,9 @@ namespace ana {
         Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         float r2() { return x*x + y*y + z*z; }
+        friend std::ostream& operator<<(std::ostream& os, const Point& p) {
+            return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
+        }
     };
     struct Points {
         unsigned N;

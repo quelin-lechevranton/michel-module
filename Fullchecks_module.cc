@@ -152,7 +152,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
 
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
-    tEvent->Branch("Muon", &EventiMuon);
+    tEvent->Branch("iMuon", &EventiMuon);
     HITS_BRANCHES(tEvent, "", EventHits);
 
     tMuon = tfs->make<TTree>("muon","");
@@ -170,10 +170,10 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         tMuon->Branch("EndIsInWindowT", &MuonEndIsInWindowT),
         tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ),
 
-        POINTS_BRANCHES(tMuon, "Track", MuonTrackPoints),
-        POINT_BRANCHES(tMuon, "EndTrack", MuonEndTrackPoint),
         HITS_BRANCHES(tMuon, "", MuonHits),
         HIT_BRANCHES(tMuon, "End", MuonEndHit),
+        POINTS_BRANCHES(tMuon, "Track", MuonTrackPoints),
+        POINT_BRANCHES(tMuon, "EndTrack", MuonEndTrackPoint),
         POINTS_BRANCHES(tMuon, "Space", MuonSpacePoints)
     };
 
@@ -361,6 +361,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key(), MuonEndSpt});
 
         for (TBranch *b : brMuon) b->Fill();
+        iMuon++;
     } // end of loop over tracks
 
 
@@ -487,19 +488,19 @@ void ana::Fullchecks::beginJob()
         geo::TPCID tpcid{0, tpc};
 
         if (tpc >= 8) {
-            upper_bounds.x.min = upper_bounds.x.min < asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
-            upper_bounds.x.max = upper_bounds.x.max > asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
-            upper_bounds.y.min = upper_bounds.y.min < asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
-            upper_bounds.y.max = upper_bounds.y.max > asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : upper_bounds.y.max;
-            upper_bounds.z.min = upper_bounds.z.min < asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : upper_bounds.z.min;
-            upper_bounds.z.max = upper_bounds.z.max > asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : upper_bounds.z.max;
+            upper_bounds.x.min = upper_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
+            upper_bounds.x.max = upper_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
+            upper_bounds.y.min = upper_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
+            upper_bounds.y.max = upper_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : upper_bounds.y.max;
+            upper_bounds.z.min = upper_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : upper_bounds.z.min;
+            upper_bounds.z.max = upper_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : upper_bounds.z.max;
         } else {
-            lower_bounds.x.min = lower_bounds.x.min < asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : lower_bounds.x.min;
-            lower_bounds.x.max = lower_bounds.x.max > asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : lower_bounds.x.max;
-            lower_bounds.y.min = lower_bounds.y.min < asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : lower_bounds.y.min;
-            lower_bounds.y.max = lower_bounds.y.max > asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : lower_bounds.y.max;
-            lower_bounds.z.min = lower_bounds.z.min < asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : lower_bounds.z.min;
-            lower_bounds.z.max = lower_bounds.z.max > asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
+            lower_bounds.x.min = lower_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : lower_bounds.x.min;
+            lower_bounds.x.max = lower_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : lower_bounds.x.max;
+            lower_bounds.y.min = lower_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : lower_bounds.y.min;
+            lower_bounds.y.max = lower_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : lower_bounds.y.max;
+            lower_bounds.z.min = lower_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : lower_bounds.z.min;
+            lower_bounds.z.max = lower_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
         }
 
         geo::PlaneID planeid{tpcid, 0};
