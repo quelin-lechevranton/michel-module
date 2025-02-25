@@ -32,7 +32,8 @@ physics: {
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
-                ["Reco",       "pandora",       "",       "recob::SpacePoint"]
+                ["Reco",       "pandora",       "",       "recob::SpacePoint"],
+                ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
             MichelSpaceRadius: 20.

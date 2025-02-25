@@ -48,7 +48,7 @@ private:
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
-    art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt;
+    art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp;
 
     // Input Parameters
     float fMichelSpaceRadius; // in cm
@@ -136,6 +136,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
+        else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
 
     fChannelPitch = geo::WireGeo::WirePitch(
@@ -209,7 +210,8 @@ void ana::Fullchecks::analyze(art::Event const& e)
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
-    auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoints>>(tag_spt);
+    auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
