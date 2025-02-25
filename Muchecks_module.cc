@@ -204,27 +204,26 @@ private:
 
     TTree* tEvent;
 
-    size_t iEvent=0;
+    unsigned iEvent=0;
 
-    ana::Hits EventHits; //[hit]
+    ana::Hits EventHits;
 
-    size_t EventNMuon;
-    std::vector<int> EventiMuon; //[muon]
+    unsigned EventNMuon;
+    std::vector<unsigned> EventiMuon; //[muon]
 
     // enum Tag { kMCP, kDaughters, kSphere, kTrue, kNTag };
     TTree* tMuon;
     std::vector<TBranch*> brMuon, brMichel;
 
-    size_t iMuon=0;
+    unsigned iMuon=0;
 
     int MuonIsAnti;
-    int MuonDoesDecay;
     std::string MuonEndProcess;
     int MuonHasMichel;
 
     float MuonTrackLength;
 
-    size_t MuonNTrackPoint;
+    unsigned MuonNTrackPoint;
     std::vector<float> MuonTrackPointX, MuonTrackPointY, MuonTrackPointZ;
 
     float MuonEndPointY, MuonEndPointZ;
@@ -235,25 +234,27 @@ private:
     int MuonEndIsInVolumeZ;
     int MuonEndIsInVolumeYZ;
 
-    ana::Hits MuonHits; //[hit]
+    ana::Hits MuonHits;
 
     float MichelTrackLength;
     float MichelTrueEnergy;
     float MichelHitEnergy;
 
-    ana::Hits MichelHits; //[hit]
+    ana::Hits MichelHits;
 
-    ana::Hits SphereHits; //[hit]
+    ana::Hits SphereHits;
     float SphereEnergy;
 
-    size_t SphereTruePositive;
-    size_t SphereFalsePositive;
+    unsigned SphereTruePositive;
+    unsigned SphereFalsePositive;
 
     float SphereEnergyTruePositive;
     float SphereEnergyFalsePositive;
 
+    ana::Hits NearbyHits;
+
     // Diagnostic Variables
-    unsigned int n_section = 4;
+    unsigned n_section = 4;
     ana::Binning binTick;
     std::vector<ana::Binning> binChan; //[section]
     std::vector<ana::Binning> chanTPC; //[tpc]
@@ -365,8 +366,7 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
 
     brMuon.push_back(tMuon->Branch("IsAnti", &MuonIsAnti));
     brMuon.push_back(tMuon->Branch("TrackLength", &MuonTrackLength));
-    brMuon.push_back(tMuon->Branch("DoesDecay", &MuonDoesDecay));
-    brMuon.push_back(tMuon->Branch("MuonEndProcess", &MuonEndProcess));
+    brMuon.push_back(tMuon->Branch("EndProcess", &MuonEndProcess));
     brMuon.push_back(tMuon->Branch("HasMichel", &MuonHasMichel));
 
     brMuon.push_back(tMuon->Branch("NHit", &MuonHits.N));
@@ -423,6 +423,13 @@ ana::Muchecks::Muchecks(fhicl::ParameterSet const& p)
 
     brMichel.push_back(tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive));
     brMichel.push_back(tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive));
+
+    brMichel.push_back(tMuon->Branch("NearbyNHit", &NearbyHits.N));
+    brMichel.push_back(tMuon->Branch("NearbyHitSlice", &NearbyHits.slice));
+    brMichel.push_back(tMuon->Branch("NearbyHitZ", &NearbyHits.Z));
+    brMichel.push_back(tMuon->Branch("NearbyHitChannel", &NearbyHits.channel));
+    brMichel.push_back(tMuon->Branch("NearbyHitTick", &NearbyHits.tick));
+    brMichel.push_back(tMuon->Branch("NearbyHitADC", &NearbyHits.adc));
 
     // Diagnostic Variables
     binTick.n = detProp.ReadOutWindowSize()/4;
@@ -525,6 +532,7 @@ void ana::Muchecks::analyze(art::Event const& e)
     std::vector<ana::Hit> MuonsEnd;
     std::vector<simb::MCParticle const*> MichelsMCP;
     std::vector<simb::MCParticle const*> MuonsMCP;
+    std::vector<size_t> MuonTrackKey;
 
 
     if (iLogLevel >= kInfos) std::cout << "looping over " << vp_trk.size() << " tracks..." << std::endl;
@@ -635,11 +643,11 @@ void ana::Muchecks::analyze(art::Event const& e)
     
         EventNMuon++;
         EventiMuon.push_back(iMuon);
+        MuonTrackKey.push_back(p_trk.key());
 
         // some properties of the muon
         MuonIsAnti = int(mcp->PdgCode() < 0);
         MuonTrackLength = p_trk->Length();
-        MuonDoesDecay = mcp->EndProcess() == "Decay";
         MuonEndProcess = mcp->EndProcess();
 
 
@@ -650,7 +658,7 @@ void ana::Muchecks::analyze(art::Event const& e)
             MuonHits.push_back(GetHit(*p_hit_muon));
         }
         // getting track points
-        for (size_t i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
+        for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
             if (!p_trk->HasValidPoint(i_tpt)) continue;
 
             MuonNTrackPoint++;
@@ -671,48 +679,39 @@ void ana::Muchecks::analyze(art::Event const& e)
         MuonsEnd.push_back(MuonEnd);
 
 
-
         // looking at daughters to find a michel
-        int i_dau = mcp->NumberDaughters() - 1;
+        bool has_numu=false, has_nue=false;
+        simb::MCParticle const *mcp_michel = nullptr;
         if (iLogLevel >= kDetails) std::cout << "\t" << "looping over muon's " << mcp->NumberDaughters() << " daughters..." << std::endl;
-        for (; i_dau >= 0; i_dau--) {
+        for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
             if (iLogLevel >= kDetails) std::cout << "\t" << "dau#" << i_dau+1 << "\r" << std::flush;
             
             simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
 
-            // if (mcp_dau->Mother() != mcp->TrackId()) anomalies.push_back(Form("e%ld t%d µ%ld: TrackID: mcp_dau->Mother() (%d) != mcp->TrackId() (%d)", iEvent, p_trk->ID(), iMuon, mcp_dau->Mother(), mcp->TrackId()));
-
             if (!Log(mcp_dau, kDetails, 2, "id to mcp...", "done", "failed")
             ) continue;
 
-            if (!Log(abs(mcp_dau->PdgCode()) == 11 && mcp_dau->Process() == "Decay", kDetails, 2, "is michel...", "yes", "no")
-            ) continue;
-
-            break;
+            if (Log(abs(mcp_dau->PdgCode()) == 14, kDetails, 2, "is muon neutrino...", "yes", "no")
+            ) has_numu = true;
+            if (Log(abs(mcp_dau->PdgCode()) == 12, kDetails, 2, "is electron neutrino...", "yes", "no")
+            ) has_nue = true;
+            if (Log(abs(mcp_dau->PdgCode()) == 11, kDetails, 2, "is electron...", "yes", "no")
+            ) mcp_michel = mcp_dau;
         } // end loop over muon daughters
-        if (i_dau == -1) {
-            // loop over daughters ended without finding a michel
-            if (iLogLevel >= kDetails) std::cout << "\t" << "no michel found" << std::endl;
-
-            MuonHasMichel = kNoMichel;
-
-            MichelsMCP.push_back(nullptr);
-        }
-        else {
-            // loop over daughters ended with a michel at the index i_dau
+        if (mcp_michel && has_numu && has_nue) {
             if (iLogLevel >= kDetails) std::cout << "\t" << "michel found" << std::endl;
 
-            simb::MCParticle const * mcp_michel = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));
-
-            if (Log(IsInVolume(mcp_michel->Position(0), fMichelSpaceRadius), kInfos, 1, "michel is inside...", "yes", "no")
-            ) {
+            if (Log(IsInVolume(mcp_michel->Position(0), fMichelSpaceRadius), kInfos, 1, "michel is inside...", "yes", "no"))
                 MuonHasMichel = kHasMichelInside; 
-            } else { 
+            else
                 MuonHasMichel = kHasMichelOutside;
-            }
-
-            MichelsMCP.push_back(mcp_michel);
         }
+        else {
+            if (iLogLevel >= kDetails) std::cout << "\t" << "no michel found" << std::endl;
+            MuonHasMichel = kNoMichel;
+            mcp_michel = nullptr;
+        }
+        MichelsMCP.push_back(mcp_michel);
 
         for (TBranch * b : brMuon) b->Fill();
         iMuon++;
@@ -721,13 +720,14 @@ void ana::Muchecks::analyze(art::Event const& e)
     if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Searching Michel Hits in Sphere =============================" << "\033[0m" << std::endl;
 
     std::vector<int> visited;
+
+    std::vector<ana::Hits> tpNearbyHits(EventNMuon);
     
-    std::vector<int> tpSphereNHit(EventNMuon, 0);
     std::vector<ana::Hits> tpSphereHits(EventNMuon);
     std::vector<float> tpSphereEnergy(EventNMuon, 0);
     
-    std::vector<size_t> tpSphereTruePositive(EventNMuon, 0);
-    std::vector<size_t> tpSphereFalsePositive(EventNMuon, 0);
+    std::vector<unsigned> tpSphereTruePositive(EventNMuon, 0);
+    std::vector<unsigned> tpSphereFalsePositive(EventNMuon, 0);
 
     std::vector<float> tpSphereEnergyTruePositive(EventNMuon, 0);
     std::vector<float> tpSphereEnergyFalsePositive(EventNMuon, 0);
@@ -742,19 +742,32 @@ void ana::Muchecks::analyze(art::Event const& e)
         std::vector<art::Ptr<recob::Track>> vp_trk = fmp_hit2trk.at(p_hit.key());
         auto it = vp_trk.begin();
         while (it != vp_trk.end() && (*it)->Length() < fTrackLengthCut) it++;
-        if (it != vp_trk.end()) continue;
+        bool from_track = (it != vp_trk.end());
 
         // looping over muons ends
-        for (size_t m = 0; m<EventNMuon; m++) {
-            if (!MichelsMCP[m]) continue;
-
+        for (unsigned m = 0; m<EventNMuon; m++) {
             if (GetSlice(p_hit->Channel()) != MuonsEnd[m].slice) continue;
 
             float Z = (mapChanZ[p_hit->Channel()] - MuonsEnd[m].Z) / fMichelSpaceRadius;
             float T = (p_hit->PeakTime() - MuonsEnd[m].tick) / fMichelTickRadius;
+            float sphere = Z*Z + T*T;
 
-            // ellipse around muon's end
-            if (Z*Z + T*T > 1) continue;
+            bool from_this_muon = from_track ? (MuonTrackKey[m] == it->key()) : false;
+
+            // not from on other track
+            if (from_track && !from_this_muon) continue;
+            // nearby muon's end
+            if (sphere > 4) continue;
+
+            tpNearbyHits[m].push_back(GetHit(*p_hit));
+
+            // only integrate around muon with a michel electron
+            if (!MichelsMCP[m]) continue;
+
+            // not from any track
+            if (from_track) continue;
+            // sphere around muon's end
+            if (sphere > 1) continue;
 
             // checking if the hit is associated to the michel MCParticle
             std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *MichelsMCP[m], e, tag_hit.label());
@@ -780,9 +793,11 @@ void ana::Muchecks::analyze(art::Event const& e)
     if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Muchecks::analyze: Filling Michel Branches =====================================" << "\033[0m" << std::endl;
 
     // filling the michel tree
-    for (size_t m=0; m<EventNMuon; m++) {
+    for (unsigned m=0; m<EventNMuon; m++) {
 
         resetMichel();
+
+        NearbyHits = tpNearbyHits[m];
 
         simb::MCParticle const * mcp_michel = MichelsMCP[m];
 
@@ -791,6 +806,7 @@ void ana::Muchecks::analyze(art::Event const& e)
             continue;
         }
 
+        if (iLogLevel >= kInfos) std::cout << "mu#" << m+1 << "\r" << std::flush;
         recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
 
         // getting the track length of the michel (if any)
@@ -800,17 +816,17 @@ void ana::Muchecks::analyze(art::Event const& e)
         }
 
         // checking if the michel MCParticle has already been visited
-        if (std::find(visited.begin(), visited.end(), mcp_michel->TrackId()) != visited.end()) anomalies.push_back(Form("e%ld µ%ld: TrackID: michel already visited (%d)", iEvent, m, mcp_michel->TrackId()));
+        if (std::find(visited.begin(), visited.end(), mcp_michel->TrackId()) != visited.end()) anomalies.push_back(Form("e%u µ%u: TrackID: michel already visited (%d)", iEvent, m, mcp_michel->TrackId()));
         visited.push_back(mcp_michel->TrackId());
 
         MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
         if (iLogLevel >= kInfos) std::cout << "\t" << "michel true energy: " << "\033[93m" << MichelTrueEnergy << " MeV" << "\033[0m" << std::endl;
 
         // double dist = Dist(MuonsMCP[m]->EndPosition(), mcp_michel->Position(0));
-        // if (dist > 0) anomalies.push_back(Form("e%ld t%d µ%ld: distance of %f", iEvent, p_trk->ID(), iMuon, dist)); 
+        // if (dist > 0) anomalies.push_back(Form("e%u t%d µ%u: distance of %f", iEvent, p_trk->ID(), iMuon, dist)); 
 
         // saving anomalous michel energies
-        if (MichelTrueEnergy > 100) anomalies.push_back(Form("e%ld µ%ld: Michel True Energy %.1f MeV", iEvent, m, MichelTrueEnergy)); 
+        if (MichelTrueEnergy > 100) anomalies.push_back(Form("e%u µ%u: Michel True Energy %.1f MeV", iEvent, m, MichelTrueEnergy)); 
 
         // getting hits associated to the michel MCParticle
         std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
@@ -833,6 +849,7 @@ void ana::Muchecks::analyze(art::Event const& e)
                 std::cout << "\t" << "michel hits: " << "\033[93m" << MichelHits.N << "\033[0m" << std::endl;
                 std::cout << "\t" << "michel hit energy: " << "\033[93m" << MichelHitEnergy << "\033[0m" << std::endl;
             }
+            std::cout << "\t" << "michel process: " << "\033[93m" << mcp_michel->Process() << "\033[0m" << std::endl;
             std::cout << "\t" << "michel end process: " << "\033[93m" << mcp_michel->EndProcess() << "\033[0m" << std::endl;
         }
 
@@ -911,7 +928,6 @@ void ana::Muchecks::resetMuon() {
 
     MuonIsAnti = 0;
     MuonTrackLength = 0;
-    MuonDoesDecay = 0;
     MuonHasMichel = 0;
 
     MuonHits.clear();
@@ -947,6 +963,8 @@ void ana::Muchecks::resetMichel() {
 
     SphereHits.clear();
     SphereEnergy = 0;
+
+    NearbyHits.clear();
 
     SphereTruePositive = 0;
     SphereFalsePositive = 0;

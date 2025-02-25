@@ -207,14 +207,18 @@ void ana::Detchecks::beginJob()
         geo::TPCID tpcid{cryoid, tpc};
         geo::PlaneID planeid{tpcid, geo::kW};
 
-        for (unsigned int wire=0; wire<asWire->Nwires(planeid)-1; wire++) {
+        for (unsigned int wire=0; wire<asWire->Nwires(planeid); wire++) {
             geo::WireID wireid{planeid, wire};
             geo::WireID wireid1{planeid, wire+1};
             if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID || asWire->PlaneWireToChannel(wireid1) == raw::InvalidChannelID) {
                 std::cerr << "\033[91m" << "ERROR: Invalid channel for collection wire " << wire << " in TPC " << tpc << "\033[0m" << std::endl;
                 continue;
             }
+
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
+	        std::cout << "    {" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Z() << "}," << std::endl;
+
+            if (wire == asWire->Nwires(planeid)-1) continue;
             geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
             pitch.push_back(geo::WireGeo::WirePitch(wiregeo, wiregeo1));
         }
@@ -223,38 +227,41 @@ void ana::Detchecks::beginJob()
     std::cout << "----------------------TEST----------------------" << std::endl;
 
     std::sort(pitch.begin(), pitch.end());
-    pitch.erase(std::unique(pitch.begin(), pitch.end()), pitch.end());
+    std::map<double,unsigned int> mpp;
     for (double p : pitch) {
-        std::cout << "collection pitch: " << p << std::endl;
+	mpp[p]++;
+    }
+    for (std::pair<double,unsigned int> pp : mpp) {
+	std::cout << "pitch: " << pp.first << " count: " << pp.second << std::endl;
     }
 
     std::cout << "----------------------TEST----------------------" << std::endl;
 
-    geo::BoxBoundedGeo::Coord_t y0 = tpcgeo0.Min().Y();
-    geo::BoxBoundedGeo::Coord_t yN = tpcgeoN.Max().Y();
-    geo::BoxBoundedGeo::Coord_t z0 = tpcgeo0.Min().Z();
-    geo::BoxBoundedGeo::Coord_t zN = tpcgeoN.Max().Z();
+    // geo::BoxBoundedGeo::Coord_t y0 = tpcgeo0.Min().Y();
+    // geo::BoxBoundedGeo::Coord_t yN = tpcgeoN.Max().Y();
+    // geo::BoxBoundedGeo::Coord_t z0 = tpcgeo0.Min().Z();
+    // geo::BoxBoundedGeo::Coord_t zN = tpcgeoN.Max().Z();
 
-    const unsigned int n = 10;
-    const double dy = (yN - y0) / n;
-    const double dz = (zN - z0) / n;
+    // const unsigned int n = 10;
+    // const double dy = (yN - y0) / n;
+    // const double dz = (zN - z0) / n;
 
-    for (unsigned int i=0; i<=n; i++) {
-        for (unsigned int j=0; j<=n; j++) {
-            double y = y0 + j*dy;
-            double z = z0 + i*dz;
+    // for (unsigned int i=0; i<=n; i++) {
+        // for (unsigned int j=0; j<=n; j++) {
+            // double y = y0 + j*dy;
+            // double z = z0 + i*dz;
 
-            geo::Point_t pt_low = {-50, y, z};
-            geo::Point_t pt_upp = {50, y, z};
+            // geo::Point_t pt_low = {-50, y, z};
+            // geo::Point_t pt_upp = {50, y, z};
 
-            raw::ChannelID_t ch_low = GetChannel(pt_low, geo::kW);
-            raw::ChannelID_t ch_upp = GetChannel(pt_upp, geo::kW);
+            // raw::ChannelID_t ch_low = GetChannel(pt_low, geo::kW);
+            // raw::ChannelID_t ch_upp = GetChannel(pt_upp, geo::kW);
 
-            std::cout << "(Y,Z)=(" << y << "," << z << ")" << "\r" << std::flush;
-            std::cout << std::string(4,'\t') << "LOW: ch: " << ch_low << "\r" << std::flush;
-            std::cout << std::string(7,'\t') << "UPP: ch: " << ch_upp << std::endl;
-        }
-    }
+            // std::cout << "(Y,Z)=(" << y << "," << z << ")" << "\r" << std::flush;
+            // std::cout << std::string(4,'\t') << "LOW: ch: " << ch_low << "\r" << std::flush;
+            // std::cout << std::string(7,'\t') << "UPP: ch: " << ch_upp << std::endl;
+        // }
+    // }
 
     std::cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << std::endl;
 } // end beginJob

@@ -2,10 +2,10 @@
 #include "services_vdcoldbox.fcl" 
 #include "tools_dune.fcl"	
 
-process_name: RunMuchecks
+process_name: RunTruechecks
 
 services: {
-    TFileService: { fileName: "pdvd_Muchecks_out_100_r20_in_nh_ep.root" }
+    TFileService: { fileName: "pdvd_Truechecks_out_100_r50_in.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -23,7 +23,7 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "Muchecks"
+            module_type:    "Truechecks"
             Products:       [
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
@@ -35,13 +35,7 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"]
             ]
 
-            LogLevel: 2
-            
-            TrackLengthCut: 40.
-            MichelSpaceRadius: 20.
-
-            KeepOutside: false
-            KeepNonDecaying: true
+            LogLevel: 10
         }
     }
     ana: [ checks ]
