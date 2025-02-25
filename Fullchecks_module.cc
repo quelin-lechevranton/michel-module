@@ -78,12 +78,14 @@ private:
     float MuonTrackLength;
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
+    ana::Points MuonSpacePoints;
 
     ana::Hits MuonHits;
     ana::Hit MuonEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
 
     ana::Hits NearbyHits;
+    ana::Points NearbySpacePoints;
 
     float MichelTrackLength;
 
@@ -150,7 +152,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("Muon", &EventiMuon);
-    EventHits.SetBranches(tEvent);
+    HITS_BRANCHES(tEvent, "", EventHits);
 
     tMuon = tfs->make<TTree>("muon","");
 
@@ -170,7 +172,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         POINTS_BRANCHES(tMuon, "Track", MuonTrackPoints),
         POINT_BRANCHES(tMuon, "EndTrack", MuonEndTrackPoint),
         HITS_BRANCHES(tMuon, "", MuonHits),
-        HIT_BRANCHES(tMuon, "End", MuonEndHit)
+        HIT_BRANCHES(tMuon, "End", MuonEndHit),
+        POINTS_BRANCHES(tMuon, "Space", MuonSpacePoints)
     };
 
     brMichel = {
@@ -186,7 +189,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
 
         HITS_BRANCHES(tMuon, "Michel", MichelHits),
         HITS_BRANCHES(tMuon, "Sphere", SphereHits),
-        HITS_BRANCHES(tMuon, "Nearby", NearbyHits)
+        HITS_BRANCHES(tMuon, "Nearby", NearbyHits),
+        POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints)
     };
 }
 
@@ -205,9 +209,13 @@ void ana::Fullchecks::analyze(art::Event const& e)
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
+    auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoints>>(tag_spt);
+
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
-    art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
+    // art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
+    art::FindOneP<recob::PFParticle> fmp_trk2pfp(vh_trk, e, tag_trk);
+    art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
     resetEvent();
 
@@ -221,6 +229,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         ana::Hit hit; 
         simb::MCParticle const* mcp_michel;
         size_t track_key;
+        ana::Point spt;
     };
     std::vector<EndPoint> muon_endpoints;
 
@@ -308,6 +317,20 @@ void ana::Fullchecks::analyze(art::Event const& e)
             MuonTrackPoints.push_back(ana::Point{p_trk->LocationAtPoint(i_tpt)});
         }
 
+        // and all muon space points
+        double xmin = upper_bounds.x.max;
+        ana::Point MuonEndSpt;
+        art::Ptr<recob::PFParticle> p_pfp = fmp_trk2pfp.at(p_trk.key());
+        std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
+        for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
+            MuonSpacePoints.push_back(ana::Point{p_spt->position()});
+
+            if (p_spt->position().x() < xmin) {
+                xmin = p_spt->position().x();
+                MuonEndSpt = ana::Point{p_spt->position()};
+            }
+        }
+
         // a decaying muon has nu_mu, nu_e and el as last daughters
         bool has_numu = false, has_nue = false;
         simb::MCParticle const* mcp_michel = nullptr;
@@ -333,7 +356,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         }
 
         // saving end point info for further analysis
-        muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key()});
+        muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key(), MuonEndSpt});
 
         for (TBranch *b : brMuon) b->Fill();
     } // end of loop over tracks
@@ -346,6 +369,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         unsigned false_positive;
         float energy_true_positive;
         float energy_false_positive;
+        ana::Points spt;
     };
     std::vector<Nearby> nearby(EventNMuon);
 
@@ -355,6 +379,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
         std::vector<art::Ptr<recob::Track>> vp_trk = fmp_hit2trk.at(p_hit.key());
         auto it = vp_trk.begin();
+        std::cout << "number of tracks: " << vp_trk.size() << std::endl;
         while (it != vp_trk.end() && (*it)->Length() < fTrackLengthCut) it++;
         bool from_track = (it != vp_trk.end());
 
@@ -391,12 +416,28 @@ void ana::Fullchecks::analyze(art::Event const& e)
         }
     } // end of loop over event hits
 
+
+    // get space points nearby muon end point
+    for (recob::SpacePoint const& spt : *vh_spt) {
+        for (unsigned m=0; m<EventNMuon; m++) {
+
+            // should check if the space points is from an other track
+            //
+            //
+            
+            if ((muon_endpoints.at(m).spt - spt.position()).mag2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+
+            nearby.at(m).spt.push_back(ana::Point{spt.position()});
+        }
+    }
+
     // filling the branches related to michel
     for (unsigned m=0; m<EventNMuon; m++) {
         
         resetMichel();
 
         NearbyHits = nearby.at(m).hits;
+        NearbySpacePoints = nearby.at(m).spt;
 
         if (!muon_endpoints.at(m).mcp_michel) {
             for (TBranch *b : brMichel) b->Fill();
@@ -490,10 +531,12 @@ void ana::Fullchecks::resetEvent() {
 }
 void ana::Fullchecks::resetMuon() {
     MuonTrackPoints.clear();
+    MuonSpacePoints.clear();
     MuonHits.clear();
 }
 void ana::Fullchecks::resetMichel() {
     NearbyHits.clear();
+    NearbySpacePoints.clear();
 
     MichelTrackLength = 0;
 

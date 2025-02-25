@@ -22,13 +22,13 @@
 #include "protoduneana/Utilities/ProtoDUNEPFParticleUtils.h"
 
 #include "canvas/Persistency/Common/FindManyP.h"
+#include "canvas/Persistency/Common/FindOneP.h"
 
 #include <TTree.h>
 #include <TBranch.h>
 
 
 #define HIT_BRANCHES(t, pre, h) \
-    t->Branch(pre "NHit", &h.N), \
     t->Branch(pre "HitSlice", &h.slice), \
     t->Branch(pre "HitZ", &h.z), \
     t->Branch(pre "HitChannel", &h.channel), \
@@ -140,15 +140,6 @@ namespace ana {
             os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
             return os;
         }
-        // std::vector<TBranch*> SetBranches(TTree* t, std::string preffix="", std::string suffix="") {
-        //     return {
-        //         t->Branch((preffix+"HitSlice"+suffix).c_str(), &slice),
-        //         t->Branch((preffix+"HitZ"+suffix).c_str(), &z),
-        //         t->Branch((preffix+"HitChannel"+suffix).c_str(), &channel),
-        //         t->Branch((preffix+"HitTick"+suffix).c_str(), &tick),
-        //         t->Branch((preffix+"HitADC"+suffix).c_str(), &adc)
-        //     };
-        // }
     };
     struct Hits {
         unsigned N;
@@ -175,16 +166,6 @@ namespace ana {
             tick.clear();
             adc.clear();
         }
-        // std::vector<TBranch*> SetBranches(TTree* t, std::string preffix="", std::string suffix="") {
-        //     return {
-        //         t->Branch((preffix+"NHit"+suffix).c_str(), &N),
-        //         t->Branch((preffix+"HitSlice"+suffix).c_str(), &slice),
-        //         t->Branch((preffix+"HitZ"+suffix).c_str(), &z),
-        //         t->Branch((preffix+"HitChannel"+suffix).c_str(), &channel),
-        //         t->Branch((preffix+"HitTick"+suffix).c_str(), &tick),
-        //         t->Branch((preffix+"HitADC"+suffix).c_str(), &adc)
-        //     };
-        // }
         float energy() {
             float e = 0;
             for (unsigned i=0; i<N; i++) e += adc[i];
@@ -196,13 +177,9 @@ namespace ana {
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.X()), y(p.Y()), z(p.Z()) {}
-        // std::vector<TBranch*> SetBranches(TTree* t, std::string preffix="", std::string suffix="") {
-        //     return {
-        //         t->Branch((preffix+"TrackPointX"+suffix).c_str(), &x),
-        //         t->Branch((preffix+"TrackPointY"+suffix).c_str(), &y),
-        //         t->Branch((preffix+"TrackPointZ"+suffix).c_str(), &z)
-        //     };
-        // }
+        Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
+        Point operator-(geo::Point_t const& p) { return Point{x-p.x(), y-p.y(), z-p.z()}; }
+        float mag2() { return x*x + y*y + z*z; }
     };
     struct Points {
         unsigned N;
@@ -220,13 +197,5 @@ namespace ana {
             y.clear();
             z.clear();
         }
-        // std::vector<TBranch*> SetBranches(TTree *t, std::string preffix="", std::string suffix="") {
-        //     return {
-        //         t->Branch((preffix+"NTrackPoint"+suffix).c_str(), &N),
-        //         t->Branch((preffix+"TrackPointX"+suffix).c_str(), &x),
-        //         t->Branch((preffix+"TrackPointY"+suffix).c_str(), &y),
-        //         t->Branch((preffix+"TrackPointZ"+suffix).c_str(), &z)
-        //     };
-        // }
     };
 }
