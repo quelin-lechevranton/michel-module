@@ -179,7 +179,7 @@ namespace ana {
         Point(geo::Point_t const& p) : x(p.X()), y(p.Y()), z(p.Z()) {}
         Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
-        float mag2() { return x*x + y*y + z*z; }
+        float r2() { return x*x + y*y + z*z; }
     };
     struct Points {
         unsigned N;

@@ -214,9 +214,9 @@ void ana::Fullchecks::analyze(art::Event const& e)
     auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
+    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     // art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
-    art::FindOneP<recob::PFParticle> fmp_trk2pfp(vh_trk, e, tag_trk);
+    art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
     resetEvent();
@@ -322,7 +322,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         // and all muon space points
         double xmin = upper_bounds.x.max;
         ana::Point MuonEndSpt;
-        art::Ptr<recob::PFParticle> p_pfp = fmp_trk2pfp.at(p_trk.key());
+        art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
             MuonSpacePoints.push_back(ana::Point{p_spt->position()});
@@ -379,11 +379,8 @@ void ana::Fullchecks::analyze(art::Event const& e)
     for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
 
-        std::vector<art::Ptr<recob::Track>> vp_trk = fmp_hit2trk.at(p_hit.key());
-        auto it = vp_trk.begin();
-        std::cout << "number of tracks: " << vp_trk.size() << std::endl;
-        while (it != vp_trk.end() && (*it)->Length() < fTrackLengthCut) it++;
-        bool from_track = (it != vp_trk.end());
+        art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
+        bool from_track = p_trk && p_trk->Length() > fTrackLengthCut;
 
         // looping over muon end points
         for (unsigned m=0; m<EventNMuon; m++) {
@@ -391,18 +388,18 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
             float dz = (map_ch_z[p_hit->Channel()] - muon_endpoints.at(m).hit.z);
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
-            float sphere = dz*dz + dt*dt;
+            float dr2 = dz*dz + dt*dt;
 
-            bool from_this_muon = from_track ? (muon_endpoints.at(m).track_key == it->key()) : false;
+            bool from_another_track = from_track && muon_endpoints.at(m).track_key != p_trk->key();
 
-            if (from_track && !from_this_muon) continue;
-            if (sphere > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+            if (from_another_track) continue;
+            if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
             nearby.at(m).hits.push_back(ana::Hit{*p_hit});
 
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
-            if (sphere > fMichelSpaceRadius * fMichelSpaceRadius) continue;
+            if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
             nearby.at(m).sphere_hits.push_back(ana::Hit{*p_hit});
 
@@ -427,7 +424,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
             //
             //
             
-            if ((muon_endpoints.at(m).spt - spt.position()).mag2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+            if ((muon_endpoints.at(m).spt - spt.position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
             nearby.at(m).spt.push_back(ana::Point{spt.position()});
         }
@@ -472,6 +469,10 @@ void ana::Fullchecks::analyze(art::Event const& e)
         
         for (TBranch *b : brMichel) b->Fill();
     }
+
+    tMuon->SetEntries(brMuon.front()->GetEntries());
+    tEvent->Fill();
+    iEvent++;
 }
 
 void ana::Fullchecks::beginJob()
