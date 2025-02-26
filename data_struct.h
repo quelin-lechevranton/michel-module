@@ -93,8 +93,8 @@ namespace ana {
     bounds<float> tick_window;
     bounds3D<float> lower_bounds, upper_bounds;
 
-    std::map<raw::ChannelID_t, float> map_ch_z;
-    std::map<int,bounds<unsigned>> map_tpc_ch;
+    // std::map<raw::ChannelID_t, float> map_ch_z;
+    // std::map<int,bounds<unsigned>> map_tpc_ch;
     std::map<int,std::pair<int,int>> map_sl_tpc = {
         {0, {0, 2}},
         {1, {1, 3}},
@@ -111,10 +111,7 @@ namespace ana {
 
 
     // detector specific conversions
-    float GetZ(raw::ChannelID_t ch) {
-        return map_ch_z[ch];
-    }
-    unsigned GetSlice(raw::ChannelID_t ch) {
+    unsigned GetSlice(raw::ChannelID_t ch, std::map<int,bounds<unsigned>> const& map_tpc_ch) {
         bounds<unsigned> ch_bounds;
         for (auto const& [sl, tpcs] : map_sl_tpc) {
             ch_bounds = map_tpc_ch[tpcs.first];
@@ -125,6 +122,9 @@ namespace ana {
         }
         return -1;
     };
+    float GetZ(raw::ChannelID_t ch, std::map<int,float> const& map_ch_z) {
+        return map_ch_z[ch];
+    }
 
     struct Hit {
         // unsigned view;
@@ -136,9 +136,9 @@ namespace ana {
         Hit() : slice(0), z(0), channel(0), tick(0), adc(0) {}
         Hit(unsigned s, float z, int c, float t, float a) :
             slice(s), z(z), channel(c), tick(t), adc(a) {}
-        Hit(recob::Hit const& hit) :
-            slice(GetSlice(hit.Channel())),
-            z(GetZ(hit.Channel())),
+        Hit(recob::Hit const& hit, std::map<int,bounds<unsigned>> const& map_tpc_ch, std::map<int,float> const& map_ch_z) :
+            slice(GetSlice(hit.Channel(), map_tpc_ch)),
+            z(GetZ(hit.Channel(), map_ch_z)),
             channel(hit.Channel()),
             tick(hit.PeakTime()),
             adc(hit.Integral()) {}

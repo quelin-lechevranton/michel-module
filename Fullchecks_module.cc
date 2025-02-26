@@ -46,6 +46,9 @@ private:
     float fDriftVelocity; // cm/µs
     float fChannelPitch;
 
+    std::map<int,ana::bounds<unsigned>> map_tpc_ch;
+    std::map<int,float> map_ch_z;
+
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
     art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp;
@@ -223,7 +226,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
     for (recob::Hit const& hit : *vh_hit) {
         if (hit.View() != geo::kW) continue;
-        EventHits.push_back(ana::Hit{hit});
+        EventHits.push_back(ana::Hit{hit, map_tpc_ch, map_ch_z});
     }
 
 
@@ -278,10 +281,10 @@ void ana::Fullchecks::analyze(art::Event const& e)
         // if there is hits in lower volume, muon end is in upper volume
         // else muon end is in upper volume
         if (HitLowMin) {
-            MuonEndHit = ana::Hit{*HitLowMin};
+            MuonEndHit = ana::Hit{*HitLowMin, map_tpc_ch, map_ch_z};
         } else {
             if (HitUpMax)
-                MuonEndHit = ana::Hit{*HitUpMax};
+                MuonEndHit = ana::Hit{*HitUpMax, map_tpc_ch, map_ch_z};
             else
                 continue;
         }
@@ -300,7 +303,6 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
         // we found a muon candidate!
 
-        EventNMuon++;
         EventiMuon.push_back(iMuon);
 
         MuonIsAnti = mcp->PdgCode() < 0;
@@ -310,7 +312,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             if (p_hit_muon->View() != geo::kW) continue;
-            MuonHits.push_back(ana::Hit{*p_hit_muon});
+            MuonHits.push_back(ana::Hit{*p_hit_muon, map_tpc_ch, map_ch_z});
         }
 
         // and all muon track points
@@ -362,6 +364,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
         for (TBranch *b : brMuon) b->Fill();
         iMuon++;
+        EventNMuon++;
     } // end of loop over tracks
 
 
@@ -396,13 +399,13 @@ void ana::Fullchecks::analyze(art::Event const& e)
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).hits.push_back(ana::Hit{*p_hit});
+            nearby.at(m).hits.push_back(ana::Hit{*p_hit, map_tpc_ch, map_ch_z});
 
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
-            nearby.at(m).sphere_hits.push_back(ana::Hit{*p_hit});
+            nearby.at(m).sphere_hits.push_back(ana::Hit{*p_hit, map_tpc_ch, map_ch_z});
 
             // checking if the hit is associated to the michel MCParticle
             std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_hit.label());
@@ -456,7 +459,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
         for (const recob::Hit* hit_michel : v_hit_michel) {
             if (hit_michel->View() != geo::kW) continue;
 
-            MichelHits.push_back(ana::Hit{*hit_michel});
+            MichelHits.push_back(ana::Hit{*hit_michel, map_tpc_ch, map_ch_z});
         }
         MichelHitEnergy = MichelHits.energy();
 
