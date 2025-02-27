@@ -54,7 +54,7 @@
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
 
-#define LOG(x) (fLog ? std::cout << '\t' << #x << ": " << (x ? "\e[1;92m" : "\e[1;91m") << (x) << "\e[0m" << std::endl : void(), x)
+#define LOG(x) (fLog ? std::cout << '\t' << #x << ": " << (x ? "\033[1;92m" : "\033[1;91m") << (x) << "\033[0m" << std::endl : void(), x)
 
 
 namespace ana {
@@ -192,7 +192,7 @@ namespace ana {
             Hits_iterator& operator++() { i++; return *this; }
             bool operator!=(Hits_iterator const& h) { return i != h.i; }
             Hit operator*() { return hits->at(i); }
-        }
+        };
         Hits_iterator begin() const { return Hits_iterator(this, 0); }
         Hits_iterator end() const { return Hits_iterator(this, N); }
     };
@@ -236,7 +236,7 @@ namespace ana {
             Points_iterator& operator++() { i++; return *this; }
             bool operator!=(Points_iterator const& p) { return i != p.i; }
             Point operator*() { return points->at(i); }
-        }
+        };
         Points_iterator begin() const { return Points_iterator(this, 0); }
         Points_iterator end() const { return Points_iterator(this, N); }
     };

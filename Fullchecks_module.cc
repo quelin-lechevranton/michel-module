@@ -241,7 +241,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID(); << '\r' << std::flush;
+        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << '\r' << std::flush;
 
         // no short tracks
         if (LOG(p_trk->Length() < fTrackLengthCut)) continue;
