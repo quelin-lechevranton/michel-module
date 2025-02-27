@@ -502,7 +502,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
 
-            std::cout << "hit @ z: " << hit_col.z << std::endl;
+            std::cout << "hit @ z: " << hit_col.z << " " << (U_coincidence ? (V_coincidence ? "UV" : "U") : "V") << " coincidences" << std::endl;
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
             for (recob::Hit const* hit_ind : v_hit_coincidence) {
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
