@@ -421,7 +421,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         for (unsigned m=0; m<EventNMuon; m++) {
             if (GetSlice(*p_hit) != muon_endpoints.at(m).hit.slice) continue;
 
-            float dz = (GetZ(p_hit->Channel()) - muon_endpoints.at(m).hit.z);
+            float dz = (GetZ(*p_hit) - muon_endpoints.at(m).hit.z);
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
@@ -590,7 +590,7 @@ void ana::Fullchecks::resetMichel() {
 }
 
 unsigned ana::Fullchecks::GetSlice(recob::Hit const& hit) {
-    for (auto const [sl, p] : ana::map_sl_tpc) {
+    for (auto const& [sl, p] : ana::map_sl_tpc) {
         if (p.first == hit.WireID().TPC || p.second == hit.WireID().TPC) return sl;
     }
     return -1;

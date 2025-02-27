@@ -95,11 +95,7 @@ namespace ana {
     };
 
 
-    // some detector specific data
-
-    // std::map<raw::ChannelID_t, float> map_ch_z;
-    // std::map<int,bounds<unsigned>> map_tpc_ch;
-    std::map<int,std::pair<int,int>> map_sl_tpc = {
+    std::map<unsigned,std::pair<unsigned,unsigned>> map_sl_tpc = {
         {0, {0, 2}},
         {1, {1, 3}},
         {2, {4, 6}},
