@@ -111,7 +111,7 @@ namespace ana {
 
 
     // detector specific conversions
-    unsigned GetSlice(raw::ChannelID_t ch, std::map<int,bounds<unsigned>> const& map_tpc_ch) {
+    unsigned GetSlice(raw::ChannelID_t ch, std::map<int,bounds<unsigned>>& map_tpc_ch) {
         bounds<unsigned> ch_bounds;
         for (auto const& [sl, tpcs] : map_sl_tpc) {
             ch_bounds = map_tpc_ch[tpcs.first];
@@ -122,7 +122,7 @@ namespace ana {
         }
         return -1;
     };
-    float GetZ(raw::ChannelID_t ch, std::map<int,float> const& map_ch_z) {
+    float GetZ(raw::ChannelID_t ch, std::map<int,float>& map_ch_z) {
         return map_ch_z[ch];
     }
 
@@ -136,7 +136,7 @@ namespace ana {
         Hit() : slice(0), z(0), channel(0), tick(0), adc(0) {}
         Hit(unsigned s, float z, int c, float t, float a) :
             slice(s), z(z), channel(c), tick(t), adc(a) {}
-        Hit(recob::Hit const& hit, std::map<int,bounds<unsigned>> const& map_tpc_ch, std::map<int,float> const& map_ch_z) :
+        Hit(recob::Hit const& hit, std::map<int,bounds<unsigned>>& map_tpc_ch, std::map<int,float>& map_ch_z) :
             slice(GetSlice(hit.Channel(), map_tpc_ch)),
             z(GetZ(hit.Channel(), map_ch_z)),
             channel(hit.Channel()),

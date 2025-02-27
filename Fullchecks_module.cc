@@ -388,7 +388,7 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
         // looping over muon end points
         for (unsigned m=0; m<EventNMuon; m++) {
-            if (GetSlice(p_hit->Channel()) != muon_endpoints.at(m).hit.slice) continue;
+            if (GetSlice(p_hit->Channel(), map_tpc_ch) != muon_endpoints.at(m).hit.slice) continue;
 
             float dz = (map_ch_z[p_hit->Channel()] - muon_endpoints.at(m).hit.z);
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
@@ -569,5 +569,15 @@ bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
 bool ana::Fullchecks::IsUpright(recob::Track const& T) {
     return T.Start().X() > T.End().X();
 }
+
+
+
+// bool ana::Fullchecks::GetTimeCoincidence() {
+
+// }
+
+
+
+
 
 DEFINE_ART_MODULE(ana::Fullchecks)
