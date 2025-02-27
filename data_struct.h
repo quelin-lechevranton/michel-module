@@ -115,23 +115,6 @@ namespace ana {
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
  
 
-
-    // detector specific conversions
-    unsigned GetSlice(raw::ChannelID_t ch, std::map<int,bounds<unsigned>>& map_tpc_ch) {
-        bounds<unsigned> ch_bounds;
-        for (auto const& [sl, tpcs] : map_sl_tpc) {
-            ch_bounds = map_tpc_ch[tpcs.first];
-            if (ch_bounds.min <= ch && ch <= ch_bounds.max) return sl;
-
-            ch_bounds = map_tpc_ch[tpcs.second];
-            if (ch_bounds.min <= ch && ch <= ch_bounds.max) return sl;
-        }
-        return -1;
-    };
-    float GetZ(raw::ChannelID_t ch, std::map<int,float>& map_ch_z) {
-        return map_ch_z[ch];
-    }
-
     struct Hit {
         // unsigned view;
         unsigned slice;
@@ -142,12 +125,6 @@ namespace ana {
         Hit() : slice(0), z(0), channel(0), tick(0), adc(0) {}
         Hit(unsigned s, float z, int c, float t, float a) :
             slice(s), z(z), channel(c), tick(t), adc(a) {}
-        Hit(recob::Hit const& hit, std::map<int,bounds<unsigned>>& map_tpc_ch, std::map<int,float>& map_ch_z) :
-            slice(GetSlice(hit.Channel(), map_tpc_ch)),
-            z(GetZ(hit.Channel(), map_ch_z)),
-            channel(hit.Channel()),
-            tick(hit.PeakTime()),
-            adc(hit.Integral()) {}
 
 
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {

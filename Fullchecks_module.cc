@@ -46,8 +46,8 @@ private:
     float fDriftVelocity; // cm/µs
     float fChannelPitch;
 
-    std::map<int,ana::bounds<unsigned>> map_tpc_ch;
-    std::map<int,float> map_ch_z;
+    // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
+    // std::map<int,float> map_ch_z;
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
@@ -106,6 +106,7 @@ private:
 
     bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
+    ana::Hit GetHit(recob::Hit const& hit);
 };
 
 
@@ -227,7 +228,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     for (recob::Hit const& hit : *vh_hit) {
         if (hit.View() != geo::kW) continue;
-        EventHits.push_back(ana::Hit{hit, map_tpc_ch, map_ch_z});
+        EventHits.push_back(GetHit(hit));
     }
 
 
@@ -283,10 +284,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // if there is hits in lower volume, muon end is in upper volume
         // else muon end is in upper volume
         if (HitLowMin) {
-            MuonEndHit = ana::Hit{*HitLowMin, map_tpc_ch, map_ch_z};
+            MuonEndHit = GetHit(*HitLowMin);
         } else {
             if (HitUpMax)
-                MuonEndHit = ana::Hit{*HitUpMax, map_tpc_ch, map_ch_z};
+                MuonEndHit = GetHit(*HitUpMax);
             else
                 continue;
         }
@@ -315,7 +316,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             if (p_hit_muon->View() != geo::kW) continue;
-            MuonHits.push_back(ana::Hit{*p_hit_muon, map_tpc_ch, map_ch_z});
+            MuonHits.push_back(GetHit(*p_hit_muon));
         }
 
         // and all muon track points
@@ -391,9 +392,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // looping over muon end points
         for (unsigned m=0; m<EventNMuon; m++) {
-            if (GetSlice(p_hit->Channel(), map_tpc_ch) != muon_endpoints.at(m).hit.slice) continue;
+            if (GetSlice(*p_hit) != muon_endpoints.at(m).hit.slice) continue;
 
-            float dz = (map_ch_z[p_hit->Channel()] - muon_endpoints.at(m).hit.z);
+            float dz = (GetHit(p_hit->Channel()).z - muon_endpoints.at(m).hit.z);
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
@@ -402,13 +403,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).hits.push_back(ana::Hit{*p_hit, map_tpc_ch, map_ch_z});
+            nearby.at(m).hits.push_back(GetHit(*p_hit));
 
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
-            nearby.at(m).sphere_hits.push_back(ana::Hit{*p_hit, map_tpc_ch, map_ch_z});
+            nearby.at(m).sphere_hits.push_back(GetHit(*p_hit));
 
             // checking if the hit is associated to the michel MCParticle
             std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_hit.label());
@@ -506,7 +507,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         for (const recob::Hit* hit_michel : v_hit_michel) {
             if (hit_michel->View() != geo::kW) continue;
 
-            MichelHits.push_back(ana::Hit{*hit_michel, map_tpc_ch, map_ch_z});
+            MichelHits.push_back(GetHit(*hit_michel));
         }
         MichelHitEnergy = MichelHits.energy();
 
@@ -553,19 +554,19 @@ void ana::Fullchecks::beginJob()
             lower_bounds.z.max = lower_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
         }
 
-        geo::PlaneID planeid{tpcid, 0};
+        // geo::PlaneID planeid{tpcid, 0};
 
-        for (unsigned w=0; w<asWire->Nwires(planeid); w++) {
-            geo::WireID wireid{planeid, w};
-            geo::WireGeo const wiregeo = asWire->Wire(wireid);
+        // for (unsigned w=0; w<asWire->Nwires(planeid); w++) {
+        //     geo::WireID wireid{planeid, w};
+        //     geo::WireGeo const wiregeo = asWire->Wire(wireid);
 
-            map_ch_z[asWire->PlaneWireToChannel(wireid)] = wiregeo.GetStart().Z();
-        }
+        //     map_ch_z[asWire->PlaneWireToChannel(wireid)] = wiregeo.GetStart().Z();
+        // }
 
-        map_tpc_ch[tpc] = {
-            asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, 0}),
-            asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, asWire->Nwires(geo::PlaneID{tpcid, 0})-1})
-        };
+        // map_tpc_ch[tpc] = {
+        //     asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, 0}),
+        //     asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, asWire->Nwires(geo::PlaneID{tpcid, 0})-1})
+        // };
     }
 }
 
@@ -608,10 +609,24 @@ void ana::Fullchecks::resetMichel() {
     SphereEnergyFalsePositive = 0;
 }
 
-
+unsigned GetSlice(recob::Hit const& hit) {
+    for (auto const [sl, p] : map_sl_tpc) {
+        if (p.first == hit.WireID().TPC || p.second == hit.WireID().TPC) return sl;
+    }
+    return -1;
+}
+ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
+    return ana::Hit{
+        GetSlice(hit),
+        asWire->Wire(hit.WireID()).GetStart().Z(),
+        hit.Channel(),
+        hit.PeakTime(),
+        hit.Integral()
+    };
+}
 bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
     if (ch == raw::InvalidChannelID) return false;
-    return ch >= map_tpc_ch[8].min;
+    return ch >= asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{geo::TPCID{0, 8}, geo::kW}, 0});
 }
 bool ana::Fullchecks::IsUpright(recob::Track const& T) {
     return T.Start().X() > T.End().X();
