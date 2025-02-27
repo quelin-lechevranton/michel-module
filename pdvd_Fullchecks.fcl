@@ -37,13 +37,15 @@ physics: {
             ]
 
             Log: true
+            KeepOutside: false
+
+            TrackLengthCut: 40.
 
             MichelSpaceRadius: 20.
             NearbySpaceRadius: 40.
 
-            TrackLengthCut: 40.
-
-            KeepOutside: false
+            CoincidenceWindowBefore: 5.
+            CoincidenceWindowAfter: 5.
         }
     }
     ana: [ checks ]

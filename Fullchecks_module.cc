@@ -57,11 +57,13 @@ private:
 
     // Input Parameters
     bool fLog;
+    bool fKeepOutside;
+    float fTrackLengthCut; // in cm
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
     float fNearbySpaceRadius; // in cm
-    float fTrackLengthCut; // in cm
-    bool fKeepOutside;
+    float fCoincidenceWindowBefore; // in ticks
+    float fCoincidenceWindowAfter; // in ticks
 
     // Output Variables
     TTree* tEvent;
@@ -118,10 +120,12 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log")),
+    fKeepOutside(p.get<bool>("KeepOutside")),
+    fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
     fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
     fNearbySpaceRadius(p.get<float>("NearbySpaceRadius")), //in cm
-    fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
-    fKeepOutside(p.get<bool>("KeepOutside"))
+    fCoincidenceWindowBefore(p.get<float>("CoincidenceWindowBefore")), // in ticks
+    fCoincidenceWindowAfter(p.get<float>("CoincidenceWindowAfter")) // in ticks
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -315,8 +319,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         } else {
             if (HitUpMax)
                 MuonEndHit = GetHit(*HitUpMax);
-            else
+            else {
+                LOG("no collection hit in volume")
                 continue;
+            }
         }
             
         // track end point is the deepest
@@ -470,7 +476,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
         // ana::Points NearbySpaceHits;
-        float fCoincidenceBefore = 2, fCoincidenceAfter = 2;
         std::cout << "mu#" << m << " " << nearby.at(m).hits.size() << " nearby hits" << std::endl;
         unsigned no_coincidence = 0;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
@@ -484,8 +489,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
 
-                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
-                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
+                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceWindowBefore) continue;
+                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceWindowAfter) continue;
                 v_hit_coincidence.push_back(&hit_ind);
             }
             if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
