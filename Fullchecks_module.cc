@@ -471,6 +471,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // ana::Points NearbySpaceHits;
         float fCoincidenceBefore = 2, fCoincidenceAfter = 2;
+        std::cout << "mu#" << m << " " << nearby.at(m).hits.size() << " nearby hits" << std::endl;
+        unsigned no_coincidence = 0;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
 
             std::vector<recob::Hit const*> v_hit_coincidence;
@@ -486,7 +488,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
                 v_hit_coincidence.push_back(&hit_ind);
             }
-            if (v_hit_coincidence.empty()) continue;
+            if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
@@ -502,15 +504,17 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
 
-            std::cout << "hit @ z: " << hit_col.z << " " << (U_coincidence ? (V_coincidence ? "UV" : "U") : "V") << " coincidences" << std::endl;
+            std::cout << "hit z:" << hit_col.z << " " << (U_coincidence ? "U" : "") << (V_coincidence ? "V" : " ") << " coincidences";
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
             for (recob::Hit const* hit_ind : v_hit_coincidence) {
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
 
                 geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                std::cout << " [" << 'U' + hit_ind->View() << ", z:" << pt.z() << "]";
+                std::cout << " [" << char('U' + hit_ind->View()) << ", z:" << pt.z() << "]";
             }
+            std::cout << std::endl;
         }
+        std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
         
         resetMichel();
