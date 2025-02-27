@@ -304,7 +304,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (LOG(!fKeepOutside && !(MuonEndIsInWindowT && MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
-        if (fLog) printf("\t\033[1m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
+        if (fLog) printf("\t\033[1;93m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
 
         EventiMuon.push_back(iMuon);
 
@@ -442,44 +442,46 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
         // ana::Points NearbySpaceHits;
-        // for (ana::Hit const& hit_col : nearby.at(m).hits) {
+        for (ana::Hit const& hit_col : nearby.at(m).hits) {
 
-        //     std::vector<recob::Hit const> v_hit_coincidence;
-        //     bool U_coincidence = false, V_coincidence = false;
-        //     for (recob::Hit const& hit_ind : *vh_hit) {
-        //         switch (hit_ind.View()) {
-        //             case geo::kU: U_coincidence = true; break;
-        //             case geo::kV: V_coincidence = true; break;
-        //             default: continue;
-        //         }
+            std::vector<recob::Hit const> v_hit_coincidence;
+            bool U_coincidence = false, V_coincidence = false;
+            for (recob::Hit const& hit_ind : *vh_hit) {
+                switch (hit_ind.View()) {
+                    case geo::kU: U_coincidence = true; break;
+                    case geo::kV: V_coincidence = true; break;
+                    default: continue;
+                }
 
-        //         if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
-        //         if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
-        //         v_hit_coincidence.push_back(hit_ind);
-        //     }
-        //     if (v_hit_coincidence.empty()) continue;
+                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
+                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
+                v_hit_coincidence.push_back(hit_ind);
+            }
+            if (v_hit_coincidence.empty()) continue;
 
-        //     geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
-        //     for (recob::Hit const& hit_ind : v_hit_coincidence) {
-        //         geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+            // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
+            // for (recob::Hit const& hit_ind : v_hit_coincidence) {
+            //     geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
+            //     // https://en.wikipedia.org/wiki/Line–line_intersection
 
-                
-
-            
-
-
-
-
-
-
+            //     double d = (start_col.y - end_col.y) * (start_ind.z - end_ind.z) - (start_col.z - end_col.z) * (start_ind.y - end_ind.y);
+            //     if (d == 0) continue;
+            //     double a = (start_col.y * end_col.z - start_col.z * end_col.y)
+            //     double b = (start_ind.y * end_ind.z - start_ind.z * end_ind.y)
+            //     double y = (a * (start_ind.y - end_ind.y) - b * (start_col.y - end_col.y)) / d;
+            //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
 
+            std::cout << "hit @ z: " << hit_col.z << std::endl;
+            geo::WireGeo const wiregeo_col = asWire->Wire(hit_col.WireID());
+            for (recob::Hit const& hit_ind : v_hit_coincidence) {
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
 
-
-
-
-
+                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
+                std::cout << " [" << 'U' + hit_ind.View() << ", z:" << pt.z() << "]";
+            }
+        }
 
         
         resetMichel();
