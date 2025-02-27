@@ -96,8 +96,6 @@ namespace ana {
 
 
     // some detector specific data
-    bounds<float> tick_window;
-    bounds3D<float> lower_bounds, upper_bounds;
 
     // std::map<raw::ChannelID_t, float> map_ch_z;
     // std::map<int,bounds<unsigned>> map_tpc_ch;
@@ -119,11 +117,11 @@ namespace ana {
         // unsigned view;
         unsigned slice;
         float z;
-        int channel;
+        unsigned channel;
         float tick;
         float adc;
         Hit() : slice(0), z(0), channel(0), tick(0), adc(0) {}
-        Hit(unsigned s, float z, int c, float t, float a) :
+        Hit(unsigned s, float z, unsigned c, float t, float a) :
             slice(s), z(z), channel(c), tick(t), adc(a) {}
 
 
@@ -136,7 +134,7 @@ namespace ana {
         // std::vector<unsigned> view;
         std::vector<unsigned> slice;
         std::vector<float> z;
-        std::vector<int> channel;
+        std::vector<unsigned> channel;
         std::vector<float> tick;
         std::vector<float> adc;
         Hits() : N(0), slice(), z(), channel(), tick(), adc() {}

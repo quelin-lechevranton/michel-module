@@ -46,6 +46,8 @@ private:
     float fDriftVelocity; // cm/µs
     float fChannelPitch;
 
+    bounds<float> tick_window;
+    bounds3D<float> lower_bounds, upper_bounds;
     // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
 
@@ -106,6 +108,8 @@ private:
 
     bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
+    unsigned GetSlice(recob::Hit const& hit);
+    float GetZ(recob::Hit const& hit);
     ana::Hit GetHit(recob::Hit const& hit);
 };
 
@@ -152,6 +156,29 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
+
+    tick_window.min = 0;
+    tick_window.max = detProp.ReadOutWindowSize();
+
+    for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+        geo::TPCID tpcid{0, tpc};
+
+        if (tpc >= 8) {
+            upper_bounds.x.min = upper_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
+            upper_bounds.x.max = upper_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
+            upper_bounds.y.min = upper_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
+            upper_bounds.y.max = upper_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : upper_bounds.y.max;
+            upper_bounds.z.min = upper_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : upper_bounds.z.min;
+            upper_bounds.z.max = upper_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : upper_bounds.z.max;
+        } else {
+            lower_bounds.x.min = lower_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : lower_bounds.x.min;
+            lower_bounds.x.max = lower_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : lower_bounds.x.max;
+            lower_bounds.y.min = lower_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : lower_bounds.y.min;
+            lower_bounds.y.max = lower_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : lower_bounds.y.max;
+            lower_bounds.z.min = lower_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : lower_bounds.z.min;
+            lower_bounds.z.max = lower_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
+        }
+    }
 
 
     tEvent = tfs->make<TTree>("event","");
@@ -394,7 +421,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         for (unsigned m=0; m<EventNMuon; m++) {
             if (GetSlice(*p_hit) != muon_endpoints.at(m).hit.slice) continue;
 
-            float dz = (GetHit(p_hit->Channel()).z - muon_endpoints.at(m).hit.z);
+            float dz = (GetZ(p_hit->Channel()) - muon_endpoints.at(m).hit.z);
             float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
@@ -443,9 +470,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
         // ana::Points NearbySpaceHits;
+        float fCoincidenceBefore = 2, fCoincidenceAfter = 2;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
 
-            std::vector<recob::Hit const> v_hit_coincidence;
+            std::vector<recob::Hit const*> v_hit_coincidence;
             bool U_coincidence = false, V_coincidence = false;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 switch (hit_ind.View()) {
@@ -456,7 +484,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
                 if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
-                v_hit_coincidence.push_back(hit_ind);
+                v_hit_coincidence.push_back(&hit_ind);
             }
             if (v_hit_coincidence.empty()) continue;
 
@@ -475,12 +503,12 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
             std::cout << "hit @ z: " << hit_col.z << std::endl;
-            geo::WireGeo const wiregeo_col = asWire->Wire(hit_col.WireID());
-            for (recob::Hit const& hit_ind : v_hit_coincidence) {
-                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
+            geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
+            for (recob::Hit const* hit_ind : v_hit_coincidence) {
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
 
                 geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                std::cout << " [" << 'U' + hit_ind.View() << ", z:" << pt.z() << "]";
+                std::cout << " [" << 'U' + hit_ind->View() << ", z:" << pt.z() << "]";
             }
         }
 
@@ -527,56 +555,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     iEvent++;
 }
 
-void ana::Fullchecks::beginJob()
-{
-    auto const clockData = asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(clockData);
-
-    tick_window.min = 0;
-    tick_window.max = detProp.ReadOutWindowSize();
-
-    for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
-        geo::TPCID tpcid{0, tpc};
-
-        if (tpc >= 8) {
-            upper_bounds.x.min = upper_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
-            upper_bounds.x.max = upper_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
-            upper_bounds.y.min = upper_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
-            upper_bounds.y.max = upper_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : upper_bounds.y.max;
-            upper_bounds.z.min = upper_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : upper_bounds.z.min;
-            upper_bounds.z.max = upper_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : upper_bounds.z.max;
-        } else {
-            lower_bounds.x.min = lower_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : lower_bounds.x.min;
-            lower_bounds.x.max = lower_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : lower_bounds.x.max;
-            lower_bounds.y.min = lower_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : lower_bounds.y.min;
-            lower_bounds.y.max = lower_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : lower_bounds.y.max;
-            lower_bounds.z.min = lower_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : lower_bounds.z.min;
-            lower_bounds.z.max = lower_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
-        }
-
-        // geo::PlaneID planeid{tpcid, 0};
-
-        // for (unsigned w=0; w<asWire->Nwires(planeid); w++) {
-        //     geo::WireID wireid{planeid, w};
-        //     geo::WireGeo const wiregeo = asWire->Wire(wireid);
-
-        //     map_ch_z[asWire->PlaneWireToChannel(wireid)] = wiregeo.GetStart().Z();
-        // }
-
-        // map_tpc_ch[tpc] = {
-        //     asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, 0}),
-        //     asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{tpcid, 0}, asWire->Nwires(geo::PlaneID{tpcid, 0})-1})
-        // };
-    }
-}
-
-
-
-
-void ana::Fullchecks::endJob()
-{
-    // Implementation of optional member function here.
-}
+void ana::Fullchecks::beginJob() {}
+void ana::Fullchecks::endJob() {}
 
 
 void ana::Fullchecks::resetEvent() {
@@ -609,16 +589,19 @@ void ana::Fullchecks::resetMichel() {
     SphereEnergyFalsePositive = 0;
 }
 
-unsigned GetSlice(recob::Hit const& hit) {
-    for (auto const [sl, p] : map_sl_tpc) {
+unsigned ana::Fullchecks::GetSlice(recob::Hit const& hit) {
+    for (auto const [sl, p] : ana::map_sl_tpc) {
         if (p.first == hit.WireID().TPC || p.second == hit.WireID().TPC) return sl;
     }
     return -1;
 }
+float ana::Fullchecks::GetZ(recob::Hit const& hit) {
+    return (float) asWire->Wire(hit.WireID()).GetStart().Z();
+}
 ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
     return ana::Hit{
         GetSlice(hit),
-        asWire->Wire(hit.WireID()).GetStart().Z(),
+        GetZ(hit),
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
