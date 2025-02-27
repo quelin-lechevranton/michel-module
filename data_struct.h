@@ -54,7 +54,8 @@
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
 
-#define LOG(x) (fLog ? void(std::cout << '\t' << #x << ": " << (x ? "\033[1;92m" : "\033[1;91m") << (x) << "\033[0m" << std::endl) : void(), x)
+// #define LOG(x) (fLog ? void(std::cout << '\t' << #x << ": " << (x ? "\033[1;92m" : "\033[1;91m") << (x ? "true" : "false") << "\033[0m" << std::endl) : void(), x)
+#define LOG(x) (fLog ? void(printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true, continue;":"false")) : void(), x)
 
 
 namespace ana {

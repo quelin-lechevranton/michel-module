@@ -241,7 +241,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << '\r' << std::flush;
+        if (fLog) printf("e%ut%u\r", iEvent, p_trk->ID()), fflush(stdout);
 
         // no short tracks
         if (LOG(p_trk->Length() < fTrackLengthCut)) continue;
@@ -250,7 +250,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // tracks associated to a MCTruth muon
         if (!mcp) continue;
-        if (LOG(mcp->PdgCode() != 13)) continue;
+        if (LOG(abs(mcp->PdgCode()) != 13)) continue;
 
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
@@ -304,7 +304,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (LOG(!fKeepOutside && !(MuonEndIsInWindowT && MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
-        if (fLog) std::cout << "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" << std::endl;
+        if (fLog) printf("\t\033[1m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
 
         EventiMuon.push_back(iMuon);
 
@@ -441,22 +441,30 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     for (unsigned m=0; m<EventNMuon; m++) {
 
 
-        // ana::Points NearbySpaceHits;
-        // for (ana::Hit const& hit_col : nearby.at(m).hits) {
+        ana::Points NearbySpaceHits;
+        for (ana::Hit const& hit_col : nearby.at(m).hits) {
 
-        //     std::vector<recob::Hit const> v_hit_coincidence;
-        //     bool U_coincidence = false, V_coincidence = false;
-        //     for (recob::Hit const& hit_ind : *vh_hit) {
-        //         switch (hit_ind.View()) {
-        //             case geo::kU: U_coincidence = true; break;
-        //             case geo::kV: V_coincidence = true; break;
-        //             default: continue;
-        //         }
+            std::vector<recob::Hit const> v_hit_coincidence;
+            bool U_coincidence = false, V_coincidence = false;
+            for (recob::Hit const& hit_ind : *vh_hit) {
+                switch (hit_ind.View()) {
+                    case geo::kU: U_coincidence = true; break;
+                    case geo::kV: V_coincidence = true; break;
+                    default: continue;
+                }
 
-        //         if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
-        //         if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
-        //         v_hit_close.push_back(hit_ind);
-        //     }
+                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
+                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
+                v_hit_coincidence.push_back(hit_ind);
+            }
+            if (v_hit_coincidence.empty()) continue;
+
+            geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
+            for (recob::Hit const& hit_ind : v_hit_coincidence) {
+                geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+
+
+                
 
             
 
