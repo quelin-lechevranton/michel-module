@@ -150,6 +150,7 @@ namespace ana {
             tick.clear();
             adc.clear();
         }
+        unsigned size() const { return N; }
         float energy() const {
             float e = 0;
             for (unsigned i=0; i<N; i++) e += adc[i];
@@ -199,6 +200,7 @@ namespace ana {
             y.clear();
             z.clear();
         }
+        unsigned size() const { return N; }
 
         // for range-loop
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
