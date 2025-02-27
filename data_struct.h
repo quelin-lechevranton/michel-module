@@ -54,7 +54,7 @@
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
 
-
+#define LOG(x) (fLog ? std::cout << '\t' << #x << ": " << (x ? "\e[1;92m" : "\e[1;91m") << (x) << "\e[0m" << std::endl : void(), x)
 
 
 namespace ana {
@@ -66,6 +66,8 @@ namespace ana {
         bool isInside(T x, float r=0) { 
             return min+r <= x && x <= max-r;
         }
+
+
         friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
             return os << "[" << b.min << ", " << b.max << "]";
         }
@@ -83,6 +85,8 @@ namespace ana {
         bool isInside(TLorentzVector const& v, float r=0) {
             return isInside(v.X(), v.Y(), v.Z(), r);
         }
+
+
         friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
             return os << b.x << "x" << b.y << "x" << b.z;
         }
@@ -142,6 +146,8 @@ namespace ana {
             channel(hit.Channel()),
             tick(hit.PeakTime()),
             adc(hit.Integral()) {}
+
+
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
@@ -171,11 +177,24 @@ namespace ana {
             tick.clear();
             adc.clear();
         }
-        float energy() {
+        float energy() const {
             float e = 0;
             for (unsigned i=0; i<N; i++) e += adc[i];
             return e * fADCtoMeV;
         }
+
+        // for range-loop
+        Hit at(unsigned i) const { return Hit{slice[i], z[i], channel[i], tick[i], adc[i]}; }
+        struct Hits_iterator {
+            const Hits* hits;
+            unsigned i;
+            Hits_iterator(Hits const* h, unsigned i) : hits(h), i(i) {}
+            Hits_iterator& operator++() { i++; return *this; }
+            bool operator!=(Hits_iterator const& h) { return i != h.i; }
+            Hit operator*() { return hits->at(i); }
+        }
+        Hits_iterator begin() const { return Hits_iterator(this, 0); }
+        Hits_iterator end() const { return Hits_iterator(this, N); }
     };
     struct Point {
         float x, y, z;
@@ -185,6 +204,8 @@ namespace ana {
         Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         float r2() { return x*x + y*y + z*z; }
+
+
         friend std::ostream& operator<<(std::ostream& os, const Point& p) {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
@@ -205,5 +226,18 @@ namespace ana {
             y.clear();
             z.clear();
         }
+
+        // for range-loop
+        Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
+        struct Points_iterator {
+            const Points* points;
+            unsigned i;
+            Points_iterator(Points const* p, unsigned i) : points(p), i(i) {}
+            Points_iterator& operator++() { i++; return *this; }
+            bool operator!=(Points_iterator const& p) { return i != p.i; }
+            Point operator*() { return points->at(i); }
+        }
+        Points_iterator begin() const { return Points_iterator(this, 0); }
+        Points_iterator end() const { return Points_iterator(this, N); }
     };
 }

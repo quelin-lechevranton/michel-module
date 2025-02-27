@@ -36,6 +36,8 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
+            Log: true
+
             MichelSpaceRadius: 20.
             NearbySpaceRadius: 40.
 

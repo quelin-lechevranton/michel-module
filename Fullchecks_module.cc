@@ -54,6 +54,7 @@ private:
     art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp;
 
     // Input Parameters
+    bool fLog;
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
     float fNearbySpaceRadius; // in cm
@@ -111,6 +112,7 @@ private:
 ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    fLog(p.get<bool>("Log")),
     fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
     fNearbySpaceRadius(p.get<float>("NearbySpaceRadius")), //in cm
     fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
@@ -198,8 +200,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     };
 }
 
-void ana::Fullchecks::analyze(art::Event const& e)
-{
+void ana::Fullchecks::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
@@ -240,19 +241,20 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
+        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID(); << '\r' << std::flush;
 
         // no short tracks
-        if (p_trk->Length() < fTrackLengthCut) continue;
+        if (LOG(p_trk->Length() < fTrackLengthCut)) continue;
 
         simb::MCParticle const* mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
 
         // tracks associated to a MCTruth muon
         if (!mcp) continue;
-        if (mcp->PdgCode() != 13) continue;
+        if (LOG(mcp->PdgCode() != 13)) continue;
 
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
-        if (vp_hit_muon.empty()) continue;
+        if (LOG(vp_hit_muon.empty())) continue;
 
         float TickUpMax = tick_window.min, TickLowMin = tick_window.max;
         art::Ptr<recob::Hit> HitUpMax, HitLowMin;
@@ -299,9 +301,10 @@ void ana::Fullchecks::analyze(art::Event const& e)
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
         MuonEndIsInVolumeYZ = upper_bounds.isInside(150.F, MuonEndTrackPoint.y, MuonEndTrackPoint.z, fMichelSpaceRadius);
 
-        if (!fKeepOutside && !(MuonEndIsInWindowT && MuonEndIsInVolumeYZ)) continue;
+        if (LOG(!fKeepOutside && !(MuonEndIsInWindowT && MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
+        if (fLog) std::cout << "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" << std::endl;
 
         EventiMuon.push_back(iMuon);
 
@@ -436,6 +439,40 @@ void ana::Fullchecks::analyze(art::Event const& e)
 
     // filling the branches related to michel
     for (unsigned m=0; m<EventNMuon; m++) {
+
+
+        // ana::Points NearbySpaceHits;
+        // for (ana::Hit const& hit_col : nearby.at(m).hits) {
+
+        //     std::vector<recob::Hit const> v_hit_coincidence;
+        //     bool U_coincidence = false, V_coincidence = false;
+        //     for (recob::Hit const& hit_ind : *vh_hit) {
+        //         switch (hit_ind.View()) {
+        //             case geo::kU: U_coincidence = true; break;
+        //             case geo::kV: V_coincidence = true; break;
+        //             default: continue;
+        //         }
+
+        //         if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
+        //         if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
+        //         v_hit_close.push_back(hit_ind);
+        //     }
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
         resetMichel();
 
@@ -569,15 +606,6 @@ bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
 bool ana::Fullchecks::IsUpright(recob::Track const& T) {
     return T.Start().X() > T.End().X();
 }
-
-
-
-// bool ana::Fullchecks::GetTimeCoincidence() {
-
-// }
-
-
-
 
 
 DEFINE_ART_MODULE(ana::Fullchecks)
