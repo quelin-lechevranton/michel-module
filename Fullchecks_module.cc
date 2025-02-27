@@ -62,8 +62,7 @@ private:
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
     float fNearbySpaceRadius; // in cm
-    float fCoincidenceWindowBefore; // in ticks
-    float fCoincidenceWindowAfter; // in ticks
+    float fCoincidenceWindow; // in ticks
 
     // Output Variables
     TTree* tEvent;
@@ -124,8 +123,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
     fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
     fNearbySpaceRadius(p.get<float>("NearbySpaceRadius")), //in cm
-    fCoincidenceWindowBefore(p.get<float>("CoincidenceWindowBefore")), // in ticks
-    fCoincidenceWindowAfter(p.get<float>("CoincidenceWindowAfter")) // in ticks
+    fCoincidenceWindow(p.get<float>("CoincidenceWindow")) // in ticks
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -483,14 +481,15 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::vector<recob::Hit const*> v_hit_coincidence;
             bool U_coincidence = false, V_coincidence = false;
             for (recob::Hit const& hit_ind : *vh_hit) {
+
+                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow) continue;
+
                 switch (hit_ind.View()) {
                     case geo::kU: U_coincidence = true; break;
                     case geo::kV: V_coincidence = true; break;
                     default: continue;
                 }
 
-                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceWindowBefore) continue;
-                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceWindowAfter) continue;
                 v_hit_coincidence.push_back(&hit_ind);
             }
             if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
