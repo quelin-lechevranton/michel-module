@@ -441,27 +441,27 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     for (unsigned m=0; m<EventNMuon; m++) {
 
 
-        ana::Points NearbySpaceHits;
-        for (ana::Hit const& hit_col : nearby.at(m).hits) {
+        // ana::Points NearbySpaceHits;
+        // for (ana::Hit const& hit_col : nearby.at(m).hits) {
 
-            std::vector<recob::Hit const> v_hit_coincidence;
-            bool U_coincidence = false, V_coincidence = false;
-            for (recob::Hit const& hit_ind : *vh_hit) {
-                switch (hit_ind.View()) {
-                    case geo::kU: U_coincidence = true; break;
-                    case geo::kV: V_coincidence = true; break;
-                    default: continue;
-                }
+        //     std::vector<recob::Hit const> v_hit_coincidence;
+        //     bool U_coincidence = false, V_coincidence = false;
+        //     for (recob::Hit const& hit_ind : *vh_hit) {
+        //         switch (hit_ind.View()) {
+        //             case geo::kU: U_coincidence = true; break;
+        //             case geo::kV: V_coincidence = true; break;
+        //             default: continue;
+        //         }
 
-                if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
-                if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
-                v_hit_coincidence.push_back(hit_ind);
-            }
-            if (v_hit_coincidence.empty()) continue;
+        //         if (hit_ind.PeakTime() - hit_col.tick < fCoincidenceBefore) continue;
+        //         if (hit_ind.PeakTime() - hit_col.tick > fCoincidenceAfter) continue;
+        //         v_hit_coincidence.push_back(hit_ind);
+        //     }
+        //     if (v_hit_coincidence.empty()) continue;
 
-            geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
-            for (recob::Hit const& hit_ind : v_hit_coincidence) {
-                geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+        //     geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
+        //     for (recob::Hit const& hit_ind : v_hit_coincidence) {
+        //         geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
 
                 

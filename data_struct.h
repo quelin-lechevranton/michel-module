@@ -27,6 +27,8 @@
 #include <TTree.h>
 #include <TBranch.h>
 
+#include <cstdio>
+
 
 #define HIT_BRANCHES(t, pre, h) \
     t->Branch(pre "HitSlice", &h.slice), \
