@@ -320,7 +320,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (HitUpMax)
                 MuonEndHit = GetHit(*HitUpMax);
             else {
-                LOG("no collection hit in volume")
+                LOG("no collection hit in volume");
                 continue;
             }
         }
