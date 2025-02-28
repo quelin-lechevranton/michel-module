@@ -45,6 +45,7 @@ physics: {
             NearbySpaceRadius: 40.
 
             CoincidenceWindow: 1.
+            CoincidenceRadius: 1.
         }
     }
     ana: [ checks ]

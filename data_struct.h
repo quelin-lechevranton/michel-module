@@ -139,6 +139,7 @@ namespace ana {
             adc.clear();
         }
         unsigned size() const { return N; }
+        bool empty() const { return !N; }
         float energy() const {
             float e = 0;
             for (unsigned i=0; i<N; i++) e += adc[i];
@@ -164,9 +165,13 @@ namespace ana {
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
         // Point(recob::SpacePoint const& p) : x(p.XYZ()[0]), y(p.XYZ()[1]), z(p.XYZ()[2]) {}
+        Point operator+(Point const& p) { return Point{x+p.x, y+p.y, z+p.z}; }
+        Point operator+(geo::Point_t const& p) { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
+        // Point operator+(recob::SpacePoint const& p) { return Point{x+(float)p.XYZ()[0], y+(float)p.XYZ()[1], z+(float)p.XYZ()[2]}; }
         Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         // Point operator-(recob::SpacePoint const& p) { return Point{x-(float)p.XYZ()[0], y-(float)p.XYZ()[1], z-(float)p.XYZ()[2]}; }
+        Point operator*(float  f, Point const& p) { return Point{f*p.x, f*p.y, f*p.z}; }
         float r2() { return x*x + y*y + z*z; }
 
 
@@ -193,6 +198,7 @@ namespace ana {
             z.clear();
         }
         unsigned size() const { return N; }
+        bool empty() const { return !N; }
 
         // for range-loop
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
