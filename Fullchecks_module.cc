@@ -480,7 +480,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         for (unsigned m=0; m<EventNMuon; m++) {
 
             std::vector<art::Ptr<recob::Hit>> vp_hit_assns = fmp_spt2hit.at(p_spt.key());
-            std::cout << "space point w/ " << vp_hit_assns.size() << " associated hits" << std::endl;
+            std::cout << "space point w/ " << vp_hit_assns.size() << " associated hits: ";
+            for (art::Ptr<recob::Hit> const& p_hit : vp_hit_assns) {
+                std::cout << char('U' + p_hit->View()) << " ";
+            }
+            std::cout << std::endl;
             art::Ptr<recob::Track> p_trk = fop_hit2trk.at(vp_hit_assns.front().key());
             if (p_trk && p_trk->Length() > fTrackLengthCut) continue;
             
