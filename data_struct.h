@@ -146,7 +146,6 @@ namespace ana {
             return e * fADCtoMeV;
         }
 
-        // for range-loop
         Hit at(unsigned i) const { return Hit{slice[i], z[i], channel[i], tick[i], adc[i]}; }
         struct iterator {
             const Hits* hits;
@@ -164,13 +163,10 @@ namespace ana {
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
-        // Point(recob::SpacePoint const& p) : x(p.XYZ()[0]), y(p.XYZ()[1]), z(p.XYZ()[2]) {}
         Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
         Point operator+(geo::Point_t const& p) const { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
-        // Point operator+(recob::SpacePoint const& p) { return Point{x+(float)p.XYZ()[0], y+(float)p.XYZ()[1], z+(float)p.XYZ()[2]}; }
         Point operator-(Point const& p) const { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) const { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
-        // Point operator-(recob::SpacePoint const& p) { return Point{x-(float)p.XYZ()[0], y-(float)p.XYZ()[1], z-(float)p.XYZ()[2]}; }
         Point operator*(float f) const { return Point{f*x, f*y, f*z}; }
         float r2() const { return x*x + y*y + z*z; }
 
@@ -189,7 +185,6 @@ namespace ana {
             z.push_back(p.z);
         }
         void push_back(geo::Point_t const& p) { push_back(Point{p}); }
-        // void push_back(recob::SpacePoint const& p) { push_back(Point{p.position()}); }
         void clear() {
             N = 0;
             x.clear();
@@ -199,7 +194,6 @@ namespace ana {
         unsigned size() const { return N; }
         bool empty() const { return !N; }
 
-        // for range-loop
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
         struct iterator {
             const Points* points;
