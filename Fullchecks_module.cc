@@ -476,17 +476,17 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
     // get space points nearby muon end point
-    geo::Point_t prev_spt{0, 0, 0};
+    recob::SpacePoint::ID_t prev_id = -1;
     for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
         for (unsigned m=0; m<EventNMuon; m++) {
 
-            if (p_spt->position() == prev_spt) continue;
-            prev_spt = p_spt->position();
+            if (p_spt->ID() == prev_id) continue;
+            prev_id = p_spt->ID();
 
             art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
             art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
 
-            std::cout << "spt: " << "(" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
+            std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
                 << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
                 << std::endl;
 
