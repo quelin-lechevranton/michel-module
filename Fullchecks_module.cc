@@ -487,49 +487,52 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << m << " " << nearby.at(m).hits.size() << " nearby hits" << std::endl;
-        // unsigned no_coincidence = 0;
+        unsigned nb_hit_wpt = 0;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
 
             ana::Points v_pt_u, v_pt_v;
             bool U_coincidence = false, V_coincidence = false;
 
-            std::cout << "\033[1m" "hit z:" << hit_col.z << ": " "\033[0m";
+            std::cout << "\033[1m" "hit z:" << hit_col.z << ": " "\033[0m" << std::endl;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (hit_ind.View() == geo::kW) continue;
 
                 if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow) continue;
 
-                switch (hit_ind.View()) {
-                    case geo::kU: U_coincidence = true; break;
-                    case geo::kV: V_coincidence = true; break;
-                    default: continue;
-                }
-
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-
                 ana::Point pt{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
-                std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
+                // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
-                    case geo::kU: v_pt_u.push_back(pt); break;
-                    case geo::kV: v_pt_v.push_back(pt); break;
-                    default: continue;
+                    case geo::kU: 
+                        U_coincidence = true;
+                        v_pt_u.push_back(pt);
+                        break;
+                    case geo::kV: 
+                        V_coincidence = true;
+                        v_pt_v.push_back(pt);
+                        break;
+                    default:
+                        continue;
                 }
             }
             std::cout << std::endl;
 
-            if (LOG(!(U_coincidence && V_coincidence))) continue;
+            if (!(U_coincidence && V_coincidence)) continue;
 
+            bool has_point = false
             float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
                     if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
+                    has_point = true;
                     ana::Point bary{(pt_u + pt_v)*0.5F};
                     bary.x = x;
                     std::cout << "  " << bary << std::endl;
                 }
             }
+            if (has_point) nb_hit_wpt++;
 
             // float x = IsInUpperVolume(hit_col.channel)
                 // ? upper_bounds.x.max - hit_col.tick * fSamplingRate * fDriftVelocity;
@@ -551,6 +554,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
         }
+        std::cout << nb_hit_wpt << " nearby hits with with point" << std::endl;
+        std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
         resetMichel();
