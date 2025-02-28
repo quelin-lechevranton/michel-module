@@ -490,8 +490,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // unsigned no_coincidence = 0;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
-            LOG(wiregeo_col.GetStart().Z());
-            LOG(hit_col.z);
+            std::cout << wiregeo_col.GetStart().Z() << " vs. " << hit_col.z << std::endl;
             if (LOG(wiregeo_col.GetStart().Z() != hit_col.z)) continue;
 
             ana::Points v_pt_u, v_pt_v;
