@@ -122,7 +122,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)), //in cm
     fNearbySpaceRadius(p.get<float>("NearbySpaceRadius", 40.F)), //in cm
-    fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)) // in ticks
+    fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)), // in ticks
     fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
@@ -507,14 +507,15 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
 
-                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
 
                 ana::Point pt{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
-                std::cout << " [" << char('U' + hit_ind->View()) << ", " << pt << "]";
+                std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
                     case geo::kU: v_pt_u.push_back(pt); break;
                     case geo::kV: v_pt_v.push_back(pt); break;
+                    default: continue;
                 }
             }
             std::cout << std::endl;
@@ -524,9 +525,16 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
                     if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
-                    std::cout << "  " << (1/2*(pt_u + pt_v)) << std::endl;
+                    std::cout << "  " << ((pt_u + pt_v)*0.5F) << std::endl;
                 }
             }
+
+            // float x = IsInUpperVolume(hit_col.channel)
+                // ? upper_bounds.x.max - hit_col.tick * fSamplingRate * fDriftVelocity;
+                // : lower_bounds.x.min + hit_col.tick * fSamplingRate * fDriftVelocity;
+            float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
+            ana::Point pt{}
+
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {

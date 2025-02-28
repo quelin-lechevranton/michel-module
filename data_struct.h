@@ -109,7 +109,7 @@ namespace ana {
             slice(s), z(z), channel(c), tick(t), adc(a) {}
 
 
-        friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
+        friend std::ostream& operator<<(std::ostream& os, const Hit& hit) const {
             return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
     };
@@ -153,8 +153,8 @@ namespace ana {
             unsigned i;
             iterator(Hits const* h, unsigned i) : hits(h), i(i) {}
             iterator& operator++() { i++; return *this; }
-            bool operator!=(iterator const& h) { return i != h.i; }
-            Hit operator*() { return hits->at(i); }
+            bool operator!=(iterator const& h) const { return i != h.i; }
+            Hit operator*() const { return hits->at(i); }
         };
         iterator begin() const { return iterator(this, 0); }
         iterator end() const { return iterator(this, N); }
@@ -165,17 +165,16 @@ namespace ana {
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
         // Point(recob::SpacePoint const& p) : x(p.XYZ()[0]), y(p.XYZ()[1]), z(p.XYZ()[2]) {}
-        Point operator+(Point const& p) { return Point{x+p.x, y+p.y, z+p.z}; }
-        Point operator+(geo::Point_t const& p) { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
+        Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
+        Point operator+(geo::Point_t const& p) const { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
         // Point operator+(recob::SpacePoint const& p) { return Point{x+(float)p.XYZ()[0], y+(float)p.XYZ()[1], z+(float)p.XYZ()[2]}; }
-        Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
-        Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
+        Point operator-(Point const& p) const { return Point{x-p.x, y-p.y, z-p.z}; }
+        Point operator-(geo::Point_t const& p) const { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         // Point operator-(recob::SpacePoint const& p) { return Point{x-(float)p.XYZ()[0], y-(float)p.XYZ()[1], z-(float)p.XYZ()[2]}; }
-        Point operator*(float  f, Point const& p) { return Point{f*p.x, f*p.y, f*p.z}; }
-        float r2() { return x*x + y*y + z*z; }
+        Point operator*(float  f) const { return Point{f*p.x, f*p.y, f*p.z}; }
+        float r2() const { return x*x + y*y + z*z; }
 
-
-        friend std::ostream& operator<<(std::ostream& os, const Point& p) {
+        friend std::ostream& operator<<(std::ostream& os, const Point& p) const {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
     };
