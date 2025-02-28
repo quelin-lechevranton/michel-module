@@ -65,7 +65,7 @@ namespace ana {
         T min, max;
         bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
         bounds(T m, T M) : min(m), max(M) {}
-        bool isInside(T x, float r=0) { 
+        bool isInside(T x, float r=0) const { 
             return min+r <= x && x <= max-r;
         }
 
@@ -81,10 +81,10 @@ namespace ana {
         bounds<T> x, y, z;
         bounds3D() : x(), y(), z() {}
         bounds3D(T xm, T xM, T ym, T yM, T zm, T zM) : x(xm, xM), y(ym, yM), z(zm, zM) {}
-        bool isInside(T x, T y, T z, float r=0) {
+        bool isInside(T x, T y, T z, float r=0) const {
             return this->x.isInside(x, r) && this->y.isInside(y, r) && this->z.isInside(z, r);
         }
-        bool isInside(TLorentzVector const& v, float r=0) {
+        bool isInside(TLorentzVector const& v, float r=0) const {
             return isInside(v.X(), v.Y(), v.Z(), r);
         }
 
@@ -109,7 +109,7 @@ namespace ana {
             slice(s), z(z), channel(c), tick(t), adc(a) {}
 
 
-        friend std::ostream& operator<<(std::ostream& os, const Hit& hit) const {
+        friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
     };
@@ -171,10 +171,10 @@ namespace ana {
         Point operator-(Point const& p) const { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) const { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         // Point operator-(recob::SpacePoint const& p) { return Point{x-(float)p.XYZ()[0], y-(float)p.XYZ()[1], z-(float)p.XYZ()[2]}; }
-        Point operator*(float  f) const { return Point{f*p.x, f*p.y, f*p.z}; }
+        Point operator*(float f) const { return Point{f*x, f*y, f*z}; }
         float r2() const { return x*x + y*y + z*z; }
 
-        friend std::ostream& operator<<(std::ostream& os, const Point& p) const {
+        friend std::ostream& operator<<(std::ostream& os, const Point& p) {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
     };
