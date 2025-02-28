@@ -517,7 +517,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
             if (p_spt) nb_hit_wspt++;
 
-            std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
+            // std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (hit_ind.View() == geo::kW) continue;
 
