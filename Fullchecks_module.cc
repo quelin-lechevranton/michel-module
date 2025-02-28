@@ -486,7 +486,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).spt.push_back(spt->position());
+            nearby.at(m).spt.push_back(p_spt->position());
         }
     }
 
