@@ -521,7 +521,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
             if (!(U_coincidence && V_coincidence)) continue;
 
-            bool has_point = false
+            bool has_point = false;
             float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
