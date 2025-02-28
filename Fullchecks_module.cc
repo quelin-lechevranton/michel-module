@@ -262,7 +262,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-    // art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
+    art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
@@ -414,7 +414,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
     struct Nearby {
-        ana::Hits hits;
+        // ana::Hits hits;
+        std::vector<art::Ptr<recob::Hit>> vp_hit;
         ana::Hits sphere_hits;
         unsigned true_positive;
         unsigned false_positive;
@@ -446,7 +447,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).hits.push_back(hit);
+            // nearby.at(m).hits.push_back(hit);
+            nearby.at(m).vp_hit.push_back(p_hit);
 
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
@@ -484,22 +486,26 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     // filling the branches related to michel
     for (unsigned m=0; m<EventNMuon; m++) {
 
-        /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
+        // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
-        std::cout << "mu#" << m << " " << nearby.at(m).hits.size() << " nearby hits" << std::endl;
+        std::cout << "mu#" << m << " " << nearby.at(m).vp_hit.size() << " nearby hits" << std::endl;
         unsigned nb_hit_wpt = 0;
-        for (ana::Hit const& hit_col : nearby.at(m).hits) {
-            geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
+        unsigned nb_hit_wspt = 0;
+        for (art::Ptr<recob::Hit> const& p_hit_col : nearby.at(m).vp_hit) {
+            geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
 
             ana::Points v_pt_u, v_pt_v;
             bool U_coincidence = false, V_coincidence = false;
 
-            std::cout << "\033[1m" "hit z:" << hit_col.z << ": " "\033[0m" << std::endl;
+            std::vector<art::Ptr<recob::SpacePoint>> vp_spt = fmp_hit2spt.at(p_hit_col.key());
+            if (vp_spt.size()) nb_hit_wspt++;
+
+            std::cout << "\033[1m" "hit w/ " << vp_spt.size() << " spt: " "\033[0m" << std::endl;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (hit_ind.View() == geo::kW) continue;
 
-                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow) continue;
+                if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 ana::Point pt{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
@@ -554,10 +560,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         }
         std::cout << nb_hit_wpt << " nearby hits with with point" << std::endl;
+        std::cout << nb_hit_wspt << " nearby hits with with space point" << std::endl;
         std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
-        */
+        // */
 
         resetMichel();
 
