@@ -266,8 +266,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
-    art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
-    art::FindManyP<recob::Hit> fmp_spt2hit(vh_spt, e, tag_spt);
+    art::FindOneP<recob::SpacePoint> fop_hit2spt(vh_hit, e, tag_spt);
+    art::FindOneP<recob::Hit> fop_spt2hit(vh_spt, e, tag_spt);
 
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
@@ -479,13 +479,14 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
         for (unsigned m=0; m<EventNMuon; m++) {
 
-            std::vector<art::Ptr<recob::Hit>> vp_hit_assns = fmp_spt2hit.at(p_spt.key());
-            std::cout << "space point w/ " << vp_hit_assns.size() << " associated hits: ";
-            for (art::Ptr<recob::Hit> const& p_hit : vp_hit_assns) {
-                std::cout << char('U' + p_hit->View()) << " ";
-            }
-            std::cout << std::endl;
-            art::Ptr<recob::Track> p_trk = fop_hit2trk.at(vp_hit_assns.front().key());
+            art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
+            art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
+
+            std::cout << "spt: " << "(" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
+                << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
+                << std::endl;
+
+
             if (p_trk && p_trk->Length() > fTrackLengthCut) continue;
             
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
@@ -509,10 +510,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             ana::Points v_pt_u, v_pt_v;
             bool U_coincidence = false, V_coincidence = false;
 
-            std::vector<art::Ptr<recob::SpacePoint>> vp_spt = fmp_hit2spt.at(p_hit_col.key());
-            if (vp_spt.size()) nb_hit_wspt++;
+            art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
 
-            std::cout << "\033[1m" "hit w/ " << vp_spt.size() << " spt: " "\033[0m" << std::endl;
+            std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (hit_ind.View() == geo::kW) continue;
 
