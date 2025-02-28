@@ -283,7 +283,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     struct EndPoint {
         ana::Hit hit; 
         simb::MCParticle const* mcp_michel;
-        size_t track_key;
+        size_t trk_key;
         ana::Point spt;
     };
     std::vector<EndPoint> muon_endpoints;
@@ -448,7 +448,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             float dt = (hit.tick - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
-            bool from_another_track = from_track && muon_endpoints.at(m).track_key != p_trk.key();
+            bool from_another_track = from_track && muon_endpoints.at(m).trk_key != p_trk.key();
 
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
@@ -491,7 +491,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 << std::endl;
 
 
-            if (p_trk && p_trk->Length() > fTrackLengthCut) continue;
+            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trkp_trk->Length() > fTrackLengthCut) continue;
             
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
