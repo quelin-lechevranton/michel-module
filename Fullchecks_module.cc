@@ -480,7 +480,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
         for (unsigned m=0; m<EventNMuon; m++) {
 
-            if (p_spt->ID() == prev_id) continue;
+            if (LOG(p_spt->ID() == prev_id)) continue;
             prev_id = p_spt->ID();
 
             art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
@@ -491,9 +491,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 << std::endl;
 
 
-            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut) continue;
+            if (LOG(p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut)) continue;
             
-            if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+            if (LOG((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius)) continue;
 
             nearby.at(m).spt.push_back(p_spt->position());
         }
