@@ -484,6 +484,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     // filling the branches related to michel
     for (unsigned m=0; m<EventNMuon; m++) {
 
+        /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << m << " " << nearby.at(m).hits.size() << " nearby hits" << std::endl;
@@ -513,11 +514,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                         V_coincidence = true;
                         v_pt_v.push_back(pt);
                         break;
-                    default:
-                        continue;
+                    default: continue;
                 }
             }
-            std::cout << std::endl;
 
             if (!(U_coincidence && V_coincidence)) continue;
 
@@ -557,6 +556,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         std::cout << nb_hit_wpt << " nearby hits with with point" << std::endl;
         std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
+
+        */
 
         resetMichel();
 
