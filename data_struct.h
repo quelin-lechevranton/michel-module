@@ -147,16 +147,16 @@ namespace ana {
 
         // for range-loop
         Hit at(unsigned i) const { return Hit{slice[i], z[i], channel[i], tick[i], adc[i]}; }
-        struct Hits_iterator {
+        struct iterator {
             const Hits* hits;
             unsigned i;
-            Hits_iterator(Hits const* h, unsigned i) : hits(h), i(i) {}
-            Hits_iterator& operator++() { i++; return *this; }
-            bool operator!=(Hits_iterator const& h) { return i != h.i; }
+            iterator(Hits const* h, unsigned i) : hits(h), i(i) {}
+            iterator& operator++() { i++; return *this; }
+            bool operator!=(iterator const& h) { return i != h.i; }
             Hit operator*() { return hits->at(i); }
         };
-        Hits_iterator begin() const { return Hits_iterator(this, 0); }
-        Hits_iterator end() const { return Hits_iterator(this, N); }
+        iterator begin() const { return iterator(this, 0); }
+        iterator end() const { return iterator(this, N); }
     };
     struct Point {
         float x, y, z;
@@ -196,15 +196,15 @@ namespace ana {
 
         // for range-loop
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
-        struct Points_iterator {
+        struct iterator {
             const Points* points;
             unsigned i;
-            Points_iterator(Points const* p, unsigned i) : points(p), i(i) {}
-            Points_iterator& operator++() { i++; return *this; }
-            bool operator!=(Points_iterator const& p) { return i != p.i; }
+            iterator(Points const* p, unsigned i) : points(p), i(i) {}
+            iterator& operator++() { i++; return *this; }
+            bool operator!=(iterator const& p) { return i != p.i; }
             Point operator*() { return points->at(i); }
         };
-        Points_iterator begin() const { return Points_iterator(this, 0); }
-        Points_iterator end() const { return Points_iterator(this, N); }
+        iterator begin() const { return iterator(this, 0); }
+        iterator end() const { return iterator(this, N); }
     };
 }

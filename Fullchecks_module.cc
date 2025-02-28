@@ -116,12 +116,12 @@ private:
 ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
-    fLog(p.get<bool>("Log")),
-    fKeepOutside(p.get<bool>("KeepOutside")),
-    fTrackLengthCut(p.get<float>("TrackLengthCut")), // in cm
-    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
-    fNearbySpaceRadius(p.get<float>("NearbySpaceRadius")), //in cm
-    fCoincidenceWindow(p.get<float>("CoincidenceWindow")) // in ticks
+    fLog(p.get<bool>("Log", false)),
+    fKeepOutside(p.get<bool>("KeepOutside", false)),
+    fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
+    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)), //in cm
+    fNearbySpaceRadius(p.get<float>("NearbySpaceRadius", 40.F)), //in cm
+    fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)) // in ticks
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -163,7 +163,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
         geo::TPCID tpcid{0, tpc};
 
-        if (tpc >= 8) {
+        if (tpc >= 8U) {
             upper_bounds.x.min = upper_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
             upper_bounds.x.max = upper_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
             upper_bounds.y.min = upper_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
@@ -504,6 +504,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 v_hit_coincidence.push_back(&hit_ind);
             }
 
+            if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
 
             std::cout << "hit z:" << hit_col.z << " " << (U_coincidence ? "U" : "") << (V_coincidence ? "V" : "") << " coincidences";
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
@@ -515,7 +516,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
             std::cout << std::endl;
 
-            if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
+            if (!(U_coincidence && V_coincidence)) continue;
+
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
@@ -533,7 +535,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
         std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
-        
         resetMichel();
 
         NearbyHits = nearby.at(m).hits;
