@@ -62,7 +62,7 @@ private:
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
     float fNearbySpaceRadius; // in cm
-    float fCoincidenceWindow; // in ticks
+    float fCoincidenceWindow; // in µs
 
     // Output Variables
     TTree* tEvent;
@@ -109,8 +109,6 @@ private:
 
     bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
-    unsigned GetSlice(recob::Hit const& hit);
-    float GetZ(recob::Hit const& hit);
     ana::Hit GetHit(recob::Hit const& hit);
 };
 
@@ -182,6 +180,19 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         }
     }
 
+    std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+        << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
+        << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
+        << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
+        << "  Tick Window: " << tick_window << std::endl
+        << "  Upper Bounds: " << upper_bounds << std::endl
+        << "  Lower Bounds: " << lower_bounds << std::endl;
+    std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+        << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
+        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm" << std::endl
+        << "  Michel Tick Radius: " << fMichelTickRadius << " ticks" << std::endl
+        << "  Nearby Space Radius: " << fNearbySpaceRadius << " cm" << std::endl
+        << "  Coincidence Window: " << fCoincidenceWindow << " µs" << std::endl;
 
     tEvent = tfs->make<TTree>("event","");
 
@@ -423,10 +434,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // looping over muon end points
         for (unsigned m=0; m<EventNMuon; m++) {
-            if (GetSlice(*p_hit) != muon_endpoints.at(m).hit.slice) continue;
+            ana::Hit hit = GetHit(*p_hit);
+            if (hit.slice != muon_endpoints.at(m).hit.slice) continue;
 
-            float dz = (GetZ(*p_hit) - muon_endpoints.at(m).hit.z);
-            float dt = (p_hit->PeakTime() - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
+            float dz = (hit.z - muon_endpoints.at(m).hit.z);
+            float dt = (hit.tick - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
             float dr2 = dz*dz + dt*dt;
 
             bool from_another_track = from_track && muon_endpoints.at(m).track_key != p_trk.key();
@@ -434,22 +446,22 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).hits.push_back(GetHit(*p_hit));
+            nearby.at(m).hits.push_back(hit);
 
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
-            nearby.at(m).sphere_hits.push_back(GetHit(*p_hit));
+            nearby.at(m).sphere_hits.push_back(hit);
 
             // checking if the hit is associated to the michel MCParticle
             std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_hit.label());
             if (std::find(v_hit_michel.begin(), v_hit_michel.end(), &*p_hit) != v_hit_michel.end()) {
                 nearby.at(m).true_positive++;
-                nearby.at(m).energy_true_positive += p_hit->Integral();
+                nearby.at(m).energy_true_positive += hit.adc;
             } else {
                 nearby.at(m).false_positive++;
-                nearby.at(m).energy_false_positive += p_hit->Integral();
+                nearby.at(m).energy_false_positive += hit.adc;
             }
         }
     } // end of loop over event hits
@@ -482,7 +494,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             bool U_coincidence = false, V_coincidence = false;
             for (recob::Hit const& hit_ind : *vh_hit) {
 
-                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow) continue;
+                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow / fSamplingRate) continue;
 
                 switch (hit_ind.View()) {
                     case geo::kU: U_coincidence = true; break;
@@ -597,19 +609,10 @@ void ana::Fullchecks::resetMichel() {
     SphereEnergyFalsePositive = 0;
 }
 
-unsigned ana::Fullchecks::GetSlice(recob::Hit const& hit) {
-    for (auto const& [sl, p] : ana::map_sl_tpc) {
-        if (p.first == hit.WireID().TPC || p.second == hit.WireID().TPC) return sl;
-    }
-    return -1;
-}
-float ana::Fullchecks::GetZ(recob::Hit const& hit) {
-    return (float) asWire->Wire(hit.WireID()).GetStart().Z();
-}
 ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
     return ana::Hit{
-        GetSlice(hit),
-        GetZ(hit),
+        unsigned(2*(hit.WireID().TPC/4) + hit.WireID().TPC%2),
+        float(asWire->Wire(hit.WireID()).GetStart().Z()),
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()

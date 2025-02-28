@@ -94,18 +94,6 @@ namespace ana {
         }
     };
 
-
-    std::map<unsigned,std::pair<unsigned,unsigned>> map_sl_tpc = {
-        {0, {0, 2}},
-        {1, {1, 3}},
-        {2, {4, 6}},
-        {3, {5, 7}},
-        {4, {8, 10}},
-        {5, {9, 11}},
-        {6, {12, 14}},
-        {7, {13, 15}}
-    };
-
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
  
 
