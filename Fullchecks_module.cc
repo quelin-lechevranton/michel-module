@@ -490,6 +490,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // unsigned no_coincidence = 0;
         for (ana::Hit const& hit_col : nearby.at(m).hits) {
             geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
+            LOG(wiregeo_col.GetStart().Z());
+            LOG(hit_col.z);
             if (LOG(wiregeo_col.GetStart().Z() != hit_col.z)) continue;
 
             ana::Points v_pt_u, v_pt_v;
@@ -522,17 +524,19 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
             if (LOG(!(U_coincidence && V_coincidence))) continue;
 
+            float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
                     if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
-                    std::cout << "  " << ((pt_u + pt_v)*0.5F) << std::endl;
+                    ana::Point bary{(pt_u + pt_v)*0.5F};
+                    bary.x = x;
+                    std::cout << "  " << bary << std::endl;
                 }
             }
 
             // float x = IsInUpperVolume(hit_col.channel)
                 // ? upper_bounds.x.max - hit_col.tick * fSamplingRate * fDriftVelocity;
                 // : lower_bounds.x.min + hit_col.tick * fSamplingRate * fDriftVelocity;
-            // float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
             // ana::Point pt{}
 
 
