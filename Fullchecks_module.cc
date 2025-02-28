@@ -476,24 +476,18 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
     // get space points nearby muon end point
-    recob::SpacePoint::ID_t prev_id = -1;
     for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
+
+        art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
+        art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
+
+        std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
+            << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
+            << std::endl;
+
         for (unsigned m=0; m<EventNMuon; m++) {
-
-            if (LOG(p_spt->ID() == prev_id)) continue;
-            prev_id = p_spt->ID();
-
-            art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
-            art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
-
-            std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
-                << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
-                << std::endl;
-
-
-            if (LOG(p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut)) continue;
-            
-            if (LOG((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius)) continue;
+            if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut) continue;
 
             nearby.at(m).spt.push_back(p_spt->position());
         }
