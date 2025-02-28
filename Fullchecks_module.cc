@@ -62,7 +62,7 @@ private:
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
     float fNearbySpaceRadius; // in cm
-    float fCoincidenceWindow; // in µs
+    float fCoincidenceWindow; // in ticks
 
     // Output Variables
     TTree* tEvent;
@@ -192,7 +192,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         << "  Michel Space Radius: " << fMichelSpaceRadius << " cm" << std::endl
         << "  Michel Tick Radius: " << fMichelTickRadius << " ticks" << std::endl
         << "  Nearby Space Radius: " << fNearbySpaceRadius << " cm" << std::endl
-        << "  Coincidence Window: " << fCoincidenceWindow << " µs" << std::endl;
+        << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
 
     tEvent = tfs->make<TTree>("event","");
 
@@ -364,21 +364,18 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // and all muon track points
         for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
             if (!p_trk->HasValidPoint(i_tpt)) continue;
-            MuonTrackPoints.push_back(ana::Point{p_trk->LocationAtPoint(i_tpt)});
+            MuonTrackPoints.push_back(p_trk->LocationAtPoint(i_tpt));
         }
 
         // and all muon space points
-        double xmin = upper_bounds.x.max;
-        ana::Point MuonEndSpt;
+        ana::Point MuonEndSpt(upper_bounds.x.max, 0, 0);
         art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
-            MuonSpacePoints.push_back(ana::Point{p_spt->position()});
+            MuonSpacePoints.push_back(p_spt->position());
 
-            if (p_spt->position().x() < xmin) {
-                xmin = p_spt->position().x();
+            if (p_spt->position().x() < MuonEndSpt.x)
                 MuonEndSpt = ana::Point{p_spt->position()};
-            }
         }
 
         // a decaying muon has nu_mu, nu_e and el as last daughters
@@ -422,6 +419,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         float energy_true_positive;
         float energy_false_positive;
         ana::Points spt;
+        ana::Points custom_spt;
     };
     std::vector<Nearby> nearby(EventNMuon);
 
@@ -477,7 +475,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             
             if ((muon_endpoints.at(m).spt - spt.position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            nearby.at(m).spt.push_back(ana::Point{spt.position()});
+            nearby.at(m).spt.push_back(spt.position());
         }
     }
 
@@ -493,8 +491,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::vector<recob::Hit const*> v_hit_coincidence;
             bool U_coincidence = false, V_coincidence = false;
             for (recob::Hit const& hit_ind : *vh_hit) {
+                if (hit_ind.View() == geo::kW) continue;
 
-                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow / fSamplingRate) continue;
+                if (abs(hit_ind.PeakTime() - hit_col.tick) > fCoincidenceWindow) continue;
 
                 switch (hit_ind.View()) {
                     case geo::kU: U_coincidence = true; break;
@@ -504,6 +503,18 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 v_hit_coincidence.push_back(&hit_ind);
             }
+
+
+            std::cout << "hit z:" << hit_col.z << " " << (U_coincidence ? "U" : "") << (V_coincidence ? "V" : "") << " coincidences";
+            geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
+            for (recob::Hit const* hit_ind : v_hit_coincidence) {
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
+
+                ana::Point pt{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                std::cout << " [" << char('U' + hit_ind->View()) << ", " << pt << "]";
+            }
+            std::cout << std::endl;
+
             if (v_hit_coincidence.empty()) {no_coincidence++; continue;}
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
@@ -519,16 +530,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             //     double y = (a * (start_ind.y - end_ind.y) - b * (start_col.y - end_col.y)) / d;
             //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
-
-            std::cout << "hit z:" << hit_col.z << " " << (U_coincidence ? "U" : "") << (V_coincidence ? "V" : " ") << " coincidences";
-            geo::WireGeo const wiregeo_col = asWire->Wire(asWire->ChannelToWire(hit_col.channel).front());
-            for (recob::Hit const* hit_ind : v_hit_coincidence) {
-                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind->WireID());
-
-                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                std::cout << " [" << char('U' + hit_ind->View()) << ", z:" << pt.z() << "]";
-            }
-            std::cout << std::endl;
         }
         std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 

@@ -44,7 +44,7 @@ physics: {
             MichelSpaceRadius: 20.
             NearbySpaceRadius: 40.
 
-            CoincidenceWindow: 0.01
+            CoincidenceWindow: 1.
         }
     }
     ana: [ checks ]

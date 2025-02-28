@@ -90,7 +90,7 @@ namespace ana {
 
 
         friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
-            return os << b.x << "x" << b.y << "x" << b.z;
+            return os << b.x << " x " << b.y << " x " << b.z;
         }
     };
 
@@ -162,9 +162,11 @@ namespace ana {
         float x, y, z;
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
-        Point(geo::Point_t const& p) : x(p.X()), y(p.Y()), z(p.Z()) {}
+        Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
+        // Point(recob::SpacePoint const& p) : x(p.XYZ()[0]), y(p.XYZ()[1]), z(p.XYZ()[2]) {}
         Point operator-(Point const& p) { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
+        // Point operator-(recob::SpacePoint const& p) { return Point{x-(float)p.XYZ()[0], y-(float)p.XYZ()[1], z-(float)p.XYZ()[2]}; }
         float r2() { return x*x + y*y + z*z; }
 
 
@@ -182,6 +184,8 @@ namespace ana {
             y.push_back(p.y);
             z.push_back(p.z);
         }
+        void push_back(geo::Point_t const& p) { push_back(Point{p}); }
+        // void push_back(recob::SpacePoint const& p) { push_back(Point{p.position()}); }
         void clear() {
             N = 0;
             x.clear();
