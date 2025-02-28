@@ -258,11 +258,17 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     art::fill_ptr_vector(vp_trk, vh_trk);
 
     auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    std::vector<art::Ptr<recob::SpacePoint>> vp_spt;
+    art::fill_ptr_vector(vp_spt, vh_spt);
+
     auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+
     art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
+    art::FindManyP<recob::Hit> fmp_spt2hit(vh_spt, e, tag_spt);
+
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
@@ -473,9 +479,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     for (recob::SpacePoint const& spt : *vh_spt) {
         for (unsigned m=0; m<EventNMuon; m++) {
 
-            // should check if the space points is from an other track
-            //
-            //
+            std::vector<art::Ptr<recob::Hit>> vp_hit_assns = fmp_spt2hit.at(spt.key());
+            std::cout << "space point w/ " << vp_hit_assns.size() << " associated hits" << std::endl;
+            art::Ptr<recob::Track> p_trk = fop_hit2trk.at(vp_hit_assns.front().key());
+            if (p_trk && p_trk->Length() > fTrackLengthCut) continue;
             
             if ((muon_endpoints.at(m).spt - spt.position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
@@ -527,7 +534,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (!(U_coincidence && V_coincidence)) continue;
 
             bool has_point = false;
-            float x = muon_endpoints.at(m).spt.x + (hit_col.tick - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
+            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
                     if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
@@ -568,7 +575,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         resetMichel();
 
-        NearbyHits = nearby.at(m).hits;
+        // NearbyHits = nearby.at(m).hits;
+        for (art::Ptr<recob::Hit> const& p_hit : nearby.at(m).vp_hit)
+            NearbyHits.push_back(GetHit(*p_hit));
+            
         NearbySpacePoints = nearby.at(m).spt;
 
         if (!muon_endpoints.at(m).mcp_michel) {
