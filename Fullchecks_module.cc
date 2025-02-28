@@ -491,7 +491,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 << std::endl;
 
 
-            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trkp_trk->Length() > fTrackLengthCut) continue;
+            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut) continue;
             
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
