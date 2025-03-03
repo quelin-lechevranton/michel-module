@@ -241,7 +241,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         HITS_BRANCHES(tMuon, "Sphere", SphereHits),
         HITS_BRANCHES(tMuon, "Nearby", NearbyHits),
         POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints),
-        POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbYHitSpacePoints)
+        POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbyHitSpacePoints)
     };
 }
 
@@ -504,7 +504,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     }
 
     // filling the branches related to michel
-    for (unsigned m=0; m<EventNMuon; m++, for(TBranch *b : brMichel) b->Fill()) {
+    for (unsigned m=0; m<EventNMuon; m++) {
 
         resetMichel();
 
@@ -590,7 +590,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         NearbySpacePoints = nearby.at(m).spt;
         NearbyHitSpacePoints = nearby.at(m).hit_spt;
 
-        if (!muon_endpoints.at(m).mcp_michel) continue;
+        if (!muon_endpoints.at(m).mcp_michel) {
+            for (TBranch *b : brMichel) b->Fill();
+            continue;
+        }
 
         recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_trk.label());
         if (trk_michel) 
@@ -615,6 +618,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         SphereFalsePositive = nearby.at(m).false_positive;
         SphereEnergyTruePositive = nearby.at(m).energy_true_positive;
         SphereEnergyFalsePositive = nearby.at(m).energy_false_positive;
+
+        for (TBranch *b : brMichel) b->Fill();
     }
 
     tMuon->SetEntries(brMuon.front()->GetEntries());
