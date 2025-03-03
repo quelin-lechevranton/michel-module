@@ -529,40 +529,40 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::cout << std::endl;
 
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
-            ana::Points v_pt_u, v_pt_v;
-            bool U_coincidence = false, V_coincidence = false;
+
+            struct Coincidence {
+                ana::Point pt;
+                recob::Hit const* hit;
+            };
+            std::vector<Coincidence> V_coincidences, U_coincidences;
+
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
 
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                ana::Point pt{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                Coincidence co = {pt, &hit_ind};
                 // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
-                    case geo::kU: 
-                        U_coincidence = true;
-                        v_pt_u.push_back(pt);
-                        break;
-                    case geo::kV: 
-                        V_coincidence = true;
-                        v_pt_v.push_back(pt);
-                        break;
+                    case geo::kU: U_coincidences.push_back(co); break;
+                    case geo::kV: V_coincidences.push_back(co); break;
                     default: continue;
                 }
             }
-            if (!(U_coincidence and V_coincidence)) continue;
+            if (U_coincidences.empty() or V_coincidences.empty()) continue;
 
             bool has_point = false;
             // assuming MuonEndHasGood3DAssociation is true
             float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
-            for (ana::Point const& pt_u : v_pt_u) {
-                for (ana::Point const& pt_v : v_pt_v) {
-                    if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
+            for (Coincidence const& U_co : U_coincidences) {
+                for (Coincidence const& V_co : V_coincidences) {
+                    if ((U_co.pt - V_co.pt).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
 
                     has_point = true;
-                    ana::Point bary{(pt_u + pt_v)*0.5F};
+                    ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1. / (U_co.hit->Integral() + V_co.hit->Integral()));
                     bary.x = x;
 
                     if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
