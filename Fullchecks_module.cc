@@ -94,6 +94,7 @@ private:
 
     ana::Hits NearbyHits;
     ana::Points NearbySpacePoints;
+    ana::Points NearbyHitSpacePoints;
 
     float MichelTrackLength;
 
@@ -239,7 +240,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         HITS_BRANCHES(tMuon, "Michel", MichelHits),
         HITS_BRANCHES(tMuon, "Sphere", SphereHits),
         HITS_BRANCHES(tMuon, "Nearby", NearbyHits),
-        POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints)
+        POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints),
+        POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbYHitSpacePoints)
     };
 }
 
@@ -428,7 +430,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         float energy_true_positive;
         float energy_false_positive;
         ana::Points spt;
-        ana::Points custom_spt;
+        ana::Points hit_spt;
     };
     std::vector<Nearby> nearby(EventNMuon);
 
@@ -456,6 +458,14 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             // nearby.at(m).hits.push_back(hit);
             nearby.at(m).vp_hit.push_back(p_hit);
 
+
+            art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit.key());
+            if (p_spt)
+                nearby.at(m).hit_spt.push_back(p_spt->position());
+            else 
+                nearby.at(m).hit_spt.push_back(ana::Point{0.F, 0.F, 0.F});
+
+
             if (!muon_endpoints.at(m).mcp_michel) continue;
             if (from_track) continue;
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
@@ -481,9 +491,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
         art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
 
-        std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
-            << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
-            << std::endl;
+        // std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
+        //     << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
+        //     << std::endl;
 
         for (unsigned m=0; m<EventNMuon; m++) {
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
@@ -494,24 +504,22 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     }
 
     // filling the branches related to michel
-    for (unsigned m=0; m<EventNMuon; m++) {
+    for (unsigned m=0; m<EventNMuon; m++, for(TBranch *b : brMichel) b->Fill()) {
 
-        // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
+        resetMichel();
+
+        /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << m << " " << nearby.at(m).vp_hit.size() << " nearby hits" << std::endl;
         unsigned nb_hit_wpt = 0;
-        unsigned nb_hit_wspt = 0;
         for (art::Ptr<recob::Hit> const& p_hit_col : nearby.at(m).vp_hit) {
-            geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
 
+
+            geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
+            // std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
             ana::Points v_pt_u, v_pt_v;
             bool U_coincidence = false, V_coincidence = false;
-
-            art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
-            if (p_spt) nb_hit_wspt++;
-
-            // std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (hit_ind.View() == geo::kW) continue;
 
@@ -570,24 +578,19 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         }
         std::cout << nb_hit_wpt << " nearby hits with with point" << std::endl;
-        std::cout << nb_hit_wspt << " nearby hits with with space point" << std::endl;
         std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
-        // */
-
-        resetMichel();
+        */
 
         // NearbyHits = nearby.at(m).hits;
         for (art::Ptr<recob::Hit> const& p_hit : nearby.at(m).vp_hit)
             NearbyHits.push_back(GetHit(*p_hit));
             
         NearbySpacePoints = nearby.at(m).spt;
+        NearbyHitSpacePoints = nearby.at(m).hit_spt;
 
-        if (!muon_endpoints.at(m).mcp_michel) {
-            for (TBranch *b : brMichel) b->Fill();
-            continue;
-        }
+        if (!muon_endpoints.at(m).mcp_michel) continue;
 
         recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_trk.label());
         if (trk_michel) 
@@ -612,8 +615,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         SphereFalsePositive = nearby.at(m).false_positive;
         SphereEnergyTruePositive = nearby.at(m).energy_true_positive;
         SphereEnergyFalsePositive = nearby.at(m).energy_false_positive;
-        
-        for (TBranch *b : brMichel) b->Fill();
     }
 
     tMuon->SetEntries(brMuon.front()->GetEntries());
@@ -638,6 +639,7 @@ void ana::Fullchecks::resetMuon() {
 void ana::Fullchecks::resetMichel() {
     NearbyHits.clear();
     NearbySpacePoints.clear();
+    NearbyHitSpacePoints.clear();
 
     MichelTrackLength = 0;
 

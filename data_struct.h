@@ -163,12 +163,15 @@ namespace ana {
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
+        float r2() const { return x*x + y*y + z*z; }
+
         Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
         Point operator+(geo::Point_t const& p) const { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
         Point operator-(Point const& p) const { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) const { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
         Point operator*(float f) const { return Point{f*x, f*y, f*z}; }
-        float r2() const { return x*x + y*y + z*z; }
+
+        operator bool() const { return !(x==0 && y==0 && z==0); }
 
         friend std::ostream& operator<<(std::ostream& os, const Point& p) {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
