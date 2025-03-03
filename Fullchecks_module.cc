@@ -562,7 +562,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     if ((U_co.pt - V_co.pt).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
 
                     has_point = true;
-                    ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1. / (U_co.hit->Integral() + V_co.hit->Integral()));
+                    ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
                     bary.x = x;
 
                     if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
