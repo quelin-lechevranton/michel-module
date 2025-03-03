@@ -56,7 +56,7 @@
     t->Branch(pre "PointY", &p.y), \
     t->Branch(pre "PointZ", &p.z)
 
-#define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)
+#define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
 
 
 namespace ana {

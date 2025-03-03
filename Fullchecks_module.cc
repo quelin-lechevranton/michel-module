@@ -302,17 +302,17 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (fLog) printf("e%ut%u\r", iEvent, p_trk->ID()), fflush(stdout);
 
         // no short tracks
-        if (LOG(p_trk->Length() < fTrackLengthCut)) continue;
+        if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
 
         simb::MCParticle const* mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
 
         // tracks associated to a MCTruth muon
         if (!mcp) continue;
-        if (LOG(abs(mcp->PdgCode()) != 13)) continue;
+        if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
-        if (LOG(vp_hit_muon.empty())) continue;
+        if (!LOG(vp_hit_muon.size())) continue;
 
         float TickUpMax = tick_window.min, TickLowMin = tick_window.max;
         art::Ptr<recob::Hit> HitUpMax, HitLowMin;
@@ -346,7 +346,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (HitUpMax)
                 MuonEndHit = GetHit(*HitUpMax);
             else {
-                LOG("no collection hit in volume");
+                LOG(!"no collection hit in volume");
                 continue;
             }
         }
@@ -361,7 +361,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
         MuonEndIsInVolumeYZ = upper_bounds.isInside(150.F, MuonEndTrackPoint.y, MuonEndTrackPoint.z, fMichelSpaceRadius);
 
-        if (LOG(!fKeepOutside and !(MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
+        if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
         if (fLog) printf("\t\033[1;93m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
@@ -556,12 +556,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
             }
-            if (LOG(U_coincidences.empty() or V_coincidences.empty())) continue;
+            if (!LOG(U_coincidences.size() and V_coincidences.size())) continue;
 
             bool has_point = false;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
+                    std::cout << "  " << U_co.pt << " vs. " << V_co.pt << std::endl;
                     if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
 
                     has_point = true;
@@ -569,7 +570,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                     // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                    std::cout << "  " << bary << std::endl;
+                    // std::cout << "  " << bary << std::endl;
                 }
             }
             if (has_point) nb_hit_wpt++;
