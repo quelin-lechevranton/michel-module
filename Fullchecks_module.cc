@@ -562,6 +562,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     has_point = true;
                     ana::Point bary{(pt_u + pt_v)*0.5F};
                     bary.x = x;
+
+                    if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+
                     std::cout << "  " << bary << std::endl;
                 }
             }
