@@ -556,21 +556,21 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
             }
-            if (!LOG(U_coincidences.size() and V_coincidences.size())) continue;
+            std::cout << "  U coincidences: " << U_coincidences.size() << ", V coincidences: " << V_coincidences.size() << std::endl;
+            if (U_coincidences.empty() or V_coincidences.empty()) continue;
 
             bool has_point = false;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
-                    std::cout << "  " << U_co.pt << " vs. " << V_co.pt << std::endl;
                     if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
 
                     has_point = true;
-                    // ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
+                    ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
 
                     // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                    // std::cout << "  " << bary << std::endl;
+                    std::cout << "  " << bary << std::endl;
                 }
             }
             if (has_point) nb_hit_wpt++;
