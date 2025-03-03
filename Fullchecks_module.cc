@@ -41,7 +41,8 @@ private:
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     // Detector Properties
-    // float fADCtoMeV;
+    // float fADC2MeV;
+    float fTick2cm; // cm/tick
     float fSamplingRate; // µs/tick
     float fDriftVelocity; // cm/µs
     float fChannelPitch;
@@ -87,10 +88,12 @@ private:
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
     ana::Points MuonSpacePoints;
+    ana::Point MuonEndSpacePoint;
 
     ana::Hits MuonHits;
     ana::Hit MuonEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
+    bool MuonEndHasGood3DAssociation;
 
     ana::Hits NearbyHits;
     ana::Points NearbySpacePoints;
@@ -158,6 +161,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     );
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
+    fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     tick_window.min = 0;
@@ -218,12 +222,14 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         tMuon->Branch("TrackLength", &MuonTrackLength),
         tMuon->Branch("EndIsInWindowT", &MuonEndIsInWindowT),
         tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ),
+        tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation),
 
         HITS_BRANCHES(tMuon, "", MuonHits),
         HIT_BRANCHES(tMuon, "End", MuonEndHit),
         POINTS_BRANCHES(tMuon, "Track", MuonTrackPoints),
         POINT_BRANCHES(tMuon, "EndTrack", MuonEndTrackPoint),
-        POINTS_BRANCHES(tMuon, "Space", MuonSpacePoints)
+        POINTS_BRANCHES(tMuon, "Space", MuonSpacePoints),
+        POINT_BRANCHES(tMuon, "EndSpace", MuonEndSpacePoint)
     };
 
     brMichel = {
@@ -250,6 +256,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
+    fTick2cm = fDriftVelocity * fSamplingRate;
 
     auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     std::vector<art::Ptr<recob::Hit>> vp_hit;
@@ -354,7 +361,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
         MuonEndIsInVolumeYZ = upper_bounds.isInside(150.F, MuonEndTrackPoint.y, MuonEndTrackPoint.z, fMichelSpaceRadius);
 
-        if (LOG(!fKeepOutside && !(MuonEndIsInWindowT && MuonEndIsInVolumeYZ))) continue;
+        if (LOG(!fKeepOutside and !(MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
         if (fLog) printf("\t\033[1;93m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
@@ -378,15 +385,16 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // and all muon space points
-        ana::Point MuonEndSpt(upper_bounds.x.max, 0, 0);
+        MuonEndSpacePoint = ana::Point{upper_bounds.x.max, 0, 0};
         art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
             MuonSpacePoints.push_back(p_spt->position());
 
-            if (p_spt->position().x() < MuonEndSpt.x)
-                MuonEndSpt = ana::Point{p_spt->position()};
+            if (p_spt->position().x() < MuonEndSpacePoint.x)
+                MuonEndSpacePoint = ana::Point{p_spt->position()};
         }
+        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != upper_bounds.x.max and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and el as last daughters
         bool has_numu = false, has_nue = false;
@@ -401,8 +409,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 case 11: mcp_michel = mcp_dau; break;
             }
         }
-        if (mcp_michel && has_numu && has_nue) {
-            if (lower_bounds.isInside(mcp_michel->Position(0)) || upper_bounds.isInside(mcp_michel->Position(0))) 
+        if (mcp_michel and has_numu and has_nue) {
+            if (lower_bounds.isInside(mcp_michel->Position(0)) or upper_bounds.isInside(mcp_michel->Position(0))) 
                 MuonHasMichel = kHasMichelInside; 
             else
                 MuonHasMichel = kHasMichelOutside;
@@ -413,7 +421,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // saving end point info for further analysis
-        muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key(), MuonEndSpt});
+        muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key(), MuonEndSpacePoint});
 
         for (TBranch *b : brMuon) b->Fill();
         iMuon++;
@@ -439,7 +447,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (p_hit->View() != geo::kW) continue;
 
         art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
-        bool from_track = p_trk && p_trk->Length() > fTrackLengthCut;
+        bool from_track = p_trk and p_trk->Length() > fTrackLengthCut;
 
         // looping over muon end points
         for (unsigned m=0; m<EventNMuon; m++) {
@@ -447,10 +455,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (hit.slice != muon_endpoints.at(m).hit.slice) continue;
 
             float dz = (hit.z - muon_endpoints.at(m).hit.z);
-            float dt = (hit.tick - muon_endpoints.at(m).hit.tick) * fDriftVelocity * fSamplingRate;
+            float dt = (hit.tick - muon_endpoints.at(m).hit.tick) * fTick2cm;
             float dr2 = dz*dz + dt*dt;
 
-            bool from_another_track = from_track && muon_endpoints.at(m).trk_key != p_trk.key();
+            bool from_another_track = from_track and muon_endpoints.at(m).trk_key != p_trk.key();
 
             if (from_another_track) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
@@ -497,7 +505,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         for (unsigned m=0; m<EventNMuon; m++) {
             if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
-            if (p_trk && p_trk.key() != muon_endpoints.at(m).trk_key && p_trk->Length() > fTrackLengthCut) continue;
+            if (p_trk and p_trk.key() != muon_endpoints.at(m).trk_key and p_trk->Length() > fTrackLengthCut) continue;
 
             nearby.at(m).spt.push_back(p_spt->position());
         }
@@ -508,20 +516,21 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         resetMichel();
 
-        /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
+        // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << m << " " << nearby.at(m).vp_hit.size() << " nearby hits" << std::endl;
         unsigned nb_hit_wpt = 0;
         for (art::Ptr<recob::Hit> const& p_hit_col : nearby.at(m).vp_hit) {
 
+            art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
+            std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
 
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
-            // std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m" << std::endl;
             ana::Points v_pt_u, v_pt_v;
             bool U_coincidence = false, V_coincidence = false;
             for (recob::Hit const& hit_ind : *vh_hit) {
-                if (hit_ind.View() == geo::kW) continue;
+                if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
 
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
@@ -541,14 +550,15 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
             }
-
-            if (!(U_coincidence && V_coincidence)) continue;
+            if (!(U_coincidence and V_coincidence)) continue;
 
             bool has_point = false;
-            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fSamplingRate * fDriftVelocity;
+            // assuming MuonEndHasGood3DAssociation is true
+            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
             for (ana::Point const& pt_u : v_pt_u) {
                 for (ana::Point const& pt_v : v_pt_v) {
                     if ((pt_u - pt_v).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
+
                     has_point = true;
                     ana::Point bary{(pt_u + pt_v)*0.5F};
                     bary.x = x;
@@ -556,12 +566,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 }
             }
             if (has_point) nb_hit_wpt++;
-
-            // float x = IsInUpperVolume(hit_col.channel)
-                // ? upper_bounds.x.max - hit_col.tick * fSamplingRate * fDriftVelocity;
-                // : lower_bounds.x.min + hit_col.tick * fSamplingRate * fDriftVelocity;
-            // ana::Point pt{}
-
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
@@ -581,7 +585,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
-        */
+        // */
 
         // NearbyHits = nearby.at(m).hits;
         for (art::Ptr<recob::Hit> const& p_hit : nearby.at(m).vp_hit)
