@@ -556,18 +556,18 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     default: continue;
                 }
             }
-            if (U_coincidences.empty() or V_coincidences.empty()) continue;
+            if (LOG(U_coincidences.empty() or V_coincidences.empty())) continue;
 
             bool has_point = false;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
-                    if ((U_co.pt - V_co.pt).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
+                    if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
 
                     has_point = true;
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
 
-                    if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+                    // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
                     std::cout << "  " << bary << std::endl;
                 }
