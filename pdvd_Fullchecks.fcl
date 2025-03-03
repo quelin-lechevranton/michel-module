@@ -44,7 +44,7 @@ physics: {
             MichelSpaceRadius: 20.
             NearbySpaceRadius: 40.
 
-            CoincidenceWindow: 1.
+            CoincidenceWindow: 10.
             CoincidenceRadius: 1.
         }
     }
