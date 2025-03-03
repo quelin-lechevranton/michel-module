@@ -295,7 +295,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         size_t trk_key;
         ana::Point spt;
     };
-    std::vector<EndPoint> muon_endpoints;
+    std::vector<struct EndPoint> muon_endpoints;
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
@@ -440,7 +440,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         ana::Points spt;
         ana::Points hit_spt;
     };
-    std::vector<Nearby> nearby(EventNMuon);
+    std::vector<struct Nearby> nearby(EventNMuon);
 
     // looping over all hits
     for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -504,7 +504,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         //     << std::endl;
 
         for (unsigned m=0; m<EventNMuon; m++) {
-            if ((muon_endpoints.at(m).spt - p_spt->position()).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+            ana::Point dpt = muon_endpoints.at(m).spt - p_spt->position();
+            dpt.x = 0;
+            if (dpt.r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
             if (p_trk and p_trk.key() != muon_endpoints.at(m).trk_key and p_trk->Length() > fTrackLengthCut) continue;
 
             nearby.at(m).spt.push_back(p_spt->position());
@@ -529,12 +531,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::cout << std::endl;
 
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
+            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
 
             struct Coincidence {
                 ana::Point pt;
                 recob::Hit const* hit;
             };
-            std::vector<Coincidence> V_coincidences, U_coincidences;
+            std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
@@ -543,7 +546,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
-                Coincidence co = {pt, &hit_ind};
+                pt.x = x;
+                struct Coincidence co = {pt, &hit_ind};
                 // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
@@ -556,14 +560,12 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
             bool has_point = false;
             // assuming MuonEndHasGood3DAssociation is true
-            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
-            for (Coincidence const& U_co : U_coincidences) {
-                for (Coincidence const& V_co : V_coincidences) {
+            for (struct Coincidence const& U_co : U_coincidences) {
+                for (struct Coincidence const& V_co : V_coincidences) {
                     if ((U_co.pt - V_co.pt).r2() > fCoincidenceRadius * fCoincidenceRadius) continue;
 
                     has_point = true;
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
-                    bary.x = x;
 
                     if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
