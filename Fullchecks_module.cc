@@ -578,7 +578,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     // std::cout << "  " << bary << std::endl;
                 }
             }
-            std::cout << "  best bary: " << best_bary << std::endl;
+            std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
