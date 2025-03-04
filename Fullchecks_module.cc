@@ -98,6 +98,7 @@ private:
     ana::Hits NearbyHits;
     ana::Points NearbySpacePoints;
     ana::Points NearbyHitSpacePoints;
+    ana::Points NearbyHitPoints;
 
     float MichelTrackLength;
 
@@ -247,7 +248,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         HITS_BRANCHES(tMuon, "Sphere", SphereHits),
         HITS_BRANCHES(tMuon, "Nearby", NearbyHits),
         POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints),
-        POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbyHitSpacePoints)
+        POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbyHitSpacePoints),
+        POINTS_BRANCHES(tMuon, "NearbyHit", NearbyHitPoints)
     };
 }
 
@@ -594,6 +596,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
             // std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
             std::cout << "  custom spt: " << barys.barycenter() << " oof " << barys.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
+            NearbyHitPoints.push_back(barys.barycenter());
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
@@ -675,6 +678,7 @@ void ana::Fullchecks::resetMichel() {
     NearbyHits.clear();
     NearbySpacePoints.clear();
     NearbyHitSpacePoints.clear();
+    NearbyHitPoints.clear();
 
     MichelTrackLength = 0;
 
