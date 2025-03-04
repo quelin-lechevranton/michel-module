@@ -549,6 +549,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 // geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 // ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                // pt.x = x;
 
                 auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
@@ -582,10 +583,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     float dy = abs(U_co.pt.y - V_co.pt.y);
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
 
-                    std::cout << "  Upt: " << U_co.pt << " w/ " << U_co.hit->Integral() << " Vpt: " << V_co.pt << " w/ " << V_co.hit->Integral() << " bary: " << bary << " w/ dy: " << dy << std::endl;
+                    // std::cout << "  Upt: " << U_co.pt << " w/ " << U_co.hit->Integral() << " Vpt: " << V_co.pt << " w/ " << V_co.hit->Integral() << " bary: " << bary << " w/ dy: " << dy << std::endl;
 
                     if (has_good_coincidence) {
-                        if (
+                        if (dy < fCoincidenceRadius && abs(bary.y - muon_endpoints.at(m).spt.y) < fNearbySpaceRadius) {
                             barys.push_back(bary);
                         }
                         continue;
