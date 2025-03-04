@@ -361,7 +361,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // fiducial cuts
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
-        MuonEndIsInVolumeYZ = upper_bounds.isInside(150.F, MuonEndTrackPoint.y, MuonEndTrackPoint.z, fMichelSpaceRadius);
+        MuonEndIsInVolumeYZ = upper_bounds.y.isInside(MuonEndHit.y, fMichelSpaceRadius) and upper_bounds.z.isInside(MuonEndHit.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
@@ -532,8 +532,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (p_spt) std::cout << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")";
             std::cout << std::endl;
 
-            geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
+            // geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
             float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
+            float z = asWire->Wire(p_hit_col->WireID()).GetCenter().Z();
 
             struct Coincidence {
                 ana::Point pt;
@@ -546,9 +547,18 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
-                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
-                pt.x = x;
+                // geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
+                // ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+
+                geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+
+                double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
+                double y = start_ind.y() + s * (end_ind.y() - start_ind.y());
+
+                if (!(upper_bounds.y.isInside(y) or lower_bounds.y.isInside(y))) continue;
+
+                ana::Point pt{x, y, z};
+
                 struct Coincidence co = {pt, &hit_ind};
                 // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
@@ -701,7 +711,7 @@ void ana::Fullchecks::resetMichel() {
 ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
     return ana::Hit{
         unsigned(2*(hit.WireID().TPC/4) + hit.WireID().TPC%2),
-        float(asWire->Wire(hit.WireID()).GetStart().Z()),
+        float(asWire->Wire(hit.WireID()).GetCenter().Z()),
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
