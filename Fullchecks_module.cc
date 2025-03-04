@@ -577,11 +577,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                     if (dy < fCoincidenceRadius) {
                         has_good_coincidence = true;
-                        barys = {bary};
+                        barys.clear();
+                        barys.push_back(bary);
                     } else {
                         if (dy < min_dy) {
                             min_dy = dy;
-                            barys = {bary};
+                            barys.clear();
+                            barys.push_back(bary);
                         }
                     }
 
