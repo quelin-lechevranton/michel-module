@@ -549,7 +549,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
                 float co1_y = pt.y();
 
                 auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
