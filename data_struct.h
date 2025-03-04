@@ -167,8 +167,10 @@ namespace ana {
 
         Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
         Point operator+(geo::Point_t const& p) const { return Point{x+(float)p.x(), y+(float)p.y(), z+(float)p.z()}; }
+        Point operator+=(Point const& p) { x += p.x; y += p.y; z += p.z; return *this; }
         Point operator-(Point const& p) const { return Point{x-p.x, y-p.y, z-p.z}; }
         Point operator-(geo::Point_t const& p) const { return Point{x-(float)p.x(), y-(float)p.y(), z-(float)p.z()}; }
+        Point operator-=(Point const& p) { x -= p.x; y -= p.y; z -= p.z; return *this; }
         Point operator*(float f) const { return Point{f*x, f*y, f*z}; }
 
         operator bool() const { return !(x==0 && y==0 && z==0); }
@@ -196,6 +198,11 @@ namespace ana {
         }
         unsigned size() const { return N; }
         bool empty() const { return !N; }
+        Point barycenter() const {
+            Point b;
+            for (unsigned i=0; i<N; i++) b += at(i);
+            return b * (1.F / N);
+        }
 
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
         struct iterator {

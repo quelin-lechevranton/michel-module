@@ -560,7 +560,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (U_coincidences.empty() or V_coincidences.empty()) continue;
 
             float min_dy = 600.F;
-            ana::Point best_bary;
+            ana::Points barys;
+            bool has_good_coincidence = false;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
@@ -569,16 +570,28 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     float dy = abs(U_co.pt.y - V_co.pt.y);
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
 
-                    if (dy > min_dy) continue;
-                    min_dy = dy;
-                    best_bary = bary;
+                    if (has_good_coincidence) {
+                        if (dy < fCoincidenceRadius) barys.push_back(bary);
+                        continue;
+                    } 
+
+                    if (dy < fCoincidenceRadius) {
+                        has_good_coincidence = true;
+                        barys = {bary};
+                    } else {
+                        if (dy < min_dy) {
+                            min_dy = dy;
+                            barys = {bary};
+                        }
+                    }
 
                     // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
                     // std::cout << "  " << bary << std::endl;
                 }
             }
-            std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
+            // std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
+            std::cout << "  custom spt: " << barys.barycenter() << " oof " << barys.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
