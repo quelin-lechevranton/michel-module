@@ -610,7 +610,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 }
             }
             // std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
-            ana::Point pt = {x, barys_y.empty() ? 0 : std::accumulate(barys_y.begin(), barys_y.end(), 0.F) / barys_y.size(), z};
+            y = barys_y.empty() ? 0 : std::accumulate(barys_y.begin(), barys_y.end(), 0.F) / barys_y.size();
+            ana::Point pt{x, y, z};
             std::cout << "  custom spt: " << pt << " oof " << barys_y.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
             NearbyHitPoints.push_back(pt);
         }
