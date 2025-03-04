@@ -361,7 +361,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // fiducial cuts
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
-        MuonEndIsInVolumeYZ = upper_bounds.y.isInside(MuonEndHit.y, fMichelSpaceRadius) and upper_bounds.z.isInside(MuonEndHit.z, fMichelSpaceRadius);
+        MuonEndIsInVolumeYZ = upper_bounds.y.isInside(MuonEndTrackPoint.y, fMichelSpaceRadius) and upper_bounds.z.isInside(MuonEndTrackPoint.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
@@ -550,10 +550,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 // geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 // ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
 
-                geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+                auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
                 double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
-                double y = start_ind.y() + s * (end_ind.y() - start_ind.y());
+                float y = start_ind.y() + s * (end_ind.y() - start_ind.y());
 
                 if (!(upper_bounds.y.isInside(y) or lower_bounds.y.isInside(y))) continue;
 
