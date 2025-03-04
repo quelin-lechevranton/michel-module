@@ -532,35 +532,36 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (p_spt) std::cout << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")";
             std::cout << std::endl;
 
-            // geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
-            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
+            // assuming MuonEndHasGood3DAssociation is true
+            float y;
             float z = asWire->Wire(p_hit_col->WireID()).GetCenter().Z();
+            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
 
             struct Coincidence {
-                ana::Point pt;
+                // ana::Point pt;
+                float y;
                 recob::Hit const* hit;
             };
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
-
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
-                // geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                // ana::Point pt = ana::Point{geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
-                // pt.x = x;
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
+                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind)};
+                float co1_y = pt.y();
 
                 auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
                 double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
-                float y = start_ind.y() + s * (end_ind.y() - start_ind.y());
+                float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
 
-                if (!(upper_bounds.y.isInside(y) or lower_bounds.y.isInside(y))) continue;
+                if (abs(co1_y - co_y) > 0.1) LOG(!"co1_y == co_y");
 
-                ana::Point pt{x, y, z};
+                if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
-                struct Coincidence co = {pt, &hit_ind};
+                struct Coincidence co = {co_y, &hit_ind};
                 // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
@@ -575,13 +576,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             float min_dy = 600.F;
             ana::Points barys;
             bool has_good_coincidence = false;
-            // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
-                    // if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
 
-                    float dy = abs(U_co.pt.y - V_co.pt.y);
-                    ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
+                    float dy = abs(U_co.y - V_co.y);
 
                     // std::cout << "  Upt: " << U_co.pt << " w/ " << U_co.hit->Integral() << " Vpt: " << V_co.pt << " w/ " << V_co.hit->Integral() << " bary: " << bary << " w/ dy: " << dy << std::endl;
 
@@ -612,20 +610,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             // std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
             std::cout << "  custom spt: " << barys.barycenter() << " oof " << barys.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
             NearbyHitPoints.push_back(barys.barycenter());
-
-            // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
-            // for (recob::Hit const& hit_ind : v_hit_coincidence) {
-            //     geo::Point_t const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
-
-            //     // https://en.wikipedia.org/wiki/Line–line_intersection
-
-            //     double d = (start_col.y - end_col.y) * (start_ind.z - end_ind.z) - (start_col.z - end_col.z) * (start_ind.y - end_ind.y);
-            //     if (d == 0) continue;
-            //     double a = (start_col.y * end_col.z - start_col.z * end_col.y)
-            //     double b = (start_ind.y * end_ind.z - start_ind.z * end_ind.y)
-            //     double y = (a * (start_ind.y - end_ind.y) - b * (start_col.y - end_col.y)) / d;
-            //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
-
         }
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
