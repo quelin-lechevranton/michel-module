@@ -560,7 +560,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (U_coincidences.empty() or V_coincidences.empty()) continue;
 
             float min_dy = 600.F;
-            ana::point best_bary;
+            ana::Point best_bary;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
