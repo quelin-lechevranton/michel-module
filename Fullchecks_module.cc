@@ -585,11 +585,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     std::cout << "  Upt: " << U_co.pt << " w/ " << U_co.hit->Integral() << " Vpt: " << V_co.pt << " w/ " << V_co.hit->Integral() << " bary: " << bary << " w/ dy: " << dy << std::endl;
 
                     if (has_good_coincidence) {
-                        if (dy < fCoincidenceRadius) barys.push_back(bary);
+                        if (
+                            barys.push_back(bary);
+                        }
                         continue;
                     } 
 
-                    if (dy < fCoincidenceRadius) {
+                    if (dy < fCoincidenceRadius && abs(bary.y - muon_endpoints.at(m).spt.y) < fNearbySpaceRadius) {
                         has_good_coincidence = true;
                         barys.clear();
                         barys.push_back(bary);
