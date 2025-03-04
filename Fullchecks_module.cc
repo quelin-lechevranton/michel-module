@@ -522,7 +522,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << m << " " << nearby.at(m).vp_hit.size() << " nearby hits" << std::endl;
-        unsigned nb_hit_wpt = 0;
+        std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         for (art::Ptr<recob::Hit> const& p_hit_col : nearby.at(m).vp_hit) {
 
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
@@ -559,21 +559,26 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::cout << "  U coincidences: " << U_coincidences.size() << ", V coincidences: " << V_coincidences.size() << std::endl;
             if (U_coincidences.empty() or V_coincidences.empty()) continue;
 
-            bool has_point = false;
+            float min_dy = 600.F;
+            ana::point best_bary;
             // assuming MuonEndHasGood3DAssociation is true
             for (struct Coincidence const& U_co : U_coincidences) {
                 for (struct Coincidence const& V_co : V_coincidences) {
-                    if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
+                    // if (abs(U_co.pt.y - V_co.pt.y) > fCoincidenceRadius) continue;
 
-                    has_point = true;
+                    float dy = abs(U_co.pt.y - V_co.pt.y);
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
+
+                    if (dy > min_dy) continue;
+                    min_dy = dy;
+                    best_bary = bary;
 
                     // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                    std::cout << "  " << bary << std::endl;
+                    // std::cout << "  " << bary << std::endl;
                 }
             }
-            if (has_point) nb_hit_wpt++;
+            std::cout << "  best bary: " << best_bary << std::endl;
 
             // geo::Point_t const [start_col, end_col] = asWire->WireEndPoints(hit_col.WireID());
             // for (recob::Hit const& hit_ind : v_hit_coincidence) {
@@ -589,8 +594,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             //     double z = (a * (start_ind.z - end_ind.z) - b * (start_col.z - end_col.z)) / d;
 
         }
-        std::cout << nb_hit_wpt << " nearby hits with with point" << std::endl;
-        std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
         // */
