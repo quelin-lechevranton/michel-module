@@ -572,6 +572,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     float dy = abs(U_co.pt.y - V_co.pt.y);
                     ana::Point bary = (U_co.pt * U_co.hit->Integral() + V_co.pt * V_co.hit->Integral()) * (1.F / (U_co.hit->Integral() + V_co.hit->Integral()));
 
+                    std::cout << "  Upt: " << U_co.pt << " w/ " << U_co.hit->Integral() << " Vpt: " << V_co.pt << " w/ " << V_co.hit->Integral() << " bary: " << bary << " w/ dy: " << dy << std::endl;
+
                     if (has_good_coincidence) {
                         if (dy < fCoincidenceRadius) barys.push_back(bary);
                         continue;
