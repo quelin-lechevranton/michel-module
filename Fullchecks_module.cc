@@ -99,6 +99,7 @@ private:
     ana::Points NearbySpacePoints;
     ana::Points NearbyHitSpacePoints;
     ana::Points NearbyHitPoints;
+    std::vector<float> NearbyHitPointQuality;
 
     float MichelTrackLength;
 
@@ -249,7 +250,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         HITS_BRANCHES(tMuon, "Nearby", NearbyHits),
         POINTS_BRANCHES(tMuon, "NearbySpace", NearbySpacePoints),
         POINTS_BRANCHES(tMuon, "NearbyHitSpace", NearbyHitSpacePoints),
-        POINTS_BRANCHES(tMuon, "NearbyHit", NearbyHitPoints)
+        POINTS_BRANCHES(tMuon, "NearbyHit", NearbyHitPoints),
+        tMuon->Branch("NearbyHitPointQuality", &NearbyHitPointQuality)
     };
 }
 
@@ -552,13 +554,14 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
                 float co1_y = pt.y();
+                ana::Point wpt{pt};
 
                 auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
                 double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
                 float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
 
-                if (abs(co1_y - co_y) > 0.1) LOG(!"co1_y == co_y");
+                std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " ana::Point{x, co_y, z} << std::endl;
 
                 if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
@@ -682,6 +685,7 @@ void ana::Fullchecks::resetMichel() {
     NearbySpacePoints.clear();
     NearbyHitSpacePoints.clear();
     NearbyHitPoints.clear();
+    NearbyHitPointQuality.clear();
 
     MichelTrackLength = 0;
 
