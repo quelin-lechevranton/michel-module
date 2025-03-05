@@ -547,8 +547,10 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             };
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
+
+            std::cout << "   EndSpt: " << ana::Point(muon_endpoints.at(m).spt.position()) << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
             geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
-            printf("  TPC bounds: [%lf, %lf] x [%lf, %lf] x [%lf, %lf]", tpcgeo.MinX(), tpcgeo.MaxX(), tpcgeo.MinY(), tpcgeo.MaxY(), tpcgeo.MinZ(), tpcgeo.MaxZ());
+            printf("  TPC %u bounds: [%lf, %lf] x [%lf, %lf] x [%lf, %lf]", p_hit_col->WireID().TPC, tpcgeo.MinX(), tpcgeo.MaxX(), tpcgeo.MinY(), tpcgeo.MaxY(), tpcgeo.MinZ(), tpcgeo.MaxZ());
 
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
