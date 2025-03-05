@@ -585,26 +585,29 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // */
 
 
-        recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
-        if (trk_michel) 
-            MichelTrackLength = trk_michel->Length();
-        else
-            MichelTrackLength = 0;
+        if (mcp_michel) {
+            recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
+            if (trk_michel) 
+                MichelTrackLength = trk_michel->Length();
+            else
+                MichelTrackLength = 0;
 
-        MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
+            MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-        std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-        for (const recob::Hit* hit_michel : v_hit_michel) {
-            if (hit_michel->View() != geo::kW) continue;
+            std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
+            for (const recob::Hit* hit_michel : v_hit_michel) {
+                if (hit_michel->View() != geo::kW) continue;
 
-            MichelHits.push_back(GetHit(*hit_michel));
+                MichelHits.push_back(GetHit(*hit_michel));
+            }
+            MichelHitEnergy = MichelHits.energy();
+
+            SphereEnergy = SphereHits.energy();
         }
-        MichelHitEnergy = MichelHits.energy();
 
-        SphereEnergy = SphereHits.energy();
-
-        for (TBranch *b : brMichel) b->Fill();
-        for (TBranch *b : brMuon) b->Fill();
+        // for (TBranch *b : brMichel) b->Fill();
+        // for (TBranch *b : brMuon) b->Fill();
+        tMuon->Fill();
         iMuon++;
         EventNMuon++;
     } // end of loop over tracks
