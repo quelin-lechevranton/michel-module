@@ -460,7 +460,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
 
             art::Ptr<recob::Hit> p_spt_hit = fop_spt2hit.at(p_spt.key());
-            art::Ptr<recob::Track> p_spt_trk = fop_hit2trk.at(p_hit.key());
+            art::Ptr<recob::Track> p_spt_trk = fop_hit2trk.at(p_spt_hit.key());
 
             // std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
             //     << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
@@ -480,7 +480,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
-        std::cout << "mu#" << m << " " << NearbyPHits.size() << " nearby hits" << std::endl;
+        std::cout << "mu#" << iMuon << " " << NearbyPHits.size() << " nearby hits" << std::endl;
         std::cout << NearbySpacePoints.size() << " nearby space points" << std::endl;
         for (art::Ptr<recob::Hit> const& p_hit_col : NearbyPHits) {
 
