@@ -29,33 +29,6 @@
 
 #include <cstdio>
 
-
-#define HIT_BRANCHES(t, pre, h) \
-    t->Branch(pre "HitSlice", &h.slice), \
-    t->Branch(pre "HitZ", &h.z), \
-    t->Branch(pre "HitChannel", &h.channel), \
-    t->Branch(pre "HitTick", &h.tick), \
-    t->Branch(pre "HitADC", &h.adc)
-
-#define HITS_BRANCHES(t, pre, h) \
-    t->Branch(pre "NHit", &h.N), \
-    t->Branch(pre "HitSlice", &h.slice), \
-    t->Branch(pre "HitZ", &h.z), \
-    t->Branch(pre "HitChannel", &h.channel), \
-    t->Branch(pre "HitTick", &h.tick), \
-    t->Branch(pre "HitADC", &h.adc)
-
-#define POINT_BRANCHES(t, pre, p) \
-    t->Branch(pre "PointX", &p.x), \
-    t->Branch(pre "PointY", &p.y), \
-    t->Branch(pre "PointZ", &p.z)
-
-#define POINTS_BRANCHES(t, pre, p) \
-    t->Branch(pre "NPoint", &p.N), \
-    t->Branch(pre "PointX", &p.x), \
-    t->Branch(pre "PointY", &p.y), \
-    t->Branch(pre "PointZ", &p.z)
-
 #define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
 
 
@@ -76,26 +49,7 @@ namespace ana {
     };
 
 
-    // template<typename T>
-    // struct bounds3D {
-    //     bounds<T> x, y, z;
-    //     bounds3D() : x(), y(), z() {}
-    //     bounds3D(T xm, T xM, T ym, T yM, T zm, T zM) : x(xm, xM), y(ym, yM), z(zm, zM) {}
-    //     bool isInside(T x, T y, T z, float r=0) const {
-    //         return this->x.isInside(x, r) && this->y.isInside(y, r) && this->z.isInside(z, r);
-    //     }
-    //     bool isInside(TLorentzVector const& v, float r=0) const {
-    //         return isInside(v.X(), v.Y(), v.Z(), r);
-    //     }
-
-
-    //     friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
-    //         return os << b.x << " x " << b.y << " x " << b.z;
-    //     }
-    // };
-
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
- 
 
     struct Hit {
         // unsigned view;
@@ -108,9 +62,15 @@ namespace ana {
         Hit(unsigned s, float z, unsigned c, float t, float a) :
             slice(s), z(z), channel(c), tick(t), adc(a) {}
 
-
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
+        }
+        void SetBranches(TTree* t, const char* pre) const {
+            t->Branch(Form("%sHitSlice", pre), &slice);
+            t->Branch(Form("%sHitZ", pre), &z);
+            t->Branch(Form("%sHitChannel", pre), &channel);
+            t->Branch(Form("%sHitTick", pre), &tick);
+            t->Branch(Form("%sHitADC", pre), &adc);
         }
     };
     struct Hits {
@@ -146,6 +106,17 @@ namespace ana {
             return e * fADCtoMeV;
         }
 
+        void SetBranches(TTree *t, const char* pre) const {
+            t->Branch(Form("%sNHit", pre), &N);
+            t->Branch(Form("%sHitSlice", pre), &slice);
+            t->Branch(Form("%sHitZ", pre), &z);
+            t->Branch(Form("%sHitChannel", pre), &channel);
+            t->Branch(Form("%sHitTick", pre), &tick);
+            t->Branch(Form("%sHitADC", pre), &adc);
+        }
+
+
+
         Hit at(unsigned i) const { return Hit{slice[i], z[i], channel[i], tick[i], adc[i]}; }
         struct iterator {
             const Hits* hits;
@@ -179,6 +150,12 @@ namespace ana {
         friend std::ostream& operator<<(std::ostream& os, const Point& p) {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
+
+        void SetBranches(TTree* t, const char* pre) const {
+            t->Branch(Form("%sPointX", pre), &x);
+            t->Branch(Form("%sPointY", pre), &y);
+            t->Branch(Form("%sPointZ", pre), &z);
+        }
     };
     struct Points {
         unsigned N;
@@ -203,6 +180,14 @@ namespace ana {
             Point b;
             for (unsigned i=0; i<N; i++) b += at(i);
             return b * (1.F / N);
+        }
+
+
+        void SetBranches(TTree* t, const char* pre) const {
+            t->Branch(Form("%sNPoint", pre), &N);
+            t->Branch(Form("%sPointX", pre), &x);
+            t->Branch(Form("%sPointY", pre), &y);
+            t->Branch(Form("%sPointZ", pre), &z);
         }
 
         Point at(unsigned i) const { return Point{x[i], y[i], z[i]}; }
