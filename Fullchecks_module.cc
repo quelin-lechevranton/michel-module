@@ -574,7 +574,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 std::cout << " .  pt: " << ana::Point(x,co_y,z) << std::endl;
 
-                if (!LOG(tpcgeo.ContainsPosition(geo::Point_t(x,co_y,z), 1))) continue;
+                if (!LOG(tpcgeo.ContainsYZ(co_y,z, 1))) continue;
 
 
                 struct Coincidence co = {co_y, &hit_ind};
