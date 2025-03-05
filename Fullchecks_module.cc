@@ -132,7 +132,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
-    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
+    asWire = &*art::ServiceHandle<geo::WireReadout>();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
@@ -548,7 +548,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
 
-            std::cout << "   EndSpt: " << muon_endpoints.at(m).spt << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
+            std::cout << "   " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << muon_endpoints.at(m).spt << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
+            if (!MuonEndHasGood3DAssociation) continue;
             geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
             printf("  TPC %u bounds: [%lf, %lf] x [%lf, %lf] x [%lf, %lf]", p_hit_col->WireID().TPC, tpcgeo.MinX(), tpcgeo.MaxX(), tpcgeo.MinY(), tpcgeo.MaxY(), tpcgeo.MinZ(), tpcgeo.MaxZ());
 
