@@ -408,109 +408,81 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // saving end point info for further analysis
-        muon_endpoints.push_back({MuonEndHit, mcp_michel, p_trk.key(), MuonEndSpacePoint});
-
-        for (TBranch *b : brMuon) b->Fill();
-        iMuon++;
-        EventNMuon++;
-    } // end of loop over tracks
 
 
-    struct Nearby {
-        // ana::Hits hits;
-        std::vector<art::Ptr<recob::Hit>> vp_hit;
-        ana::Hits sphere_hits;
-        unsigned true_positive;
-        unsigned false_positive;
-        float energy_true_positive;
-        float energy_false_positive;
-        ana::Points spt;
-        ana::Points hit_spt;
-    };
-    std::vector<struct Nearby> nearby(EventNMuon);
 
-    // looping over all hits
-    for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-        if (p_hit->View() != geo::kW) continue;
+        std::vector<art::Ptr<recob::Hit>> NearbyPHits;
+        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+            if (p_hit->View() != geo::kW) continue;
 
-        art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
-        bool from_track = p_trk and p_trk->Length() > fTrackLengthCut;
+            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
+            bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
-        // looping over muon end points
-        for (unsigned m=0; m<EventNMuon; m++) {
             ana::Hit hit = GetHit(*p_hit);
-            if (hit.slice != muon_endpoints.at(m).hit.slice) continue;
+            if (hit.slice != MuonEndHit.slice) continue;
 
-            float dz = (hit.z - muon_endpoints.at(m).hit.z);
-            float dt = (hit.tick - muon_endpoints.at(m).hit.tick) * fTick2cm;
+            float dz = (hit.z - MuonEndHit.z);
+            float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
             float dr2 = dz*dz + dt*dt;
 
-            bool from_another_track = from_track and muon_endpoints.at(m).trk_key != p_trk.key();
-
-            if (from_another_track) continue;
+            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-            // nearby.at(m).hits.push_back(hit);
-            nearby.at(m).vp_hit.push_back(p_hit);
+            NearbyHits.push_back(hit);
+            NearbyPHits.push_back(p_hit);
 
-
-            art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit.key());
-            if (p_spt)
-                nearby.at(m).hit_spt.push_back(p_spt->position());
+            art::Ptr<recob::SpacePoint> p_hit_spt = fop_hit2spt.at(p_hit.key());
+            if (p_hit_spt)
+                NearbyHitSpacePoints.push_back(p_hit_spt->position());
             else 
-                nearby.at(m).hit_spt.push_back(ana::Point{0.F, 0.F, 0.F});
+                NearbyHitSpacePoints.push_back(ana::Point{});
 
 
-            if (!muon_endpoints.at(m).mcp_michel) continue;
+            if (!mcp_michel) continue;
             if (from_track) continue;
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
-            nearby.at(m).sphere_hits.push_back(hit);
+            SphereHits.push_back(hit);
 
             // checking if the hit is associated to the michel MCParticle
-            std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_hit.label());
+            std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
             if (std::find(v_hit_michel.begin(), v_hit_michel.end(), &*p_hit) != v_hit_michel.end()) {
-                nearby.at(m).true_positive++;
-                nearby.at(m).energy_true_positive += hit.adc;
+                SphereTruePositive++;
+                SphereEnergyTruePositive += hit.adc;
             } else {
-                nearby.at(m).false_positive++;
-                nearby.at(m).energy_false_positive += hit.adc;
+                SphereFalsePositive++;
+                SphereEnergyFalsePositive += hit.adc;
             }
-        }
-    } // end of loop over event hits
+        } // end of loop over event hits
 
 
-    // get space points nearby muon end point
-    for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
+        // get space points nearby muon end point
+        for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
 
-        art::Ptr<recob::Hit> p_hit = fop_spt2hit.at(p_spt.key());
-        art::Ptr<recob::Track> p_trk = fop_hit2trk.at(p_hit.key());
+            art::Ptr<recob::Hit> p_spt_hit = fop_spt2hit.at(p_spt.key());
+            art::Ptr<recob::Track> p_spt_trk = fop_hit2trk.at(p_hit.key());
 
-        // std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
-        //     << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
-        //     << std::endl;
+            // std::cout << "spt: id" << p_spt->ID() << " (" << p_spt->position().x() << ", " << p_spt->position().y() << ", " << p_spt->position().z() << ")"
+            //     << " w/ hit: " << char('U' + p_hit->View()) << " (" << p_hit->Channel() << ", " << p_hit->PeakTime() << ")"
+            //     << std::endl;
 
-        for (unsigned m=0; m<EventNMuon; m++) {
-            ana::Point dpt = muon_endpoints.at(m).spt - p_spt->position();
+            ana::Point dpt = MuonEndSpacePoint - p_spt->position();
             dpt.x = 0;
             if (dpt.r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
-            if (p_trk and p_trk.key() != muon_endpoints.at(m).trk_key and p_trk->Length() > fTrackLengthCut) continue;
+            if (p_spt_trk and p_spt_trk.key() != p_trk.key() and p_spt_trk->Length() > fTrackLengthCut) continue;
 
-            nearby.at(m).spt.push_back(p_spt->position());
+            NearbySpacePoints.push_back(p_spt->position());
         }
-    }
-
-    // filling the branches related to michel
-    for (unsigned m=0; m<EventNMuon; m++) {
-
+        
+        
         resetMichel();
 
         // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
-        std::cout << "mu#" << m << " " << nearby.at(m).vp_hit.size() << " nearby hits" << std::endl;
-        std::cout << nearby.at(m).spt.size() << " nearby space points" << std::endl;
-        for (art::Ptr<recob::Hit> const& p_hit_col : nearby.at(m).vp_hit) {
+        std::cout << "mu#" << m << " " << NearbyPHits.size() << " nearby hits" << std::endl;
+        std::cout << NearbySpacePoints.size() << " nearby space points" << std::endl;
+        for (art::Ptr<recob::Hit> const& p_hit_col : NearbyPHits) {
 
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
             std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m";
@@ -521,7 +493,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
             float y = 0;
             float z = wiregeo_col.GetCenter().Z();
-            float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
+            float x = MuonEndSpacePoint.x + (p_hit_col->PeakTime() - MuonEndHit.tick) * fTick2cm;
 
             struct Coincidence {
                 float y;
@@ -529,7 +501,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             };
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
-            std::cout << "  " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << muon_endpoints.at(m).spt << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
+            std::cout << "  " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << MuonEndSpacePoint << "  dtick: " << p_hit_col->PeakTime() - MuonEndHit.tick << std::endl;
             if (!MuonEndHasGood3DAssociation) continue;
             geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
             std::cout << "  TPC " << p_hit_col->WireID().TPC << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
@@ -565,13 +537,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     float bary_y = (U_co.y * U_co.hit->Integral() + V_co.y * V_co.hit->Integral()) / (U_co.hit->Integral() + V_co.hit->Integral());
 
                     if (has_good_coincidence) {
-                        if (dy < fCoincidenceRadius && abs(bary_y - muon_endpoints.at(m).spt.y) < fNearbySpaceRadius) {
+                        if (dy < fCoincidenceRadius && abs(bary_y - MuonEndSpacePoint.y) < fNearbySpaceRadius) {
                             barys_y.push_back(bary_y);
                         }
                         continue;
                     } 
 
-                    if (dy < fCoincidenceRadius && abs(bary_y - muon_endpoints.at(m).spt.y) < fNearbySpaceRadius) {
+                    if (dy < fCoincidenceRadius && abs(bary_y - MuonEndSpacePoint.y) < fNearbySpaceRadius) {
                         has_good_coincidence = true;
                         barys_y.clear();
                         barys_y.push_back(bary_y);
@@ -583,7 +555,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                         }
                     }
 
-                    // if ((bary - muon_endpoints.at(m).spt).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+                    // if ((bary - MuonEndSpacePoint).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
                     // std::cout << "  " << bary << std::endl;
                 }
@@ -612,27 +584,16 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // */
 
-        // NearbyHits = nearby.at(m).hits;
-        for (art::Ptr<recob::Hit> const& p_hit : nearby.at(m).vp_hit)
-            NearbyHits.push_back(GetHit(*p_hit));
-            
-        NearbySpacePoints = nearby.at(m).spt;
-        NearbyHitSpacePoints = nearby.at(m).hit_spt;
 
-        if (!muon_endpoints.at(m).mcp_michel) {
-            for (TBranch *b : brMichel) b->Fill();
-            continue;
-        }
-
-        recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_trk.label());
+        recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
         if (trk_michel) 
             MichelTrackLength = trk_michel->Length();
         else
             MichelTrackLength = 0;
 
-        MichelTrueEnergy = (muon_endpoints.at(m).mcp_michel->E() - muon_endpoints.at(m).mcp_michel->Mass()) * 1e3;
+        MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-        std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *muon_endpoints.at(m).mcp_michel, e, tag_hit.label());
+        std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
         for (const recob::Hit* hit_michel : v_hit_michel) {
             if (hit_michel->View() != geo::kW) continue;
 
@@ -640,17 +601,16 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
         MichelHitEnergy = MichelHits.energy();
 
-        SphereHits = nearby.at(m).sphere_hits;
         SphereEnergy = SphereHits.energy();
 
-        SphereTruePositive = nearby.at(m).true_positive;
-        SphereFalsePositive = nearby.at(m).false_positive;
-        SphereEnergyTruePositive = nearby.at(m).energy_true_positive;
-        SphereEnergyFalsePositive = nearby.at(m).energy_false_positive;
-
         for (TBranch *b : brMichel) b->Fill();
-    }
+        for (TBranch *b : brMuon) b->Fill();
+        iMuon++;
+        EventNMuon++;
+    } // end of loop over tracks
 
+
+        
     tMuon->SetEntries(brMuon.front()->GetEntries());
     tEvent->Fill();
     iEvent++;
