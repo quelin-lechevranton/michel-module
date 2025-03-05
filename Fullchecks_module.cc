@@ -346,7 +346,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // fiducial cuts
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
-        MuonEndIsInVolumeYZ = geoCryo.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius) and geoCryo.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
+        MuonEndIsInVolumeYZ = geoUp.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius) and geoUp.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
@@ -397,7 +397,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
         }
         if (mcp_michel and has_numu and has_nue) {
-            if (geoLow.ContainsPosition(mcp_michel->Position(0).Vect(), 1.) or geoUp.ContainsPosition(mcp_michel->Position(0).Vect(), 1.)) 
+            if (geoLow.ContainsPosition(mcp_michel->Position(0).Vect()) or geoUp.ContainsPosition(mcp_michel->Position(0).Vect())) 
                 MuonHasMichel = kHasMichelInside; 
             else
                 MuonHasMichel = kHasMichelOutside;
