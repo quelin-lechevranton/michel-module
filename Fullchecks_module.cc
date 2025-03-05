@@ -552,18 +552,23 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                // float co1_y = pt.y();
-                ana::Point wpt{pt};
+                float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
+                // geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
+                // // float co1_y = pt.y();
+                // ana::Point wpt{pt};
 
-                auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
+                // auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
 
-                double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
-                float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
+                // double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
+                // float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
 
-                std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " << ana::Point(x, co_y, z) << std::endl;
+                // std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " << ana::Point(x, co_y, z) << std::endl;
 
-                if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
+                // if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
+
+                geo::TPCID tpcid{0, p_hit_col->WireID().TPC};
+                if (!LOG(asGeo->TPC(tpcid).ContainsPosition(geo::Point_t(x,co_y,z), 0))) continue;
+
 
                 struct Coincidence co = {co_y, &hit_ind};
                 // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
