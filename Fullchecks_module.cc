@@ -519,7 +519,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
             // assuming MuonEndHasGood3DAssociation is true
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
-            float y;
+            float y = 0;
             float z = wiregeo_col.GetCenter().Z();
             float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
 
@@ -589,7 +589,20 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 }
             }
             // std::cout << "  best bary: " << best_bary << " w/ dy: " << min_dy << std::endl;
-            y = barys_y.empty() ? 0 : std::accumulate(barys_y.begin(), barys_y.end(), 0.F) / barys_y.size();
+            float mean_y = std::accumulate(barys_y.begin(), barys_y.end(), 0.F) / barys_y.size();
+            unsigned n = 0;
+            for (float bary_y : barys_y) {
+                if (abs(bary_y - mean_y) < 2 * fCoincidenceRadius) {
+                    y += bary_y;
+                    n++;
+                }
+            }
+            if (n) y /= n;
+            else {
+                y = mean_y;
+                has_good_coincidence = false;
+            }
+
             ana::Point pt{x, y, z};
             std::cout << "  custom spt: " << pt << " oof " << barys_y.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
             NearbyHitPoints.push_back(pt);
