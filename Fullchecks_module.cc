@@ -524,17 +524,15 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             float x = muon_endpoints.at(m).spt.x + (p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick) * fTick2cm;
 
             struct Coincidence {
-                // ana::Point pt;
                 float y;
                 recob::Hit const* hit;
             };
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
-
-            std::cout << "   " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << muon_endpoints.at(m).spt << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
+            std::cout << "  " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << muon_endpoints.at(m).spt << "  dtick: " << p_hit_col->PeakTime() - muon_endpoints.at(m).hit.tick << std::endl;
             if (!MuonEndHasGood3DAssociation) continue;
             geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
-            printf("  TPC %u bounds: [%lf, %lf] x [%lf, %lf] x [%lf, %lf]", p_hit_col->WireID().TPC, tpcgeo.MinX(), tpcgeo.MaxX(), tpcgeo.MinY(), tpcgeo.MaxY(), tpcgeo.MinZ(), tpcgeo.MaxZ());
+            std::cout << "  TPC " << p_hit_col->WireID().TPC << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
 
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
@@ -543,13 +541,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
 
-                std::cout << " .  pt: " << ana::Point(x,co_y,z) << std::endl;
-
-                if (!LOG(tpcgeo.ContainsYZ(co_y,z, 1))) continue;
-
-
+                if (!tpcgeo.ContainsYZ(co_y,z)) continue;
                 struct Coincidence co = {co_y, &hit_ind};
-                // std::cout << " [" << char('U' + hit_ind.View()) << ", " << pt << "]";
 
                 switch (hit_ind.View()) {
                     case geo::kU: U_coincidences.push_back(co); break;
@@ -600,6 +593,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             ana::Point pt{x, y, z};
             std::cout << "  custom spt: " << pt << " oof " << barys_y.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
             NearbyHitPoints.push_back(pt);
+            NearbyHitPointQuality.push_back(has_good_coincidence ? 0.F : min_dy);
         }
         // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 

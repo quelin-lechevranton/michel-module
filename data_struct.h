@@ -76,23 +76,23 @@ namespace ana {
     };
 
 
-    template<typename T>
-    struct bounds3D {
-        bounds<T> x, y, z;
-        bounds3D() : x(), y(), z() {}
-        bounds3D(T xm, T xM, T ym, T yM, T zm, T zM) : x(xm, xM), y(ym, yM), z(zm, zM) {}
-        bool isInside(T x, T y, T z, float r=0) const {
-            return this->x.isInside(x, r) && this->y.isInside(y, r) && this->z.isInside(z, r);
-        }
-        bool isInside(TLorentzVector const& v, float r=0) const {
-            return isInside(v.X(), v.Y(), v.Z(), r);
-        }
+    // template<typename T>
+    // struct bounds3D {
+    //     bounds<T> x, y, z;
+    //     bounds3D() : x(), y(), z() {}
+    //     bounds3D(T xm, T xM, T ym, T yM, T zm, T zM) : x(xm, xM), y(ym, yM), z(zm, zM) {}
+    //     bool isInside(T x, T y, T z, float r=0) const {
+    //         return this->x.isInside(x, r) && this->y.isInside(y, r) && this->z.isInside(z, r);
+    //     }
+    //     bool isInside(TLorentzVector const& v, float r=0) const {
+    //         return isInside(v.X(), v.Y(), v.Z(), r);
+    //     }
 
 
-        friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
-            return os << b.x << " x " << b.y << " x " << b.z;
-        }
-    };
+    //     friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
+    //         return os << b.x << " x " << b.y << " x " << b.z;
+    //     }
+    // };
 
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
  
