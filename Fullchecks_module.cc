@@ -137,8 +137,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
-    geoLow = geo::BoxBoundedGeo(asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max());
-    geoUp = geo::BoxBoundedGeo(asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max());
+    geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
+    geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
 
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -170,7 +170,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    tick_window = bounds<float>(0, detProp.ReadOutWindowSize());
+    tick_window = bounds<float>{0, detProp.ReadOutWindowSize()};
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
@@ -372,7 +372,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // and all muon space points
-        MuonEndSpacePoint = ana::Point{geoCryo.MaxX(), 0., 0.};
+        MuonEndSpacePoint = ana::Point{geoUp.MaxX(), 0., 0.};
         art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
@@ -381,7 +381,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (p_spt->position().x() < MuonEndSpacePoint.x)
                 MuonEndSpacePoint = ana::Point{p_spt->position()};
         }
-        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoCryo.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
+        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoUp.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and el as last daughters
         bool has_numu = false, has_nue = false;
