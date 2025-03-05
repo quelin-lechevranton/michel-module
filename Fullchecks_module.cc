@@ -567,7 +567,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 // if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
                 geo::TPCID tpcid{0, p_hit_col->WireID().TPC};
-                if (!LOG(asGeo->TPC(tpcid).ContainsPosition(geo::Point_t(x,co_y,z), 0))) continue;
+                if (!LOG(asGeo->TPC(tpcid).ContainsPosition(geo::Point_t(x,co_y,z), 1))) continue;
 
 
                 struct Coincidence co = {co_y, &hit_ind};
