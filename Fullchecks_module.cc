@@ -547,6 +547,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             };
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
+            geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
+            printf("  TPC bounds: [%lf, %lf] x [%lf, %lf] x [%lf, %lf]", tpcgeo.MinX(), tpcgeo.MaxX(), tpcgeo.MinY(), tpcgeo.MaxY(), tpcgeo.MinZ(), tpcgeo.MaxZ());
+
             for (recob::Hit const& hit_ind : *vh_hit) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
@@ -566,8 +569,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 // if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
-                geo::TPCID tpcid{0, p_hit_col->WireID().TPC};
-                if (!LOG(asGeo->TPC(tpcid).ContainsPosition(geo::Point_t(x,co_y,z), 1))) continue;
+                std::cout << " .  pt: " << ana::Point(x,co_y,z) << std::endl;
+
+                if (!LOG(tpcgeo.ContainsPosition(geo::Point_t(x,co_y,z), 1))) continue;
 
 
                 struct Coincidence co = {co_y, &hit_ind};
