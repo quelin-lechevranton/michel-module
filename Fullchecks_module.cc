@@ -170,7 +170,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    tick_window = bounds<float>{0, detProp.ReadOutWindowSize()};
+    tick_window = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
