@@ -35,6 +35,7 @@ private:
     const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
+    geo::BoxBoundedGeo geoUp, geoLow;
 
     protoana::ProtoDUNETruthUtils truthUtil;
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
@@ -48,7 +49,7 @@ private:
     float fChannelPitch;
 
     bounds<float> tick_window;
-    bounds3D<float> lower_bounds, upper_bounds;
+    // bounds3D<float> lower_bounds, upper_bounds;
     // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
 
@@ -136,6 +137,9 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
+    geoLow = geo::BoxBoundedGeo(asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max());
+    geoUp = geo::BoxBoundedGeo(asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max());
+
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
 
@@ -166,36 +170,15 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    tick_window.min = 0;
-    tick_window.max = detProp.ReadOutWindowSize();
-
-    for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
-        geo::TPCID tpcid{0, tpc};
-
-        if (tpc >= 8U) {
-            upper_bounds.x.min = upper_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : upper_bounds.x.min;
-            upper_bounds.x.max = upper_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : upper_bounds.x.max;
-            upper_bounds.y.min = upper_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : upper_bounds.y.min;
-            upper_bounds.y.max = upper_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : upper_bounds.y.max;
-            upper_bounds.z.min = upper_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : upper_bounds.z.min;
-            upper_bounds.z.max = upper_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : upper_bounds.z.max;
-        } else {
-            lower_bounds.x.min = lower_bounds.x.min > asGeo->TPC(tpcid).MinX() ? asGeo->TPC(tpcid).MinX() : lower_bounds.x.min;
-            lower_bounds.x.max = lower_bounds.x.max < asGeo->TPC(tpcid).MaxX() ? asGeo->TPC(tpcid).MaxX() : lower_bounds.x.max;
-            lower_bounds.y.min = lower_bounds.y.min > asGeo->TPC(tpcid).MinY() ? asGeo->TPC(tpcid).MinY() : lower_bounds.y.min;
-            lower_bounds.y.max = lower_bounds.y.max < asGeo->TPC(tpcid).MaxY() ? asGeo->TPC(tpcid).MaxY() : lower_bounds.y.max;
-            lower_bounds.z.min = lower_bounds.z.min > asGeo->TPC(tpcid).MinZ() ? asGeo->TPC(tpcid).MinZ() : lower_bounds.z.min;
-            lower_bounds.z.max = lower_bounds.z.max < asGeo->TPC(tpcid).MaxZ() ? asGeo->TPC(tpcid).MaxZ() : lower_bounds.z.max;
-        }
-    }
+    tick_window = bounds<float>(0, detProp.ReadOutWindowSize());
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
         << "  Tick Window: " << tick_window << std::endl
-        << "  Upper Bounds: " << upper_bounds << std::endl
-        << "  Lower Bounds: " << lower_bounds << std::endl;
+        << "  Upper Bounds: " << geoUp.Min() << " -> " << geoUp.Max() << std::endl
+        << "  Lower Bounds: " << geoLow.Min() << " -> " << geoLow.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelSpaceRadius << " cm" << std::endl
@@ -363,7 +346,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // fiducial cuts
         MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
-        MuonEndIsInVolumeYZ = upper_bounds.y.isInside(MuonEndTrackPoint.y, fMichelSpaceRadius) and upper_bounds.z.isInside(MuonEndTrackPoint.z, fMichelSpaceRadius);
+        MuonEndIsInVolumeYZ = geoCryo.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius) and geoCryo.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
@@ -389,7 +372,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // and all muon space points
-        MuonEndSpacePoint = ana::Point{upper_bounds.x.max, 0, 0};
+        MuonEndSpacePoint = ana::Point{geoCryo.MaxX(), 0, 0};
         art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
@@ -398,7 +381,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (p_spt->position().x() < MuonEndSpacePoint.x)
                 MuonEndSpacePoint = ana::Point{p_spt->position()};
         }
-        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != upper_bounds.x.max and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
+        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoCryo.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and el as last daughters
         bool has_numu = false, has_nue = false;
@@ -414,7 +397,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
         }
         if (mcp_michel and has_numu and has_nue) {
-            if (lower_bounds.isInside(mcp_michel->Position(0)) or upper_bounds.isInside(mcp_michel->Position(0))) 
+            if (geoLow.ContainsPosition(mcp_michel->Position(0).Vect(), 1.) or geoUp.ContainsPosition(mcp_michel->Position(0).Vect(), 1.)) 
                 MuonHasMichel = kHasMichelInside; 
             else
                 MuonHasMichel = kHasMichelOutside;
@@ -559,18 +542,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
-                // geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                // // float co1_y = pt.y();
-                // ana::Point wpt{pt};
-
-                // auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
-
-                // double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
-                // float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
-
-                // std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " << ana::Point(x, co_y, z) << std::endl;
-
-                // if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
                 std::cout << " .  pt: " << ana::Point(x,co_y,z) << std::endl;
 
