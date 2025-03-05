@@ -372,7 +372,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // and all muon space points
-        MuonEndSpacePoint = ana::Point{geoCryo.MaxX(), 0, 0};
+        MuonEndSpacePoint = ana::Point{geoCryo.MaxX(), 0., 0.};
         art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
         std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
         for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {

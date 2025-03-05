@@ -162,6 +162,7 @@ namespace ana {
         float x, y, z;
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
+        Point(double x, double y, double z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
         float r2() const { return x*x + y*y + z*z; }
 
