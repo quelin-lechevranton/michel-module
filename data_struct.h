@@ -65,7 +65,7 @@ namespace ana {
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
-        void SetBranches(TTree* t, const char* pre) const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sHitSlice", pre), &slice);
             t->Branch(Form("%sHitZ", pre), &z);
             t->Branch(Form("%sHitChannel", pre), &channel);
@@ -106,7 +106,7 @@ namespace ana {
             return e * fADCtoMeV;
         }
 
-        void SetBranches(TTree *t, const char* pre) const {
+        void SetBranches(TTree *t, const char* pre="") {
             t->Branch(Form("%sNHit", pre), &N);
             t->Branch(Form("%sHitSlice", pre), &slice);
             t->Branch(Form("%sHitZ", pre), &z);
@@ -121,12 +121,12 @@ namespace ana {
         struct iterator {
             const Hits* hits;
             unsigned i;
-            iterator(Hits const* h, unsigned i) : hits(h), i(i) {}
+            iterator(Hits const* h, unsigned i=0) : hits(h), i(i) {}
             iterator& operator++() { i++; return *this; }
             bool operator!=(iterator const& h) const { return i != h.i; }
             Hit operator*() const { return hits->at(i); }
         };
-        iterator begin() const { return iterator(this, 0); }
+        iterator begin() const { return iterator(this); }
         iterator end() const { return iterator(this, N); }
     };
     struct Point {
@@ -151,7 +151,7 @@ namespace ana {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
 
-        void SetBranches(TTree* t, const char* pre) const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sPointX", pre), &x);
             t->Branch(Form("%sPointY", pre), &y);
             t->Branch(Form("%sPointZ", pre), &z);
@@ -183,7 +183,7 @@ namespace ana {
         }
 
 
-        void SetBranches(TTree* t, const char* pre) const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sNPoint", pre), &N);
             t->Branch(Form("%sPointX", pre), &x);
             t->Branch(Form("%sPointY", pre), &y);
@@ -194,12 +194,12 @@ namespace ana {
         struct iterator {
             const Points* points;
             unsigned i;
-            iterator(Points const* p, unsigned i) : points(p), i(i) {}
+            iterator(Points const* p, unsigned i=0) : points(p), i(i) {}
             iterator& operator++() { i++; return *this; }
             bool operator!=(iterator const& p) { return i != p.i; }
             Point operator*() { return points->at(i); }
         };
-        iterator begin() const { return iterator(this, 0); }
+        iterator begin() const { return iterator(this); }
         iterator end() const { return iterator(this, N); }
     };
 }

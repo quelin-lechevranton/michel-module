@@ -189,7 +189,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
-    EventHits.SetBranches(tEvent, "");
+    EventHits.SetBranches(tEvent);
 
     tMuon = tfs->make<TTree>("muon","");
 
@@ -206,7 +206,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ);
     tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
 
-    MuonHits.SetBranches(tMuon, "");
+    MuonHits.SetBranches(tMuon);
     MuonEndHit.SetBranches(tMuon, "End");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
