@@ -553,7 +553,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 geo::Point_t pt = geo::WiresIntersection(wiregeo_col, wiregeo_ind);
-                float co1_y = pt.y();
+                // float co1_y = pt.y();
                 ana::Point wpt{pt};
 
                 auto const [start_ind, end_ind] = asWire->WireEndPoints(hit_ind.WireID());
@@ -561,7 +561,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 double s = (z - start_ind.z()) / (end_ind.z() - start_ind.z());
                 float co_y = start_ind.y() + s * (end_ind.y() - start_ind.y());
 
-                std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " ana::Point{x, co_y, z} << std::endl;
+                std::cout << "\t\t wireIntersec pt: " << wpt << " vs. handmade pt: " << ana::Point(x, co_y, z) << std::endl;
 
                 if (!(upper_bounds.y.isInside(co_y) or lower_bounds.y.isInside(co_y))) continue;
 
