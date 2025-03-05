@@ -189,7 +189,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
-    HITS_BRANCHES(tEvent, "", EventHits);
+    EventHits.SetBranches(tEvent, "");
 
     tMuon = tfs->make<TTree>("muon","");
 
