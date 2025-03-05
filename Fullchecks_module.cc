@@ -132,7 +132,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
-    asWire = &*art::ServiceHandle<geo::WireReadout>();
+    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
