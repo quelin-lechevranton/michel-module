@@ -55,7 +55,7 @@ private:
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
-    art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp;
+    art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp, tag_r3d;
 
     // Input Parameters
     bool fLog;
@@ -100,6 +100,7 @@ private:
     ana::Points NearbyHitSpacePoints;
     ana::Points NearbyHitPoints;
     std::vector<float> NearbyHitPointQuality;
+    ana::Points NearbyReco3DPoints;
 
     float MichelTrackLength;
 
@@ -135,8 +136,6 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
-    geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
-    geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
 
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -157,6 +156,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
+        tag_r3d = art::InputTag("reco3d", "");
     }
 
     fChannelPitch = geo::WireGeo::WirePitch(
@@ -169,6 +169,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     tick_window = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
+    geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
@@ -230,6 +232,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     NearbyHitSpacePoints.SetBranches(tMuon, "NearbyHitSpace");
     NearbyHitPoints.SetBranches(tMuon, "NearbyHit");
     tMuon->Branch("NearbyHitPointQuality", &NearbyHitPointQuality);
+    NearbyReco3DPoints.SetBranches(tMuon, "NearbyReco3D");
 
 }
 
@@ -262,6 +265,12 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
+
+
+    auto const & vh_r3d = e.getValidHandle<std::vector<recob::Track>>(tag_r3d);
+    std::vector<art::Ptr<recob::Track>> vp_r3d;
+    art::fill_ptr_vector(vp_r3d, vh_r3d);
+
 
     resetEvent();
 
@@ -466,12 +475,20 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             NearbySpacePoints.push_back(p_spt->position());
         }
         
+        // get reco3d space points nearby muon end point
+        for (art::Ptr<recob::SpacePoint> const& p_r3d : vp_r3d) {
+            ana::Point dpt = MuonEndSpacePoint - p_r3d->position();
+            dpt.x = 0;
+            if (dpt.r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+
+            NearbyReco3DPoints.push_back(p_r3d->position());
+        }
+
 
         // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
-        std::cout << "mu#" << iMuon << " " << NearbyPHits.size() << " nearby hits" << std::endl;
-        std::cout << NearbySpacePoints.size() << " nearby space points" << std::endl;
+        std::cout << "mu#" << iMuon << " w/ " << NearbyPHits.size() << " nearby hits, w/ " NearbySpacePoints.size() << " nearby space points" << std::endl;
         for (art::Ptr<recob::Hit> const& p_hit_col : NearbyPHits) {
 
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
@@ -492,15 +509,15 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             std::vector<struct Coincidence> V_coincidences, U_coincidences;
 
             std::cout << "  " << (MuonEndHasGood3DAssociation ? "good3D" : "bad3D") << " EndSpt: " << MuonEndSpacePoint << "  dtick: " << p_hit_col->PeakTime() - MuonEndHit.tick << std::endl;
-            if (!MuonEndHasGood3DAssociation) continue;
             geo::TPCGeo const tpcgeo = asGeo->TPC(geo::TPCID{0, p_hit_col->WireID().TPC});
             std::cout << "  TPC " << p_hit_col->WireID().TPC << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
 
             for (recob::Hit const& hit_ind : *vh_hit) {
+
+                if (hit_ind.WireID().TPC != p_hit_col->WireID().TPC) continue;
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
-                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
 
                 if (!tpcgeo.ContainsYZ(co_y,z)) continue;
@@ -570,7 +587,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             NearbyHitPoints.push_back(pt);
             NearbyHitPointQuality.push_back(has_good_coincidence ? 0.F : min_dy);
         }
-        // std::cout << no_coincidence << " hits w/o coincidence" << std::endl;
 
         // */
 
@@ -603,6 +619,7 @@ void ana::Fullchecks::resetMuon() {
     NearbyHitSpacePoints.clear();
     NearbyHitPoints.clear();
     NearbyHitPointQuality.clear();
+    NearbyReco3DPoints.clear();
 
     MichelTrackLength = 0;
 
