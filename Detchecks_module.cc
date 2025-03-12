@@ -53,8 +53,8 @@ private:
     float fADCtoE = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
     float fChannelPitch = 0.5; // cm/channel
 
-    geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
-    raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
+    // geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
+    // raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
 };
 
 
@@ -72,7 +72,7 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
-    t = tfs->make<TTree*>("t","");
+    t = tfs->make<TTree>("t","");
     UStartPoints.SetBranches(t, "UStart");
     VStartPoints.SetBranches(t, "VStart");
     WStartPoints.SetBranches(t, "WStart");
@@ -240,24 +240,24 @@ void ana::Detchecks::beginJob()
         for (unsigned int wire=0; wire<asWire->Nwires(planeidU); wire++) {
             geo::WireID wireid{planeidU, wire};
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
-            // UStartPoints.push_back(wiregeo.GetStart());
-            // UEndPoints.push_back(wiregeo.GetEnd());
+            UStartPoints.push_back(wiregeo.GetStart());
+            UEndPoints.push_back(wiregeo.GetEnd());
             std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
         }
         std::cout << "  V plane, " << asWire->Nwires(planeidV) << " wires:" << std::endl;
         for (unsigned int wire=0; wire<asWire->Nwires(planeidV); wire++) {
             geo::WireID wireid{planeidV, wire};
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
-            // VStartPoints.push_back(wiregeo.GetStart());
-            // VEndPoints.push_back(wiregeo.GetEnd());
+            VStartPoints.push_back(wiregeo.GetStart());
+            VEndPoints.push_back(wiregeo.GetEnd());
             std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
         }
         std::cout << "  W plane, " << asWire->Nwires(planeidW) << " wires:" << std::endl;
         for (unsigned int wire=0; wire<asWire->Nwires(planeidW); wire++) {
             geo::WireID wireid{planeidW, wire};
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
-            // WStartPoints.push_back(wiregeo.GetStart());
-            // WEndPoints.push_back(wiregeo.GetEnd());
+            WStartPoints.push_back(wiregeo.GetStart());
+            WEndPoints.push_back(wiregeo.GetEnd());
             std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
         }
     }
@@ -273,22 +273,22 @@ void ana::Detchecks::endJob()
 
 } // end endJob
 
-geo::WireID ana::Detchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
-    geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
-    if (!tpcid.isValid) return geo::WireID();
-    geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
-    geo::WireID wireid;
-    try {
-        wireid = planegeo.NearestWireID(P);
-    } catch (geo::InvalidWireError const& e) {
-        return e.suggestedWireID();
-    }
-    return wireid;
-}
-raw::ChannelID_t ana::Detchecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
-    geo::WireID wireid = GetWireID(P, plane);
-    if (!wireid.isValid) return raw::InvalidChannelID;
-    return asWire->PlaneWireToChannel(wireid);
-}
+// geo::WireID ana::Detchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
+//     geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
+//     if (!tpcid.isValid) return geo::WireID();
+//     geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
+//     geo::WireID wireid;
+//     try {
+//         wireid = planegeo.NearestWireID(P);
+//     } catch (geo::InvalidWireError const& e) {
+//         return e.suggestedWireID();
+//     }
+//     return wireid;
+// }
+// raw::ChannelID_t ana::Detchecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
+//     geo::WireID wireid = GetWireID(P, plane);
+//     if (!wireid.isValid) return raw::InvalidChannelID;
+//     return asWire->PlaneWireToChannel(wireid);
+// }
 
 DEFINE_ART_MODULE(ana::Detchecks)
