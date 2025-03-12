@@ -230,7 +230,7 @@ void ana::Detchecks::beginJob()
 
     for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
         geo::TPCID tpcid{cryoid, tpc};
-        // geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
+        geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
         geo::PlaneID planeidU{tpcid, geo::kU};
         geo::PlaneID planeidV{tpcid, geo::kV};
         geo::PlaneID planeidW{tpcid, geo::kW};

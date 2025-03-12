@@ -267,8 +267,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
 
-    auto const & vh_r3d = e.getValidHandle<std::vector<recob::Track>>(tag_r3d);
-    std::vector<art::Ptr<recob::Track>> vp_r3d;
+    auto const & vh_r3d = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_r3d);
+    std::vector<art::Ptr<recob::SpacePoint>> vp_r3d;
     art::fill_ptr_vector(vp_r3d, vh_r3d);
 
 
@@ -488,7 +488,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
-        std::cout << "mu#" << iMuon << " w/ " << NearbyPHits.size() << " nearby hits, w/ " NearbySpacePoints.size() << " nearby space points" << std::endl;
+        std::cout << "mu#" << iMuon << " w/ " << NearbyPHits.size() << " nearby hits, w/ " << NearbySpacePoints.size() << " nearby space points" << std::endl;
         for (art::Ptr<recob::Hit> const& p_hit_col : NearbyPHits) {
 
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
@@ -518,6 +518,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
+                geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
                 float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
 
                 if (!tpcgeo.ContainsYZ(co_y,z)) continue;
