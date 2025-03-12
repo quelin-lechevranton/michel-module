@@ -242,7 +242,8 @@ void ana::Detchecks::beginJob()
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
             UStartPoints.push_back(wiregeo.GetStart());
             UEndPoints.push_back(wiregeo.GetEnd());
-            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
+            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
+
         }
         std::cout << "  V plane, " << asWire->Nwires(planeidV) << " wires:" << std::endl;
         for (unsigned int wire=0; wire<asWire->Nwires(planeidV); wire++) {
@@ -250,7 +251,7 @@ void ana::Detchecks::beginJob()
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
             VStartPoints.push_back(wiregeo.GetStart());
             VEndPoints.push_back(wiregeo.GetEnd());
-            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
+            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
         }
         std::cout << "  W plane, " << asWire->Nwires(planeidW) << " wires:" << std::endl;
         for (unsigned int wire=0; wire<asWire->Nwires(planeidW); wire++) {
@@ -258,7 +259,7 @@ void ana::Detchecks::beginJob()
             geo::WireGeo const wiregeo = asWire->Wire(wireid);
             WStartPoints.push_back(wiregeo.GetStart());
             WEndPoints.push_back(wiregeo.GetEnd());
-            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
+            std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
         }
     }
 
