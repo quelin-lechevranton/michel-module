@@ -500,7 +500,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             geo::WireGeo const wiregeo_col = asWire->Wire(p_hit_col->WireID());
             float y = 0;
             float z = wiregeo_col.GetCenter().Z();
-            float x = MuonEndSpacePoint.x + (p_hit_col->PeakTime() - MuonEndHit.tick) * fTick2cm;
+            float x;
+            if (geoUp.ContainsX(MuonEndSpacePoint.x))
+                x = MuonEndSpacePoint.x - (p_hit_col->PeakTime() - MuonEndHit.tick) * fTick2cm;
+            else
+                x = MuonEndSpacePoint.x + (p_hit_col->PeakTime() - MuonEndHit.tick) * fTick2cm;
 
             struct Coincidence {
                 float y;
@@ -515,11 +519,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             for (recob::Hit const& hit_ind : *vh_hit) {
 
                 if (hit_ind.WireID().TPC != p_hit_col->WireID().TPC) continue;
-                if (!(hit_ind.View() == geo::kU or hit_ind.View() == geo::kV)) continue;
+                if (hit_ind.View() != geo::kU and hit_ind.View() != geo::kV) continue;
                 if (abs(hit_ind.PeakTime() - p_hit_col->PeakTime()) > fCoincidenceWindow) continue;
 
                 geo::WireGeo const wiregeo_ind = asWire->Wire(hit_ind.WireID());
-                float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).y();
+                float co_y = geo::WiresIntersection(wiregeo_col, wiregeo_ind).Y();
 
                 if (!tpcgeo.ContainsYZ(co_y,z)) continue;
                 struct Coincidence co = {co_y, &hit_ind};
@@ -545,22 +549,17 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                     float bary_y = (U_co.y * U_co.hit->Integral() + V_co.y * V_co.hit->Integral()) / (U_co.hit->Integral() + V_co.hit->Integral());
 
                     if (has_good_coincidence) {
-                        if (dy < fCoincidenceRadius && abs(bary_y - MuonEndSpacePoint.y) < fNearbySpaceRadius) {
+                        if (dy < fCoincidenceRadius) {
                             barys_y.push_back(bary_y);
                         }
-                        continue;
-                    } 
-
-                    if (dy < fCoincidenceRadius && abs(bary_y - MuonEndSpacePoint.y) < fNearbySpaceRadius) {
+                    } else if (dy < fCoincidenceRadius) {
                         has_good_coincidence = true;
                         barys_y.clear();
                         barys_y.push_back(bary_y);
-                    } else {
-                        if (dy < min_dy) {
-                            min_dy = dy;
-                            barys_y.clear();
-                            barys_y.push_back(bary_y);
-                        }
+                    } else if (dy < min_dy) {
+                        min_dy = dy;
+                        barys_y.clear();
+                        barys_y.push_back(bary_y);
                     }
 
                     // if ((bary - MuonEndSpacePoint).r2() > fNearbySpaceRadius * fNearbySpaceRadius) continue;
@@ -584,7 +583,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
 
             ana::Point pt{x, y, z};
-            std::cout << "  custom spt: " << pt << " oof " << barys_y.size() << " w/ " << (has_good_coincidence ? "good" : "bad") << " coincidence" << std::endl;
+            std::cout << "  custom spt: " << pt << " oof " << barys_y.size() << " w/ " << (has_good_coincidence ? 0.F : min_dy) << " point quality" << std::endl;
             NearbyHitPoints.push_back(pt);
             NearbyHitPointQuality.push_back(has_good_coincidence ? 0.F : min_dy);
         }
