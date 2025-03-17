@@ -118,6 +118,8 @@ private:
     bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
     ana::Hit GetHit(recob::Hit const& hit);
+    ana::Hit GetUHit(recob::Hit const& hit);
+    ana::Hit GetVHit(recob::Hit const& hit);
 };
 
 
@@ -279,8 +281,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     for (recob::Hit const& hit : *vh_hit) {
         switch (hit.View()) {
-            case geo::kU: EventUHits.push_back(GetHit(hit)); break;
-            case geo::kV: EventVHits.push_back(GetHit(hit)); break;
+            case geo::kU: EventUHits.push_back(GetUHit(hit)); break;
+            case geo::kV: EventVHits.push_back(GetVHit(hit)); break;
             case geo::kW: EventHits.push_back(GetHit(hit)); break;
             default: break;
         }
@@ -654,6 +656,30 @@ ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
         hit.PeakTime(),
         hit.Integral()
     };
+}
+ana::Hit ana::Fullchecks::GetUHit(recob::Hit const& hit) {
+    geo::WireGeo wiregeo = asWire->Wire(hit.WireID());
+    float Z = wiregeo.GetCenter().Y() * sqrt(3) +
+        hit.WireID().TPC < 8 ? -wiregeo.GetCenter().Z() : +wiregeo.GetCenter().Z();
+    return ana::Hit {
+        hit.WireID().TPC, // not slice
+        Z, // not Z
+        hit.Channel(),
+        hit.PeakTime(),
+        hit.Integral()
+    }
+}
+ana::Hit ana::Fullchecks::GetVHit(recob::Hit const& hit) {
+    geo::WireGeo wiregeo = asWire->Wire(hit.WireID());
+    float Z = wiregeo.GetCenter().Y() * sqrt(3) +
+        hit.WireID().TPC < 8 ? +wiregeo.GetCenter().Z() : -wiregeo.GetCenter().Z();
+    return ana::Hit {
+        hit.WireID().TPC, // not slice
+        Z, // not Z
+        hit.Channel(),
+        hit.PeakTime(),
+        hit.Integral()
+    }
 }
 bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
     if (ch == raw::InvalidChannelID) return false;

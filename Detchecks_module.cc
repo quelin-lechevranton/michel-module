@@ -153,53 +153,6 @@ void ana::Detchecks::beginJob()
 
     // std::cout << "----------------------TEST----------------------" << std::endl;
 
-    if (pChannelPitch) {
-        std::cout << "\033[93m" "Channel Pitch:" "\033[0m" << std::endl;
-        geo::WireID wireid{geo::PlaneID{tpcid0, geo::kW}, 0};
-        geo::WireID wireid1{geo::PlaneID{tpcid0, geo::kW}, 1};
-        geo::WireGeo const wiregeo = asWire->Wire(wireid);
-        geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
-
-        std::cout << "channel: " << asWire->PlaneWireToChannel(wireid) << " " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
-        std::cout << "\t" << "pitch: " << geo::WireGeo::WirePitch(wiregeo, wiregeo1) << std::endl;
-        std::cout << "=====================" << std::endl;
-        std::cout << wiregeo.WireInfo() << std::endl;
-
-        std::vector<double> pitch;
-        for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
-            geo::TPCID tpcid{cryoid, tpc};
-            geo::PlaneID planeid{tpcid, geo::kW};
-
-            for (unsigned int wire=0; wire<asWire->Nwires(planeid); wire++) {
-                geo::WireID wireid{planeid, wire};
-                geo::WireID wireid1{planeid, wire+1};
-                if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID || asWire->PlaneWireToChannel(wireid1) == raw::InvalidChannelID) {
-                    std::cerr << "\033[91m" << "ERROR: Invalid channel for collection wire " << wire << " in TPC " << tpc << "\033[0m" << std::endl;
-                    continue;
-                }
-
-                geo::WireGeo const wiregeo = asWire->Wire(wireid);
-                std::cout << "    {" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Z() << "}," << std::endl;
-
-                if (wire == asWire->Nwires(planeid)-1) continue;
-                geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
-                pitch.push_back(geo::WireGeo::WirePitch(wiregeo, wiregeo1));
-            }
-        }
-
-        std::cout << "----------------------TEST----------------------" << std::endl;
-
-        std::sort(pitch.begin(), pitch.end());
-        std::map<double,unsigned int> mpp;
-        for (double p : pitch) {
-        mpp[p]++;
-        }
-        for (std::pair<double,unsigned int> pp : mpp) {
-        std::cout << "pitch: " << pp.first << " count: " << pp.second << std::endl;
-        }
-    }
-
-
     if (pWireEnds) {
         std::cout << "\033[93m" "Wire Ends:" "\033[0m" << std::endl;
         for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {

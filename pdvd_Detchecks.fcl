@@ -28,7 +28,6 @@ physics: {
 
             WireEnds: true
             TPCBounds: false
-            ChannelPitch: false
             pCollectionZ: false
             ViewUCoord: true
             ViewVCoord: true
