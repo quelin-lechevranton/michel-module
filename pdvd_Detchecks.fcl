@@ -25,6 +25,13 @@ physics: {
     analyzers: {
         checks: {
             module_type:    "Detchecks"
+
+            WireEnds: true
+            TPCBounds: false
+            ChannelPitch: false
+            pCollectionZ: false
+            ViewUCoord: true
+            ViewVCoord: true
         }
     }
     ana: [ checks ]

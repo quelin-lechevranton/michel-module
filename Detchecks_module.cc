@@ -43,11 +43,13 @@ private:
     const detinfo::DetectorClocksService* asDetClocks;
 
 
-    TTree* t;
-    ana::Points UStartPoints, VStartPoints, WStartPoints;
-    ana::Points UEndPoints, VEndPoints, WEndPoints;
-
-
+    // Input Parameters
+    bool pWireEnds;
+    bool pTPCBounds;
+    bool pChannelPitch;
+    bool pCollectionZ;
+    bool pViewUCoord;
+    bool pViewVCoord;
 
     // Conversion factors
     float fADCtoE = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
@@ -59,27 +61,23 @@ private:
 
 
 ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p}
-    // iLogLevel(p.get<int>("LogLevel")),
+    : EDAnalyzer{p},
+    pWireEnds(p.get<bool>("WireEnds", false)),
+    pTPCBounds(p.get<bool>("TPCBounds", false)),
+    pChannelPitch(p.get<bool>("ChannelPitch", false)),
+    pCollectionZ(p.get<bool>("CollectionZ", false)),
+    pViewUCoord(p.get<bool>("ViewUCoord", false)),
+    pViewVCoord(p.get<bool>("ViewVCoord", false))
+
 
     // fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
     // fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
 {
-
     // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
-
-    t = tfs->make<TTree>("t","");
-    UStartPoints.SetBranches(t, "UStart");
-    VStartPoints.SetBranches(t, "VStart");
-    WStartPoints.SetBranches(t, "WStart");
-    UEndPoints.SetBranches(t, "UEnd");
-    VEndPoints.SetBranches(t, "VEnd");
-    WEndPoints.SetBranches(t, "WEnd");
-    
 }
 
 void ana::Detchecks::analyze(art::Event const& e)
@@ -93,7 +91,7 @@ void ana::Detchecks::beginJob()
     auto const detProp = asDetProp->DataForJob(clockData);
 
     geo::CryostatID cryoid{0};
-    std::cout << "\033[93m" << "Detchecks::beginJob: Detector dimension =========================================" << "\033[0m" << std::endl
+    std::cout << "\033[93m" << "Detchecks::beginJob: ============================================================" << "\033[0m" << std::endl
         << "Detector name: " << asGeo->DetectorName() << std::endl
         << "Number of channels: " << asWire->Nchannels() << std::endl
         << "Number of ticks: " << detProp.ReadOutWindowSize() << std::endl
@@ -155,127 +153,155 @@ void ana::Detchecks::beginJob()
 
     // std::cout << "----------------------TEST----------------------" << std::endl;
 
-    // geo::WireID wireid{geo::PlaneID{tpcid0, geo::kW}, 0};
-    // geo::WireID wireid1{geo::PlaneID{tpcid0, geo::kW}, 1};
-    // geo::WireGeo const wiregeo = asWire->Wire(wireid);
-    // geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
+    if (pChannelPitch) {
+        std::cout << "\033[93m" "Channel Pitch:" "\033[0m" << std::endl;
+        geo::WireID wireid{geo::PlaneID{tpcid0, geo::kW}, 0};
+        geo::WireID wireid1{geo::PlaneID{tpcid0, geo::kW}, 1};
+        geo::WireGeo const wiregeo = asWire->Wire(wireid);
+        geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
 
-    // std::cout << "channel: " << asWire->PlaneWireToChannel(wireid) << " " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
-    // std::cout << "\t" << "pitch: " << geo::WireGeo::WirePitch(wiregeo, wiregeo1) << std::endl;
-    // std::cout << "=====================" << std::endl;
-    // std::cout << wiregeo.WireInfo() << std::endl;
+        std::cout << "channel: " << asWire->PlaneWireToChannel(wireid) << " " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << std::endl;
+        std::cout << "\t" << "pitch: " << geo::WireGeo::WirePitch(wiregeo, wiregeo1) << std::endl;
+        std::cout << "=====================" << std::endl;
+        std::cout << wiregeo.WireInfo() << std::endl;
 
-    // std::vector<double> pitch;
-    // for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
-    //     geo::TPCID tpcid{cryoid, tpc};
-    //     geo::PlaneID planeid{tpcid, geo::kW};
+        std::vector<double> pitch;
+        for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::PlaneID planeid{tpcid, geo::kW};
 
-    //     for (unsigned int wire=0; wire<asWire->Nwires(planeid); wire++) {
-    //         geo::WireID wireid{planeid, wire};
-    //         geo::WireID wireid1{planeid, wire+1};
-    //         if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID || asWire->PlaneWireToChannel(wireid1) == raw::InvalidChannelID) {
-    //             std::cerr << "\033[91m" << "ERROR: Invalid channel for collection wire " << wire << " in TPC " << tpc << "\033[0m" << std::endl;
-    //             continue;
-    //         }
+            for (unsigned int wire=0; wire<asWire->Nwires(planeid); wire++) {
+                geo::WireID wireid{planeid, wire};
+                geo::WireID wireid1{planeid, wire+1};
+                if (asWire->PlaneWireToChannel(wireid) == raw::InvalidChannelID || asWire->PlaneWireToChannel(wireid1) == raw::InvalidChannelID) {
+                    std::cerr << "\033[91m" << "ERROR: Invalid channel for collection wire " << wire << " in TPC " << tpc << "\033[0m" << std::endl;
+                    continue;
+                }
 
-    //         geo::WireGeo const wiregeo = asWire->Wire(wireid);
-	//         std::cout << "    {" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Z() << "}," << std::endl;
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                std::cout << "    {" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Z() << "}," << std::endl;
 
-    //         if (wire == asWire->Nwires(planeid)-1) continue;
-    //         geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
-    //         pitch.push_back(geo::WireGeo::WirePitch(wiregeo, wiregeo1));
-    //     }
-    // }
+                if (wire == asWire->Nwires(planeid)-1) continue;
+                geo::WireGeo const wiregeo1 = asWire->Wire(wireid1);
+                pitch.push_back(geo::WireGeo::WirePitch(wiregeo, wiregeo1));
+            }
+        }
 
-    // std::cout << "----------------------TEST----------------------" << std::endl;
+        std::cout << "----------------------TEST----------------------" << std::endl;
 
-    // std::sort(pitch.begin(), pitch.end());
-    // std::map<double,unsigned int> mpp;
-    // for (double p : pitch) {
-	// mpp[p]++;
-    // }
-    // for (std::pair<double,unsigned int> pp : mpp) {
-	// std::cout << "pitch: " << pp.first << " count: " << pp.second << std::endl;
-    // }
-
-    // std::cout << "----------------------TEST----------------------" << std::endl;
-
-    // geo::BoxBoundedGeo::Coord_t y0 = tpcgeo0.Min().Y();
-    // geo::BoxBoundedGeo::Coord_t yN = tpcgeoN.Max().Y();
-    // geo::BoxBoundedGeo::Coord_t z0 = tpcgeo0.Min().Z();
-    // geo::BoxBoundedGeo::Coord_t zN = tpcgeoN.Max().Z();
-
-    // const unsigned int n = 10;
-    // const double dy = (yN - y0) / n;
-    // const double dz = (zN - z0) / n;
-
-    // for (unsigned int i=0; i<=n; i++) {
-        // for (unsigned int j=0; j<=n; j++) {
-            // double y = y0 + j*dy;
-            // double z = z0 + i*dz;
-
-            // geo::Point_t pt_low = {-50, y, z};
-            // geo::Point_t pt_upp = {50, y, z};
-
-            // raw::ChannelID_t ch_low = GetChannel(pt_low, geo::kW);
-            // raw::ChannelID_t ch_upp = GetChannel(pt_upp, geo::kW);
-
-            // std::cout << "(Y,Z)=(" << y << "," << z << ")" << "\r" << std::flush;
-            // std::cout << std::string(4,'\t') << "LOW: ch: " << ch_low << "\r" << std::flush;
-            // std::cout << std::string(7,'\t') << "UPP: ch: " << ch_upp << std::endl;
-        // }
-    // }
-
-
-    // for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
-    //     geo::TPCID tpcid{cryoid, tpc};
-    //     geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
-    //     geo::PlaneID planeidU{tpcid, geo::kU};
-    //     geo::PlaneID planeidV{tpcid, geo::kV};
-    //     geo::PlaneID planeidW{tpcid, geo::kW};
-
-    //     std::cout << "TPC#" << tpc << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
-    //     std::cout << "  U plane, " << asWire->Nwires(planeidU) << " wires:" << std::endl;
-    //     for (unsigned int wire=0; wire<asWire->Nwires(planeidU); wire++) {
-    //         geo::WireID wireid{planeidU, wire};
-    //         geo::WireGeo const wiregeo = asWire->Wire(wireid);
-    //         UStartPoints.push_back(wiregeo.GetStart());
-    //         UEndPoints.push_back(wiregeo.GetEnd());
-    //         std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
-    //         // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"U\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"green\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
-    //     }
-    //     std::cout << "  V plane, " << asWire->Nwires(planeidV) << " wires:" << std::endl;
-    //     for (unsigned int wire=0; wire<asWire->Nwires(planeidV); wire++) {
-    //         geo::WireID wireid{planeidV, wire};
-    //         geo::WireGeo const wiregeo = asWire->Wire(wireid);
-    //         VStartPoints.push_back(wiregeo.GetStart());
-    //         VEndPoints.push_back(wiregeo.GetEnd());
-    //         std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
-    //         // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"V\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"blue\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
-    //     }
-    //     std::cout << "  W plane, " << asWire->Nwires(planeidW) << " wires:" << std::endl;
-    //     for (unsigned int wire=0; wire<asWire->Nwires(planeidW); wire++) {
-    //         geo::WireID wireid{planeidW, wire};
-    //         geo::WireGeo const wiregeo = asWire->Wire(wireid);
-    //         WStartPoints.push_back(wiregeo.GetStart());
-    //         WEndPoints.push_back(wiregeo.GetEnd());
-    //         std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
-    //         // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"W\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"red\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
-    //     }
-    // }
-
-
-    for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
-        geo::TPCID tpcid{cryoid, tpc};
-        geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
-
-        std::cout << "\t{" << tpc << ", {"
-            << tpcgeo.MinX() << ", " << tpcgeo.MaxX() << ", "
-            << tpcgeo.MinY() << ", " << tpcgeo.MaxY() << ", "
-            << tpcgeo.MinZ() << ", " << tpcgeo.MaxZ() << "}"
-            << "}," << std::endl;
+        std::sort(pitch.begin(), pitch.end());
+        std::map<double,unsigned int> mpp;
+        for (double p : pitch) {
+        mpp[p]++;
+        }
+        for (std::pair<double,unsigned int> pp : mpp) {
+        std::cout << "pitch: " << pp.first << " count: " << pp.second << std::endl;
+        }
     }
 
+
+    if (pWireEnds) {
+        std::cout << "\033[93m" "Wire Ends:" "\033[0m" << std::endl;
+        for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
+            geo::PlaneID planeidU{tpcid, geo::kU};
+            geo::PlaneID planeidV{tpcid, geo::kV};
+            geo::PlaneID planeidW{tpcid, geo::kW};
+
+            std::cout << "TPC#" << tpc << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
+            std::cout << "  U plane, " << asWire->Nwires(planeidU) << " wires:" << std::endl;
+            for (unsigned int wire=0; wire<asWire->Nwires(planeidU); wire++) {
+                geo::WireID wireid{planeidU, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                UStartPoints.push_back(wiregeo.GetStart());
+                UEndPoints.push_back(wiregeo.GetEnd());
+                std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
+                // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"U\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"green\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
+            }
+            std::cout << "  V plane, " << asWire->Nwires(planeidV) << " wires:" << std::endl;
+            for (unsigned int wire=0; wire<asWire->Nwires(planeidV); wire++) {
+                geo::WireID wireid{planeidV, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                VStartPoints.push_back(wiregeo.GetStart());
+                VEndPoints.push_back(wiregeo.GetEnd());
+                std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
+                // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"V\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"blue\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
+            }
+            std::cout << "  W plane, " << asWire->Nwires(planeidW) << " wires:" << std::endl;
+            for (unsigned int wire=0; wire<asWire->Nwires(planeidW); wire++) {
+                geo::WireID wireid{planeidW, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                WStartPoints.push_back(wiregeo.GetStart());
+                WEndPoints.push_back(wiregeo.GetEnd());
+                std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
+                // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"W\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"red\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
+            }
+        }
+    }
+
+    if ()
+
+
+    if (pTPCBounds) {
+        std::cout << "\033[93m" "TPC Bounds: {TPC, {Xmin, Xmax, Ymin, Ymax, Zmin, Zmax}}" "\033[0m" << std::endl;
+        for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
+
+            std::cout << "\t{" << tpc << ", {"
+                << tpcgeo.MinX() << ", " << tpcgeo.MaxX() << ", "
+                << tpcgeo.MinY() << ", " << tpcgeo.MaxY() << ", "
+                << tpcgeo.MinZ() << ", " << tpcgeo.MaxZ() << "}"
+                << "}," << std::endl;
+        }
+    }
+
+    if (pCollectionZ) {
+        std::cout << "\033[93m" "Collection Z: {channel, Z}" "\033[0m" << std::endl;
+        for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            std::cout << "TPC#" << tpc << std::endl;
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::PlaneID planeid{tpcid, geo::kW};
+            for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
+                geo::WireID wireid{planeid, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetCenter().Z() << "}," << std::endl;
+            }
+        }
+    }
+
+    if (pViewUCoord) {
+        std::cout << "\033[93m" "View U Coordinates: {channel, sqrt(3)*Y-Z}" "\033[0m" << std::endl;
+        for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            std::cout << "TPC#" << tpc << std::endl;
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::PlaneID planeid{tpcid, geo::kU};
+            for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
+                geo::WireID wireid{planeid, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetCenter().Y() * sqrt(3) - wiregeo.GetCenter().Z() << "}," << std::endl;
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Y() * sqrt(3) - wiregeo.GetStart().Z() << "}," << std::endl;
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetEnd().Y() * sqrt(3) - wiregeo.GetEnd().Z() << "}," << std::endl;
+            }
+        }
+    }
+
+    if (pViewVCoord) {
+        std::cout << "\033[93m" "View V Coordinates: {channel, sqrt(3)*Y+Z}" "\033[0m" << std::endl;
+        for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            std::cout << "TPC#" << tpc << std::endl;
+            geo::TPCID tpcid{cryoid, tpc};
+            geo::PlaneID planeid{tpcid, geo::kV};
+            for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
+                geo::WireID wireid{planeid, wire};
+                geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetCenter().Y() * sqrt(3) + wiregeo.GetCenter().Z() << "}," << std::endl;
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetStart().Y() * sqrt(3) + wiregeo.GetStart().Z() << "}," << std::endl;
+                std::cout << "\t{" << asWire->PlaneWireToChannel(wireid) << ", " << wiregeo.GetEnd().Y() * sqrt(3) + wiregeo.GetEnd().Z() << "}," << std::endl;
+            }
+        }
+    }
 
     std::cout << "\033[93m" << "End of Detchecks::beginJob ======================================================" << "\033[0m" << std::endl;
 } // end beginJob
@@ -285,23 +311,5 @@ void ana::Detchecks::endJob()
 {
 
 } // end endJob
-
-// geo::WireID ana::Detchecks::GetWireID(geo::Point_t const& P, geo::View_t plane) {
-//     geo::TPCID tpcid = asGeo->FindTPCAtPosition(P);
-//     if (!tpcid.isValid) return geo::WireID();
-//     geo::PlaneGeo const& planegeo = asWire->Plane(tpcid,plane);
-//     geo::WireID wireid;
-//     try {
-//         wireid = planegeo.NearestWireID(P);
-//     } catch (geo::InvalidWireError const& e) {
-//         return e.suggestedWireID();
-//     }
-//     return wireid;
-// }
-// raw::ChannelID_t ana::Detchecks::GetChannel(geo::Point_t const& P, geo::View_t plane) {
-//     geo::WireID wireid = GetWireID(P, plane);
-//     if (!wireid.isValid) return raw::InvalidChannelID;
-//     return asWire->PlaneWireToChannel(wireid);
-// }
 
 DEFINE_ART_MODULE(ana::Detchecks)
