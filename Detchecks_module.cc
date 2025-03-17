@@ -105,11 +105,11 @@ void ana::Detchecks::beginJob()
     //                                 << std::endl
     //     << "\t" << "volume: " << asGeo->Cryostat(cryoid).Width() << " x " << asGeo->Cryostat(cryoid).Height() << " x " << asGeo->Cryostat(cryoid).Length() << std::endl;
 
-    // geo::TPCID tpcid0{cryoid, 0};
-    // geo::TPCID tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
+    geo::TPCID tpcid0{cryoid, 0};
+    geo::TPCID tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
 
-    // geo::TPCGeo tpcgeo0 = asGeo->TPC(tpcid0);
-    // geo::TPCGeo tpcgeoN = asGeo->TPC(tpcidN);
+    geo::TPCGeo tpcgeo0 = asGeo->TPC(tpcid0);
+    geo::TPCGeo tpcgeoN = asGeo->TPC(tpcidN);
     // std::cout << "\t" << "active coordinates: " << tpcgeo0.Min() << " - " << tpcgeoN.Max() << std::endl;
     // geo::Vector_t diag = tpcgeoN.Max() - tpcgeo0.Min();
     // std::cout << "\t" << "active volume: "  << diag.X() << " x " << diag.Y() << " x " << diag.Z() << std::endl;
@@ -214,8 +214,6 @@ void ana::Detchecks::beginJob()
             for (unsigned int wire=0; wire<asWire->Nwires(planeidU); wire++) {
                 geo::WireID wireid{planeidU, wire};
                 geo::WireGeo const wiregeo = asWire->Wire(wireid);
-                UStartPoints.push_back(wiregeo.GetStart());
-                UEndPoints.push_back(wiregeo.GetEnd());
                 std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
                 // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"U\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"green\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
             }
@@ -223,8 +221,6 @@ void ana::Detchecks::beginJob()
             for (unsigned int wire=0; wire<asWire->Nwires(planeidV); wire++) {
                 geo::WireID wireid{planeidV, wire};
                 geo::WireGeo const wiregeo = asWire->Wire(wireid);
-                VStartPoints.push_back(wiregeo.GetStart());
-                VEndPoints.push_back(wiregeo.GetEnd());
                 std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
                 // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"V\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"blue\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
             }
@@ -232,15 +228,11 @@ void ana::Detchecks::beginJob()
             for (unsigned int wire=0; wire<asWire->Nwires(planeidW); wire++) {
                 geo::WireID wireid{planeidW, wire};
                 geo::WireGeo const wiregeo = asWire->Wire(wireid);
-                WStartPoints.push_back(wiregeo.GetStart());
-                WEndPoints.push_back(wiregeo.GetEnd());
                 std::cout << "\t" << wire << ": " << wiregeo.GetStart() << " -> " << wiregeo.GetEnd() << " ch: " << asWire->PlaneWireToChannel(wireid) << std::endl;
                 // std::cout << Form("<path data-tpc=\"%u\" data-plane=\"W\" data-wire=\"%u\" data-channel=\"%u\" d=\"M %f %f L %f %f\" stroke=\"red\" stroke-width=\"0.1\" />", tpc, wire, asWire->PlaneWireToChannel(wireid), wiregeo.GetStart().Y(), wiregeo.GetStart().Z(), wiregeo.GetEnd().Y(), wiregeo.GetEnd().Z()) << std::endl;
             }
         }
     }
-
-    if ()
 
 
     if (pTPCBounds) {
