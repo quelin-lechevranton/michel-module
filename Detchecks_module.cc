@@ -108,8 +108,8 @@ void ana::Detchecks::beginJob()
     geo::TPCID tpcid0{cryoid, 0};
     geo::TPCID tpcidN{cryoid, asGeo->NTPC(cryoid)-1};
 
-    geo::TPCGeo tpcgeo0 = asGeo->TPC(tpcid0);
-    geo::TPCGeo tpcgeoN = asGeo->TPC(tpcidN);
+    // geo::TPCGeo tpcgeo0 = asGeo->TPC(tpcid0);
+    // geo::TPCGeo tpcgeoN = asGeo->TPC(tpcidN);
     // std::cout << "\t" << "active coordinates: " << tpcgeo0.Min() << " - " << tpcgeoN.Max() << std::endl;
     // geo::Vector_t diag = tpcgeoN.Max() - tpcgeo0.Min();
     // std::cout << "\t" << "active volume: "  << diag.X() << " x " << diag.Y() << " x " << diag.Z() << std::endl;
