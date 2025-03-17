@@ -667,7 +667,7 @@ ana::Hit ana::Fullchecks::GetUHit(recob::Hit const& hit) {
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
-    }
+    };
 }
 ana::Hit ana::Fullchecks::GetVHit(recob::Hit const& hit) {
     geo::WireGeo wiregeo = asWire->Wire(hit.WireID());
@@ -679,7 +679,7 @@ ana::Hit ana::Fullchecks::GetVHit(recob::Hit const& hit) {
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
-    }
+    };
 }
 bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
     if (ch == raw::InvalidChannelID) return false;
