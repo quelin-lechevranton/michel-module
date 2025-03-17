@@ -270,9 +270,9 @@ void ana::Detchecks::beginJob()
         geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
 
         std::cout << "\t{" << tpc << ", {"
-            << tpcgeo.MinX() << ", " tpcgeo.MaxX() << ", "
-            << tpcgeo.MinY() << ", " tpcgeo.MaxY() << ", "
-            << tpcgeo.MinZ() << ", " tpcgeo.MaxZ() << "}"
+            << tpcgeo.MinX() << ", " << tpcgeo.MaxX() << ", "
+            << tpcgeo.MinY() << ", " << tpcgeo.MaxY() << ", "
+            << tpcgeo.MinZ() << ", " << tpcgeo.MaxZ() << "}"
             << "}," << std::endl;
     }
 
