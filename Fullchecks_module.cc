@@ -74,6 +74,7 @@ private:
     std::vector<unsigned> EventiMuon;
 
     ana::Hits EventHits;
+    ana::Hits EventUHits, EventVHits;
 
 
     TTree* tMuon;
@@ -192,6 +193,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
     EventHits.SetBranches(tEvent);
+    EventUHits.SetBranches(tEvent, "U");
+    EventVHits.SetBranches(tEvent, "V");
 
     tMuon = tfs->make<TTree>("muon","");
 
@@ -275,8 +278,12 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     resetEvent();
 
     for (recob::Hit const& hit : *vh_hit) {
-        if (hit.View() != geo::kW) continue;
-        EventHits.push_back(GetHit(hit));
+        switch (hit.View()) {
+            case geo::kU: EventUHits.push_back(GetHit(hit)); break;
+            case geo::kV: EventVHits.push_back(GetHit(hit)); break;
+            case geo::kW: EventHits.push_back(GetHit(hit)); break;
+            default: 
+        }
     }
 
 
@@ -608,6 +615,8 @@ void ana::Fullchecks::resetEvent() {
     EventNMuon = 0;
     EventiMuon.clear();
     EventHits.clear();
+    EventUHits.clear();
+    EventVHits.clear();
 }
 void ana::Fullchecks::resetMuon() {
     MuonTrackPoints.clear();
