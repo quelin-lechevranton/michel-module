@@ -282,7 +282,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             case geo::kU: EventUHits.push_back(GetHit(hit)); break;
             case geo::kV: EventVHits.push_back(GetHit(hit)); break;
             case geo::kW: EventHits.push_back(GetHit(hit)); break;
-            default: 
         }
     }
 
