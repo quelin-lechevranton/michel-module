@@ -215,7 +215,6 @@ void ana::Detchecks::beginJob()
                 unsigned min=13000, max=0;
                 for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
                     geo::WireID wireid{planeid, wire};
-                    geo::WireGeo const wiregeo = asWire->Wire(wireid);
                     raw::ChannelID_t ch = asWire->PlaneWireToChannel(wireid);
                     if (ch == raw::InvalidChannelID) continue;
                     min = ch < min ? ch : min; 
