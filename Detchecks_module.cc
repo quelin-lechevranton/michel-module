@@ -205,11 +205,11 @@ void ana::Detchecks::beginJob()
     }
 
     if (pTPCChannels) {
-        std::cout << "\033[93m" "TPC Bounds: {TPC, {ch min, ch max} }" "\033[0m" << std::endl;
-        for (unsigned view=0; view<3; view++) {
-            std::cout << "view " << char('U'+view) << std::endl;
-            for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
-                geo::TPCID tpcid{cryoid, tpc};
+        std::cout << "\033[93m" "TPC Bounds: {TPC, {{view, {ch min, ch max}}, ...}}" "\033[0m" << std::endl;
+        for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+            geo::TPCID tpcid{cryoid, tpc};
+            std::cout << "\t{" << tpc << ", {\r" << std::flush;
+            for (unsigned view=0; view<3; view++) {
                 geo::PlaneID planeid{tpcid, view};
 
                 unsigned min=13000, max=0;
@@ -220,8 +220,9 @@ void ana::Detchecks::beginJob()
                     min = ch < min ? ch : min; 
                     max = ch > max ? ch : max;
                 }
-                std::cout << "\t{" << tpc << ", {" << min << ", " << max << "} }" << std::endl;
+                std::cout << "\t\t{" << view << ", {" << min << ", " << max << "} }" << std::endl;
             }
+            std::cout << "\t}}," << std::endl;
         }
     }
 
