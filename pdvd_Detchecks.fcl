@@ -26,11 +26,12 @@ physics: {
         checks: {
             module_type:    "Detchecks"
 
-            WireEnds: true
+            WireEnds: false
             TPCBounds: false
+            TPCChannels: true
             pCollectionZ: false
-            ViewUCoord: true
-            ViewVCoord: true
+            ViewUCoord: false
+            ViewVCoord: false
         }
     }
     ana: [ checks ]

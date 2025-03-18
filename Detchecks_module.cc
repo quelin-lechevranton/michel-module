@@ -46,6 +46,7 @@ private:
     // Input Parameters
     bool pWireEnds;
     bool pTPCBounds;
+    bool pTPCChannels;
     bool pChannelPitch;
     bool pCollectionZ;
     bool pViewUCoord;
@@ -64,6 +65,7 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     pWireEnds(p.get<bool>("WireEnds", false)),
     pTPCBounds(p.get<bool>("TPCBounds", false)),
+    pTPCChannels(p.get<bool>("TPCChannels", false)),
     pChannelPitch(p.get<bool>("ChannelPitch", false)),
     pCollectionZ(p.get<bool>("CollectionZ", false)),
     pViewUCoord(p.get<bool>("ViewUCoord", false)),
@@ -189,7 +191,7 @@ void ana::Detchecks::beginJob()
 
 
     if (pTPCBounds) {
-        std::cout << "\033[93m" "TPC Bounds: {TPC, {Xmin, Xmax, Ymin, Ymax, Zmin, Zmax}}" "\033[0m" << std::endl;
+        std::cout << "\033[93m" "TPC Bounds: {TPC, {Xmin, Xmax, Ymin, Ymax, Zmin, Zmax} }" "\033[0m" << std::endl;
         for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
             geo::TPCID tpcid{cryoid, tpc};
             geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
@@ -197,8 +199,30 @@ void ana::Detchecks::beginJob()
             std::cout << "\t{" << tpc << ", {"
                 << tpcgeo.MinX() << ", " << tpcgeo.MaxX() << ", "
                 << tpcgeo.MinY() << ", " << tpcgeo.MaxY() << ", "
-                << tpcgeo.MinZ() << ", " << tpcgeo.MaxZ() << "}"
+                << tpcgeo.MinZ() << ", " << tpcgeo.MaxZ() << " }"
                 << "}," << std::endl;
+        }
+    }
+
+    if (pTPCChannels) {
+        std::cout << "\033[93m" "TPC Bounds: {TPC, {ch min, ch max} }" "\033[0m" << std::endl;
+        for (unsigned view=0; view<3; view++) {
+            std::cout << "view " << char('U'+view) << std::endl;
+            for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
+                geo::TPCID tpcid{cryoid, tpc};
+                geo::PlaneID planeid{tpcid, geo::kW};
+
+                unsigned min=13000, max=0;
+                for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
+                    geo::WireID wireid{planeid, wire};
+                    geo::WireGeo const wiregeo = asWire->Wire(wireid);
+                    raw::ChannelID_t ch = asWire->PlaneWireToChannel(wireid);
+                    if (ch == raw::InvalidChannelID) continue;
+                    min = ch < min ? ch : min; 
+                    max = ch > max ? ch : max;
+                }
+                std::cout << "\t{" << tpc << ", {" << min << ", " << max << "} }" << std::endl;
+            }
         }
     }
 
