@@ -210,7 +210,7 @@ void ana::Detchecks::beginJob()
             std::cout << "view " << char('U'+view) << std::endl;
             for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
                 geo::TPCID tpcid{cryoid, tpc};
-                geo::PlaneID planeid{tpcid, geo::kW};
+                geo::PlaneID planeid{tpcid, view};
 
                 unsigned min=13000, max=0;
                 for (unsigned wire=0; wire<asWire->Nwires(planeid); wire++) {
