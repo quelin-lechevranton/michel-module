@@ -71,8 +71,8 @@ namespace ana {
             for (art::Ptr<recob::Hit> hit : hits) this->push_back(*hit);
         }
         void SetBranches(TTree* t, const char* name) const {
-            t->Branch(Form("%sChannel"), &this->channel);
-            t->Branch(Form("%sTick"), &this->tick);
+            t->Branch(Form("%sChannel", name), &this->channel);
+            t->Branch(Form("%sTick", name), &this->tick);
         }
     };
 }
@@ -223,15 +223,25 @@ void ana::PandoraChecks::analyze(art::Event const& e)
 
 
         // michel
-        // for (int i=1; i<=3; i++) {
-        //     pi_serv->
-        // }
+        bool has_numu = false, has_nue = false;
+        simb::MCParticle const* mcp_michel = nullptr;
+        for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
+            simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
+            if (!mcp_dau) continue;
+
+            switch (abs(mcp_dau->PdgCode())) {
+                case 14: has_numu = true; break;
+                case 12: has_nue = true; break;
+                case 11: mcp_michel = mcp_dau; break;
+            }
+        }
 
         evt_trk = TrackOut(*p_trk);
         evt_trk_t0 = p_t0 ? p_t0->Time() : -999;
 
         evt_mcp = mcp ? TrackOut(*mcp) : TrackOut();
         mcp_trk = p_trk_from_mcp ? TrackOut(*p_trk_from_mcp) : TrackOut();
+        mich_mcp = mcp_michel and has_numu and has_nue ? TrackOut(*mcp_michel) : TrackOut();
 
         tTrack->Fill();
     }
