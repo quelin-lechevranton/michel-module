@@ -92,6 +92,7 @@ private:
     ana::Point MuonEndSpacePoint;
 
     ana::Hits MuonHits;
+    ana::Hits MuonUHits, MuonVHits
     ana::Hit MuonEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
     bool MuonEndHasGood3DAssociation;
@@ -214,6 +215,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
 
     MuonHits.SetBranches(tMuon);
+    MuonUHits.SetBranches(tMuon, "U");
+    MuonVHits.SetBranches(tMuon, "V");
     MuonEndHit.SetBranches(tMuon, "End");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
@@ -364,8 +367,12 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
-            if (p_hit_muon->View() != geo::kW) continue;
-            MuonHits.push_back(GetHit(*p_hit_muon));
+            switch (p_hit_muon->View()) {
+                case geo::kU: MuonUHits.push_back(GetUHit(*p_hit_muon)); break;
+                case geo::kV: MuonVHits.push_back(GetVHit(*p_hit_muon)); break;
+                case geo::kW: MuonHits.push_back(GetHit(*p_hit_muon)); break;
+                default: break;
+            }
         }
 
         // and all muon track points
@@ -624,6 +631,8 @@ void ana::Fullchecks::resetMuon() {
     MuonTrackPoints.clear();
     MuonSpacePoints.clear();
     MuonHits.clear();
+    MuonUHits.clear();
+    MuonVHits.clear();
 
     NearbyHits.clear();
     NearbySpacePoints.clear();
