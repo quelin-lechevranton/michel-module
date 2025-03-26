@@ -92,12 +92,14 @@ private:
     ana::Point MuonEndSpacePoint;
 
     ana::Hits MuonHits;
-    ana::Hits MuonUHits, MuonVHits
+    ana::Hits MuonUHits, MuonVHits;
     ana::Hit MuonEndHit;
+    ana::Hit MuonEndUHit, MuonEndVHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
     bool MuonEndHasGood3DAssociation;
 
     ana::Hits NearbyHits;
+    ana::Hits NearbyUHits, NearbyVHits;
     ana::Points NearbySpacePoints;
     ana::Points NearbyHitSpacePoints;
     ana::Points NearbyHitPoints;
@@ -121,6 +123,8 @@ private:
     ana::Hit GetHit(recob::Hit const& hit);
     ana::Hit GetUHit(recob::Hit const& hit);
     ana::Hit GetVHit(recob::Hit const& hit);
+
+    art::Ptr<recob::Hit> GetDeepestHit(std::vector<art::Ptr<recob::Hit>>, geo::View_t = geo::kW);
 };
 
 
@@ -218,6 +222,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MuonUHits.SetBranches(tMuon, "U");
     MuonVHits.SetBranches(tMuon, "V");
     MuonEndHit.SetBranches(tMuon, "End");
+    MuonEndUHit.SetBranches(tMuon, "EndU");
+    MuonEndVHit.SetBranches(tMuon, "EndV");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     MuonSpacePoints.SetBranches(tMuon, "Space");
@@ -236,6 +242,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MichelHits.SetBranches(tMuon, "Michel");
     SphereHits.SetBranches(tMuon, "Sphere");
     NearbyHits.SetBranches(tMuon, "Nearby");
+    NearbyUHits.SetBranches(tMuon, "NearbyU");
+    NearbyVHits.SetBranches(tMuon, "NearbyV");
     NearbySpacePoints.SetBranches(tMuon, "NearbySpace");
     NearbyHitSpacePoints.SetBranches(tMuon, "NearbyHitSpace");
     NearbyHitPoints.SetBranches(tMuon, "NearbyHit");
@@ -309,40 +317,19 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         if (!LOG(vp_hit_muon.size())) continue;
 
-        float TickUpMax = tick_window.min, TickLowMin = tick_window.max;
-        art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon);
+        if (!LOG(deephit)) continue;
+        MuonEndHit = GetHit(*deephit);
 
-        // tacking min of ticks in lower volume and max of ticks in upper volume
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit_muon) {
-            if (p_hit->View() != geo::kW) continue;
+        deephit = GetDeepestHit(vp_hit_muon, geo::kU);
+        if (!LOG(deephit)) continue;
+        MuonEndUHit = GetHit(*deephit);
 
-            if (IsInUpperVolume(p_hit->Channel())) {
-                if (p_hit->PeakTime() > TickUpMax) {
-                    TickUpMax = p_hit->PeakTime();
-                    HitUpMax = p_hit;
-                }
-            } else {
-                if (p_hit->PeakTime() < TickLowMin) {
-                    TickLowMin = p_hit->PeakTime();
-                    HitLowMin = p_hit;
-                }
-            }
-        }
+        deephit = GetDeepestHit(vp_hit_muon, geo::kV);
+        if (!LOG(deephit)) continue;
+        MuonEndVHit = GetHit(*deephit);
 
         resetMuon();
-
-        // if there is hits in lower volume, muon end is in upper volume
-        // else muon end is in upper volume
-        if (HitLowMin) {
-            MuonEndHit = GetHit(*HitLowMin);
-        } else {
-            if (HitUpMax)
-                MuonEndHit = GetHit(*HitUpMax);
-            else {
-                LOG(!"no collection hit in volume");
-                continue;
-            }
-        }
             
         // track end point is the deepest
         if (IsUpright(*p_trk))
@@ -431,6 +418,41 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         else MuonHasMichel = kNoMichel;
 
 
+
+
+        // get induction hits nearby muon end point
+        float induction_channel_pitch = 0.765; // cm/channel
+        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+            if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
+
+            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
+            bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
+
+            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
+
+            if (p_hit->View() == geo::kU) {
+                float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_channel_pitch;
+                float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
+                float dr2 = dz*dz + dt*dt;
+
+                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+
+                NearbyUHits.push_back(GetUHit(*p_hit));
+            }
+            if (p_hit->View() == geo::kV) {
+                float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_channel_pitch;
+                float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
+                float dr2 = dz*dz + dt*dt;
+
+                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+
+                NearbyVHits.push_back(GetVHit(*p_hit));
+            }
+        }
+
+
+
+
         // get all hits nearby muon end point
         std::vector<art::Ptr<recob::Hit>> NearbyPHits;
         for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -439,6 +461,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
             bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
+            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
+
             ana::Hit hit = GetHit(*p_hit);
             if (hit.slice != MuonEndHit.slice) continue;
 
@@ -446,7 +470,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
             float dr2 = dz*dz + dt*dt;
 
-            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
             NearbyHits.push_back(hit);
@@ -635,6 +658,8 @@ void ana::Fullchecks::resetMuon() {
     MuonVHits.clear();
 
     NearbyHits.clear();
+    NearbyUHits.clear();
+    NearbyVHits.clear();
     NearbySpacePoints.clear();
     NearbyHitSpacePoints.clear();
     NearbyHitPoints.clear();
@@ -692,11 +717,44 @@ ana::Hit ana::Fullchecks::GetVHit(recob::Hit const& hit) {
 }
 bool ana::Fullchecks::IsInUpperVolume(raw::ChannelID_t ch) {
     if (ch == raw::InvalidChannelID) return false;
-    return ch >= asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{geo::TPCID{0, 8}, geo::kW}, 0});
+    return ch >= asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{geo::TPCID{0, 8}, geo::kU}, 0});
 }
 bool ana::Fullchecks::IsUpright(recob::Track const& T) {
     return T.Start().X() > T.End().X();
 }
+
+
+
+art::Ptr<recob::Hit> ana::Fullchecks::GetDeepestHit(std::vector<art::Ptr<recob::Hit>> vp_hit, geo::View_t view) {
+    float TickUpMax = tick_window.min, TickLowMin = tick_window.max;
+    art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+
+    // tacking min of ticks in lower volume and max of ticks in upper volume
+    for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+
+        if (IsInUpperVolume(p_hit->Channel())) {
+            if (p_hit->PeakTime() > TickUpMax) {
+                TickUpMax = p_hit->PeakTime();
+                HitUpMax = p_hit;
+            }
+        } else {
+            if (p_hit->PeakTime() < TickLowMin) {
+                TickLowMin = p_hit->PeakTime();
+                HitLowMin = p_hit;
+            }
+        }
+    }
+
+    // if there is hits in lower volume, muon end is in upper volume
+    // else muon end is in upper volume
+    if (HitLowMin) return HitLowMin;
+    else {
+        if (HitUpMax) return HitUpMax;
+        else return art::Ptr<recob::Hit>();
+    }
+}
+
 
 
 DEFINE_ART_MODULE(ana::Fullchecks)

@@ -149,7 +149,10 @@ void ana::PandoraChecks::analyze(art::Event const& e)
     auto const& vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
+
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+
     art::FindOneP<anab::T0> fop_pfp2t0(vh_pfp, e, tag_pdr);
 
 
@@ -238,7 +241,7 @@ simb::MCParticle const* ana::PandoraChecks::trk2mcp(art::Ptr<recob::Track> p_trk
             map_tid_ene[ide.trackID] += ide.energy;
 
     float max_ene = -1;
-    int tid_max;
+    int tid_max = 0;
     for (std::pair<int, float> p : map_tid_ene) {
         if (p.second > max_ene) {
             max_ene = p.second;
