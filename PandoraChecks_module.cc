@@ -189,6 +189,7 @@ void ana::PandoraChecks::analyze(art::Event const& e)
 
         // mcp2trk
         std::unordered_map<art::Ptr<recob::Track>*, float> map_trk_ene;
+        std::unordered_map<art::Ptr<recob::Track>*, unsigned> map_trk_nhit;
         for (art::Ptr<recob::Track> p_trk2 : vp_trk) {
             std::vector<art::Ptr<recob::Hit>> vp_hit_from_trk2_mcp = bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_trk2hit.at(p_trk2.key()));
             for (art::Ptr<recob::Hit> p_hit : vp_hit_from_trk2_mcp) {
@@ -197,6 +198,7 @@ void ana::PandoraChecks::analyze(art::Event const& e)
                     if (ide->trackID == mcp->TrackId()) map_trk_ene[&p_trk2] += ide->energy;
                 }
             }
+            map_trk_nhit[&p_trk2] += vp_hit_from_trk2_mcp.size();
         }
         max_ene = -1;
         art::Ptr<recob::Track> p_trk_from_mcp;
@@ -206,7 +208,16 @@ void ana::PandoraChecks::analyze(art::Event const& e)
                 p_trk_from_mcp = *p.first;
             }
         }
+        unsigned max_nhit = 0;
+        art::Ptr<recob::Track> p_trk_from_mcp2;
+        for (std::pair<art::Ptr<recob::Track>*, unsigned> p : map_trk_nhit) {
+            if (p.second > max_nhit) {
+                max_nhit = p.second;
+                p_trk_from_mcp2 = *p.first;
+            }
+        }
 
+        if (p_trk_from_mcp != p_trk_from_mcp2) std::cout << "\033[1;91m" "NOT SAME MCP TRACK" "\033[0m" << std::endl;
         if (p_trk_from_mcp != p_trk) std::cout << "\033[1;91m" "NOT SAME TRACK" "\033[0m" << std::endl;
 
         printf("ax.plot([%f,%f],[%f,%f],[%f,%f], c=\"red\")\n", p_trk->Start().X(), p_trk->End().X(), p_trk->Start().Y(), p_trk->End().Y(), p_trk->Start().Z(), p_trk->End().Z());
