@@ -48,7 +48,7 @@ namespace ana {
         TrackOut(void) : id(-999), start(), end() {}
         TrackOut(recob::Track const& trk) : id(trk.ID()), start(trk.Start()), end(trk.End()) {}
         TrackOut(simb::MCParticle const& mcp) : id(mcp.TrackId()), start(mcp.Position().Vect()), end(mcp.EndPosition().Vect()) {}
-        void SetBranches(TTree* t, const char* name) const {
+        void SetBranches(TTree* t, const char* name) {
             t->Branch(Form("%sID", name), &id);
             t->Branch(Form("%sStartX", name), &start.x);
             t->Branch(Form("%sStartY", name), &start.y);
@@ -70,7 +70,7 @@ namespace ana {
         HitsOut(std::vector<art::Ptr<recob::Hit>> hits) : channel(), tick() {
             for (art::Ptr<recob::Hit> hit : hits) this->push_back(*hit);
         }
-        void SetBranches(TTree* t, const char* name) const {
+        void SetBranches(TTree* t, const char* name) {
             t->Branch(Form("%sChannel", name), &this->channel);
             t->Branch(Form("%sTick", name), &this->tick);
         }
@@ -91,6 +91,7 @@ public:
     PandoraChecks& operator=(PandoraChecks&&) = delete;
 
     void analyze(art::Event const& e) override;
+    void beginJob() override;
 private:
 
     const detinfo::DetectorPropertiesService* asDetProp;
@@ -108,6 +109,9 @@ private:
     TrackOut evt_trk, evt_mcp, mcp_trk, mich_mcp;
     double evt_trk_t0;
     HitsOut mcp_hits;
+
+    simb::MCParticle const* trk2mcp(art::Ptr<recob::Track>, detinfo::DetectorClocksData, art::FindManyP<recob::Hit>);
+    art::Ptr<recob::Track> mcp2trk(simb::MCParticle const&, std::vector<art::Ptr<recob::Track>> const&, detinfo::DetectorClocksData, art::FindManyP<recob::Hit>);
 };
 
 
@@ -121,13 +125,17 @@ ana::PandoraChecks::PandoraChecks(fhicl::ParameterSet const& p)
     tag_pdr = art::InputTag("pandora");
     tag_hit = art::InputTag("hitpdune");
 
-    tTrack = tfs->make<TTree>("tracks");
+    tTrack = tfs->make<TTree>("tracks", "");
     evt_trk.SetBranches(tTrack, "EventTrack");
     tTrack->Branch("EventTrackT0", &evt_trk_t0);
     mich_mcp.SetBranches(tTrack, "MichelMCP");
     evt_mcp.SetBranches(tTrack, "EventMCP");
     mcp_trk.SetBranches(tTrack, "MCPTrack");
     mcp_hits.SetBranches(tTrack, "MCPHits");
+}
+
+void ana::PandoraChecks::beginJob() {
+    sim::ParticleList::AdoptEveIdCalculator(new sim::EmEveIdCalculator);
 }
 
 void ana::PandoraChecks::analyze(art::Event const& e)
@@ -137,46 +145,28 @@ void ana::PandoraChecks::analyze(art::Event const& e)
 
     std::cout << "==== EVENT " << e.event() << "====" << std::endl;
 
-    auto const& vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
-    std::vector<art::Ptr<recob::Track>> vp_trk;
-    art::fill_ptr_vector(vp_trk, vh_trk);
-
     auto const& vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pdr);
-
+    auto const& vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
-    std::vector<art::Ptr<recob::Hit>> vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
-
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<anab::T0> fop_pfp2t0(vh_pfp, e, tag_pdr);
 
+
+    std::vector<art::Ptr<recob::Track>> vp_trk;
+    art::fill_ptr_vector(vp_trk, vh_trk);
+    std::vector<art::Ptr<recob::Hit>> vp_hit;
+    art::fill_ptr_vector(vp_hit, vh_hit);
+
+
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         std::cout << "trk.ID(): " << p_trk->ID() << std::endl;
 
-        // trk2mcp
-        std::unordered_map<int, float> map_tid_ene;
-        std::vector<art::Ptr<recob::Hit>> vp_hit = fmp_trk2hit.at(p_trk.key());
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-            std::vector<sim::TrackIDE> v_ide = bt_serv->HitToTrackIDEs(clockData, p_hit);
-            for (sim::TrackIDE ide : v_ide) {
-                map_tid_ene[ide.trackID] += ide.energy;
-            }
-        }
-        float max_ene = -1;
-        int tid_max;
-        for (std::pair<int, float> p : map_tid_ene) {
-            if (p.second > max_ene) {
-                max_ene = p.second;
-                tid_max = p.first;
-            }
-        }
-        if (max_ene == -1) {
+        simb::MCParticle const* mcp = trk2mcp(p_trk, clockData, fmp_trk2hit);
+        if (!mcp) {
             std::cout << "\t" "no mcp found" << std::endl;
             continue;
         }
-        simb::MCParticle const* mcp = pi_serv->TrackIdToParticle_P(tid_max);
-
 
 
         if (abs(mcp->PdgCode()) != 13) {
@@ -188,47 +178,24 @@ void ana::PandoraChecks::analyze(art::Event const& e)
         art::Ptr<anab::T0> p_t0 = fop_pfp2t0.at(p_pfp.key());
 
         // mcp2trk
-        std::unordered_map<art::Ptr<recob::Track>*, float> map_trk_ene;
-        std::unordered_map<art::Ptr<recob::Track>*, unsigned> map_trk_nhit;
-        for (art::Ptr<recob::Track> p_trk2 : vp_trk) {
-            std::vector<art::Ptr<recob::Hit>> vp_hit_from_trk2_mcp = bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_trk2hit.at(p_trk2.key()));
-            for (art::Ptr<recob::Hit> p_hit : vp_hit_from_trk2_mcp) {
-                std::vector<sim::IDE const*> v_ide = bt_serv->HitToSimIDEs_Ps(clockData, p_hit);
-                for (sim::IDE const* ide : v_ide) {
-                    if (ide->trackID == mcp->TrackId()) map_trk_ene[&p_trk2] += ide->energy;
-                }
-            }
-            map_trk_nhit[&p_trk2] += vp_hit_from_trk2_mcp.size();
-        }
-        max_ene = -1;
-        art::Ptr<recob::Track> p_trk_from_mcp;
-        for (std::pair<art::Ptr<recob::Track>*, float> p : map_trk_ene) {
-            if (p.second > max_ene) {
-                max_ene = p.second;
-                p_trk_from_mcp = *p.first;
-            }
-        }
-        unsigned max_nhit = 0;
-        art::Ptr<recob::Track> p_trk_from_mcp2;
-        for (std::pair<art::Ptr<recob::Track>*, unsigned> p : map_trk_nhit) {
-            if (p.second > max_nhit) {
-                max_nhit = p.second;
-                p_trk_from_mcp2 = *p.first;
-            }
-        }
-
-        if (p_trk_from_mcp != p_trk_from_mcp2) std::cout << "\033[1;91m" "NOT SAME MCP TRACK" "\033[0m" << std::endl;
-        if (p_trk_from_mcp != p_trk) std::cout << "\033[1;91m" "NOT SAME TRACK" "\033[0m" << std::endl;
+        art::Ptr<recob::Track> p_trk_from_mcp = mcp2trk(*mcp, vp_trk, clockData, fmp_trk2hit);
+        if (p_trk_from_mcp != p_trk) std::cout << "\033[1;91m" "mcp2trk: ID(): " << p_trk_from_mcp->ID() << " NOT SAME TRACK" "\033[0m" << std::endl;
 
         printf("ax.plot([%f,%f],[%f,%f],[%f,%f], c=\"red\")\n", p_trk->Start().X(), p_trk->End().X(), p_trk->Start().Y(), p_trk->End().Y(), p_trk->Start().Z(), p_trk->End().Z());
         printf("ax.plot([%f,%f],[%f,%f],[%f,%f], c=\"red\")\n", mcp->Position().X(), mcp->EndPosition().X(), mcp->Position().Y(), mcp->EndPosition().Y(), mcp->Position().Z(), mcp->EndPosition().Z());
 
         // mcp2hits
         std::vector<art::Ptr<recob::Hit>> vp_hit_from_mcp;
+        std::vector<art::Ptr<recob::Hit>> vp_hit_from_mcp2;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             std::vector<sim::TrackIDE> v_ide = bt_serv->HitToTrackIDEs(clockData, p_hit);
             for (sim::TrackIDE ide : v_ide) {
                 if (ide.trackID == mcp->TrackId()) vp_hit_from_mcp.push_back(p_hit);
+            }
+
+            std::vector<sim::TrackIDE> v_eveide = bt_serv->HitToEveTrackIDEs(clockData, p_hit);
+            for (sim::TrackIDE ide : v_eveide) {
+                if (ide.trackID == mcp->TrackId()) vp_hit_from_mcp2.push_back(p_hit);
             }
         }
 
@@ -254,8 +221,48 @@ void ana::PandoraChecks::analyze(art::Event const& e)
         mcp_trk = p_trk_from_mcp ? TrackOut(*p_trk_from_mcp) : TrackOut();
         mich_mcp = mcp_michel and has_numu and has_nue ? TrackOut(*mcp_michel) : TrackOut();
 
+        mcp_hits = HitsOut(vp_hit_from_mcp);
+
         tTrack->Fill();
     }
+}
+
+
+simb::MCParticle const* ana::PandoraChecks::trk2mcp(art::Ptr<recob::Track> p_trk, detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+    std::unordered_map<int, float> map_tid_ene;
+    for (art::Ptr<recob::Hit> const& p_hit : fmp.at(p_trk.key()))
+
+        // thruthUtils uses eve ID's by default
+
+        for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
+            map_tid_ene[ide.trackID] += ide.energy;
+
+    float max_ene = -1;
+    int tid_max;
+    for (std::pair<int, float> p : map_tid_ene) {
+        if (p.second > max_ene) {
+            max_ene = p.second;
+            tid_max = p.first;
+        }
+    }
+    if (max_ene == -1) return nullptr;
+    return pi_serv->TrackIdToParticle_P(tid_max);
+}
+
+art::Ptr<recob::Track> ana::PandoraChecks::mcp2trk(simb::MCParticle const& mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk ,detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+    std::unordered_map<art::Ptr<recob::Track>, unsigned> map_trk_nhit;
+    for (art::Ptr<recob::Track> p_trk : vp_trk)
+        map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(clockData, mcp.TrackId(), fmp.at(p_trk.key())).size();
+
+    unsigned max = 0;
+    art::Ptr<recob::Track> p_trk_from_mcp;
+    for (std::pair<art::Ptr<recob::Track>, unsigned> p : map_trk_nhit) {
+        if (p.second > max) {
+            max = p.second;
+            p_trk_from_mcp = p.first;
+        }
+    }
+    return p_trk_from_mcp;
 }
 
 DEFINE_ART_MODULE(ana::PandoraChecks)
