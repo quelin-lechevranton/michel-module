@@ -7,7 +7,7 @@
 // from cetlib version 3.18.02.
 ////////////////////////////////////////////////////////////////////////
 
-#include "data_struct.h"
+#include "pdvd_utils.h"
 
 namespace ana {
     class Fullchecks;
@@ -37,9 +37,9 @@ private:
     const detinfo::DetectorClocksService* asDetClocks;
     geo::BoxBoundedGeo geoUp, geoLow;
 
-    protoana::ProtoDUNETruthUtils truthUtil;
-    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+    // protoana::ProtoDUNETruthUtils truthUtil;
+    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     // Detector Properties
     // float fADC2MeV;
@@ -48,7 +48,7 @@ private:
     float fDriftVelocity; // cm/µs
     float fChannelPitch;
 
-    bounds<float> tick_window;
+    bounds<float> wireWindow;
     // bounds3D<float> lower_bounds, upper_bounds;
     // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
@@ -95,6 +95,7 @@ private:
     ana::Hits MuonUHits, MuonVHits;
     ana::Hit MuonEndHit;
     ana::Hit MuonEndUHit, MuonEndVHit;
+    ana::Hit MuonTrueEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
     bool MuonEndHasGood3DAssociation;
 
@@ -121,8 +122,6 @@ private:
     bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
     ana::Hit GetHit(recob::Hit const& hit);
-    ana::Hit GetUHit(recob::Hit const& hit);
-    ana::Hit GetVHit(recob::Hit const& hit);
 
     art::Ptr<recob::Hit> GetDeepestHit(std::vector<art::Ptr<recob::Hit>>, geo::View_t = geo::kW);
 };
@@ -176,7 +175,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    tick_window = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
     geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
 
@@ -184,7 +183,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
-        << "  Tick Window: " << tick_window << std::endl
+        << "  Tick Window: " << wireWindow << std::endl
         << "  Upper Bounds: " << geoUp.Min() << " -> " << geoUp.Max() << std::endl
         << "  Lower Bounds: " << geoLow.Min() << " -> " << geoLow.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
@@ -224,6 +223,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MuonEndHit.SetBranches(tMuon, "End");
     MuonEndUHit.SetBranches(tMuon, "EndU");
     MuonEndVHit.SetBranches(tMuon, "EndV");
+    MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     MuonSpacePoints.SetBranches(tMuon, "Space");
@@ -292,8 +292,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
     for (recob::Hit const& hit : *vh_hit) {
         switch (hit.View()) {
-            case geo::kU: EventUHits.push_back(GetUHit(hit)); break;
-            case geo::kV: EventVHits.push_back(GetVHit(hit)); break;
+            case geo::kU: EventUHits.push_back(GetHit(hit)); break;
+            case geo::kV: EventVHits.push_back(GetHit(hit)); break;
             case geo::kW: EventHits.push_back(GetHit(hit)); break;
             default: break;
         }
@@ -307,17 +307,23 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // no short tracks
         if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
 
-        simb::MCParticle const* mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
+        // simb::MCParticle const* mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
+        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
 
         // tracks associated to a MCTruth muon
         if (!mcp) continue;
         if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
+
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(ana::mcp2hits(mcp, vp_hit, clockData, false));
+        if (!LOG(deephit)) continue;
+        MuonTrueEndHit = GetHit(*deephit);
+
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         if (!LOG(vp_hit_muon.size())) continue;
 
-        art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon);
+        deephit = GetDeepestHit(vp_hit_muon);
         if (!LOG(deephit)) continue;
         MuonEndHit = GetHit(*deephit);
 
@@ -329,6 +335,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (!LOG(deephit)) continue;
         MuonEndVHit = GetHit(*deephit);
 
+
         resetMuon();
             
         // track end point is the deepest
@@ -338,7 +345,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             MuonEndTrackPoint = ana::Point{p_trk->Start()};
 
         // fiducial cuts
-        MuonEndIsInWindowT = tick_window.isInside(MuonEndHit.tick, fMichelTickRadius);
+        MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
         MuonEndIsInVolumeYZ = geoUp.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius) and geoUp.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
@@ -355,8 +362,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
-                case geo::kU: MuonUHits.push_back(GetUHit(*p_hit_muon)); break;
-                case geo::kV: MuonVHits.push_back(GetVHit(*p_hit_muon)); break;
+                case geo::kU: MuonUHits.push_back(GetHit(*p_hit_muon)); break;
+                case geo::kV: MuonVHits.push_back(GetHit(*p_hit_muon)); break;
                 case geo::kW: MuonHits.push_back(GetHit(*p_hit_muon)); break;
                 default: break;
             }
@@ -399,7 +406,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             else
                 MuonHasMichel = kHasMichelOutside;
 
-            recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
+            // recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
+            art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
             if (trk_michel) 
                 MichelTrackLength = trk_michel->Length();
             else
@@ -407,17 +415,16 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
             MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-            std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-            for (const recob::Hit* hit_michel : v_hit_michel) {
-                if (hit_michel->View() != geo::kW) continue;
+            // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
+            std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+            for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
+                if (p_hit_michel->View() != geo::kW) continue;
 
-                MichelHits.push_back(GetHit(*hit_michel));
+                MichelHits.push_back(GetHit(*p_hit_michel));
             }
             MichelHitEnergy = MichelHits.energy();
         }
         else MuonHasMichel = kNoMichel;
-
-
 
 
         // get induction hits nearby muon end point
@@ -428,7 +435,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
             bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
-            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
+            if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
             if (p_hit->View() == geo::kU) {
                 float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_channel_pitch;
@@ -437,7 +444,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyUHits.push_back(GetUHit(*p_hit));
+                NearbyUHits.push_back(GetHit(*p_hit));
             }
             if (p_hit->View() == geo::kV) {
                 float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_channel_pitch;
@@ -446,11 +453,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
                 if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyVHits.push_back(GetVHit(*p_hit));
+                NearbyVHits.push_back(GetHit(*p_hit));
             }
         }
-
-
 
 
         // get all hits nearby muon end point
@@ -461,7 +466,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
             bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
-            if (from_track and p_trk.key() != p_hit_trk.key()) continue;
+            if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
             ana::Hit hit = GetHit(*p_hit);
             if (hit.slice != MuonEndHit.slice) continue;
@@ -488,8 +493,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             SphereHits.push_back(hit);
 
             // checking if the hit is associated to the michel MCParticle
-            std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-            if (std::find(v_hit_michel.begin(), v_hit_michel.end(), &*p_hit) != v_hit_michel.end()) {
+            // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
+            // if (std::find(v_hit_michel.begin(), v_hit_michel.end(), &*p_hit) != v_hit_michel.end()) {
+            if (MichelHits.find(*p_hit) != MichelHits.N) {
                 SphereTruePositive++;
                 SphereEnergyTruePositive += hit.adc;
             } else {
@@ -683,33 +689,30 @@ void ana::Fullchecks::resetMuon() {
 }
 
 ana::Hit ana::Fullchecks::GetHit(recob::Hit const& hit) {
+    geo::WireID wireid = hit.WireID();
+    geo::WireGeo wiregeo = asWire->Wire(wireid);
+
+    unsigned slice;
+    float z;
+    switch (hit.View()) {
+        case geo::kW:
+            slice = 2*(wireid.TPC/4) + wireid.TPC%2;
+            z = wiregeo.GetCenter().Z();
+            break;
+        case geo::kU:
+            slice = wireid.TPC;
+            z = wiregeo.GetCenter().Y() * sqrt(3) + wireid.TPC < 8 ? -wiregeo.GetCenter().Z() : +wiregeo.GetCenter().Z();
+            break;
+        case geo::kV:
+            slice = wireid.TPC;
+            z = wiregeo.GetCenter().Y() * sqrt(3) + wireid.TPC < 8 ? +wiregeo.GetCenter().Z() : -wiregeo.GetCenter().Z();
+            break;
+        default:
+            return ana::Hit{};
+    }
     return ana::Hit{
-        unsigned(2*(hit.WireID().TPC/4) + hit.WireID().TPC%2),
-        float(asWire->Wire(hit.WireID()).GetCenter().Z()),
-        hit.Channel(),
-        hit.PeakTime(),
-        hit.Integral()
-    };
-}
-ana::Hit ana::Fullchecks::GetUHit(recob::Hit const& hit) {
-    geo::WireGeo wiregeo = asWire->Wire(hit.WireID());
-    float Z = wiregeo.GetCenter().Y() * sqrt(3) +
-        hit.WireID().TPC < 8 ? -wiregeo.GetCenter().Z() : +wiregeo.GetCenter().Z();
-    return ana::Hit {
-        hit.WireID().TPC, // not slice
-        Z, // not Z
-        hit.Channel(),
-        hit.PeakTime(),
-        hit.Integral()
-    };
-}
-ana::Hit ana::Fullchecks::GetVHit(recob::Hit const& hit) {
-    geo::WireGeo wiregeo = asWire->Wire(hit.WireID());
-    float Z = wiregeo.GetCenter().Y() * sqrt(3) +
-        hit.WireID().TPC < 8 ? +wiregeo.GetCenter().Z() : -wiregeo.GetCenter().Z();
-    return ana::Hit {
-        hit.WireID().TPC, // not slice
-        Z, // not Z
+        slice,
+        z,
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
@@ -726,7 +729,7 @@ bool ana::Fullchecks::IsUpright(recob::Track const& T) {
 
 
 art::Ptr<recob::Hit> ana::Fullchecks::GetDeepestHit(std::vector<art::Ptr<recob::Hit>> vp_hit, geo::View_t view) {
-    float TickUpMax = tick_window.min, TickLowMin = tick_window.max;
+    float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
     art::Ptr<recob::Hit> HitUpMax, HitLowMin;
 
     // tacking min of ticks in lower volume and max of ticks in upper volume

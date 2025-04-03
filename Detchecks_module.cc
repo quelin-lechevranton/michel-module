@@ -6,7 +6,7 @@
 // Generated at Wed Nov  6 10:31:28 2024 by Jeremy Quelin Lechevranton
 ////////////////////////////////////////////////////////////////////////
 
-#include "data_struct.h"
+#include "pdvd_utils.h"
 
 namespace ana {
   class Detchecks;

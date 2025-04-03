@@ -128,6 +128,15 @@ namespace ana {
         };
         iterator begin() const { return iterator(this); }
         iterator end() const { return iterator(this, N); }
+        
+        bool find(recob::Hit hit) {
+            auto it_chan = std::find(channel.begin(), channel.end(), hit.Channel());
+            auto it_tick = std::find(tick.begin(), tick.end(), hit.PeakTime());
+            unsigned i = std::distance(channel.begin(), it_chan);
+            if (i == std::distance(tick.begin(), it_tick)) return i;
+            return N;
+
+        }
     };
     struct Point {
         float x, y, z;
@@ -202,4 +211,43 @@ namespace ana {
         iterator begin() const { return iterator(this); }
         iterator end() const { return iterator(this, N); }
     };
+
+
+
+    // reco to truth functions
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+
+    simb::MCParticle const* trk2mcp(art::Ptr<recob::Track> p_trk, detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+        std::unordered_map<int, float> map_tid_ene;
+        for (art::Ptr<recob::Hit> const& p_hit : fmp.at(p_trk.key()))
+            for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
+                map_tid_ene[ide.trackID] += ide.energy;
+
+        float max_ene = -1;
+        int tid_max = 0;
+        for (std::pair<int, float> p : map_tid_ene)
+            if (p.second > max_ene) max_ene = p.second, tid_max = p.first;
+        return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+    }
+
+    art::Ptr<recob::Track> mcp2trk(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk ,detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+        std::unordered_map<art::Ptr<recob::Track>, unsigned> map_trk_nhit;
+        for (art::Ptr<recob::Track> p_trk : vp_trk)
+            map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp.at(p_trk.key())).size();
+
+        unsigned max = 0;
+        art::Ptr<recob::Track> p_trk_from_mcp;
+        for (std::pair<art::Ptr<recob::Track>, unsigned> p : map_trk_nhit)
+            if (p.second > max) max = p.second, p_trk_from_mcp = p.first;
+        return p_trk_from_mcp;
+    }
+
+    std::vector<art::Ptr<recob::Hit>> mcp2hits(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Hit>> const& vp_hit, detinfo::DetectorClocksData clockData, bool use_eve) {
+        std::vector<art::Ptr<recob::Hit>> vp_hit_from_mcp;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit)
+            for (sim::TrackIDE ide : (use_eve ? bt_serv->HitToEveTrackIDEs(clockData, p_hit) : bt_serv->HitToTrackIDEs(clockData, p_hit)))
+                if (ide.trackID == mcp->TrackId()) vp_hit_from_mcp.push_back(p_hit);
+        return vp_hit_from_mcp;
+    }
 }
