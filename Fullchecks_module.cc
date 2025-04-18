@@ -88,6 +88,8 @@ private:
     float MuonTrackLength;
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
+    ana::Point MuonTrueEndPoint;    
+    float MuonTrueEndPointT;
     ana::Points MuonSpacePoints;
     ana::Point MuonEndSpacePoint;
 
@@ -101,11 +103,11 @@ private:
 
     ana::Hits NearbyHits;
     ana::Hits NearbyUHits, NearbyVHits;
-    ana::Points NearbySpacePoints;
-    ana::Points NearbyHitSpacePoints;
-    ana::Points NearbyHitPoints;
-    std::vector<float> NearbyHitPointQuality;
-    ana::Points NearbyReco3DPoints;
+    // ana::Points NearbySpacePoints;
+    // ana::Points NearbyHitSpacePoints;
+    // ana::Points NearbyHitPoints;
+    // std::vector<float> NearbyHitPointQuality;
+    // ana::Points NearbyReco3DPoints;
 
     float MichelTrackLength;
 
@@ -226,6 +228,8 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
+    MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
+    tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT);
     MuonSpacePoints.SetBranches(tMuon, "Space");
     MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
 
@@ -244,11 +248,11 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     NearbyHits.SetBranches(tMuon, "Nearby");
     NearbyUHits.SetBranches(tMuon, "NearbyU");
     NearbyVHits.SetBranches(tMuon, "NearbyV");
-    NearbySpacePoints.SetBranches(tMuon, "NearbySpace");
-    NearbyHitSpacePoints.SetBranches(tMuon, "NearbyHitSpace");
-    NearbyHitPoints.SetBranches(tMuon, "NearbyHit");
-    tMuon->Branch("NearbyHitPointQuality", &NearbyHitPointQuality);
-    NearbyReco3DPoints.SetBranches(tMuon, "NearbyReco3D");
+    // NearbySpacePoints.SetBranches(tMuon, "NearbySpace");
+    // NearbyHitSpacePoints.SetBranches(tMuon, "NearbyHitSpace");
+    // NearbyHitPoints.SetBranches(tMuon, "NearbyHit");
+    // tMuon->Branch("NearbyHitPointQuality", &NearbyHitPointQuality);
+    // NearbyReco3DPoints.SetBranches(tMuon, "NearbyReco3D");
 
 }
 
@@ -358,6 +362,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         MuonIsAnti = mcp->PdgCode() < 0;
         MuonTrackLength = p_trk->Length();
         MuonEndProcess = mcp->EndProcess();
+        MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
+        MuonTrueEndPointT = mcp->EndPosition().T();
 
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
@@ -428,7 +434,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
 
         // get induction hits nearby muon end point
-        float induction_channel_pitch = 0.765; // cm/channel
+        float induction_pitch = 0.765; // cm/channel
         for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
 
@@ -438,7 +444,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
             if (p_hit->View() == geo::kU) {
-                float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_channel_pitch;
+                float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_pitch;
                 float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
                 float dr2 = dz*dz + dt*dt;
 
@@ -447,7 +453,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 NearbyUHits.push_back(GetHit(*p_hit));
             }
             if (p_hit->View() == geo::kV) {
-                float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_channel_pitch;
+                float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_pitch;
                 float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
                 float dr2 = dz*dz + dt*dt;
 
@@ -480,11 +486,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             NearbyHits.push_back(hit);
             NearbyPHits.push_back(p_hit);
 
-            art::Ptr<recob::SpacePoint> p_hit_spt = fop_hit2spt.at(p_hit.key());
-            if (p_hit_spt)
-                NearbyHitSpacePoints.push_back(p_hit_spt->position());
-            else 
-                NearbyHitSpacePoints.push_back(ana::Point{});
+            // art::Ptr<recob::SpacePoint> p_hit_spt = fop_hit2spt.at(p_hit.key());
+            // if (p_hit_spt)
+            //     NearbyHitSpacePoints.push_back(p_hit_spt->position());
+            // else 
+            //     NearbyHitSpacePoints.push_back(ana::Point{});
 
             if (!mcp_michel) continue;
             if (from_track) continue;
@@ -504,6 +510,8 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             }
         } // end of loop over event hits
         SphereEnergy = SphereHits.energy();
+
+        /*
 
         // get space points nearby muon end point
         for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
@@ -529,8 +537,9 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             NearbyReco3DPoints.push_back(p_r3d->position());
         }
 
+        */
 
-        // /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
+        /* RECREATING SPACE POINTS FROM NEARBY HITS ATTEMPT
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << iMuon << " w/ " << NearbyPHits.size() << " nearby hits, w/ " << NearbySpacePoints.size() << " nearby space points" << std::endl;
@@ -633,7 +642,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
             NearbyHitPointQuality.push_back(has_good_coincidence ? 0.F : min_dy);
         }
 
-        // */
+        */
 
 
         tMuon->Fill();
@@ -666,11 +675,11 @@ void ana::Fullchecks::resetMuon() {
     NearbyHits.clear();
     NearbyUHits.clear();
     NearbyVHits.clear();
-    NearbySpacePoints.clear();
-    NearbyHitSpacePoints.clear();
-    NearbyHitPoints.clear();
-    NearbyHitPointQuality.clear();
-    NearbyReco3DPoints.clear();
+    // NearbySpacePoints.clear();
+    // NearbyHitSpacePoints.clear();
+    // NearbyHitPoints.clear();
+    // NearbyHitPointQuality.clear();
+    // NearbyReco3DPoints.clear();
 
     MichelTrackLength = 0;
 

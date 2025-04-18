@@ -36,7 +36,7 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
-            Log: true
+            Log: false
             KeepOutside: false
 
             TrackLengthCut: 40.

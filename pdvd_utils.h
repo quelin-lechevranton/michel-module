@@ -48,7 +48,6 @@ namespace ana {
         }
     };
 
-
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
 
     struct Hit {
@@ -144,6 +143,7 @@ namespace ana {
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(double x, double y, double z) : x(x), y(y), z(z) {}
         Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
+        Point(TVector3 const& v) : x(v.x()), y(v.y()), z(v.z()) {}
         float r2() const { return x*x + y*y + z*z; }
 
         Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
@@ -218,7 +218,7 @@ namespace ana {
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
-    simb::MCParticle const* trk2mcp(art::Ptr<recob::Track> p_trk, detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+    simb::MCParticle const* trk2mcp(art::Ptr<recob::Track> const& p_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp) {
         std::unordered_map<int, float> map_tid_ene;
         for (art::Ptr<recob::Hit> const& p_hit : fmp.at(p_trk.key()))
             for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
@@ -231,7 +231,7 @@ namespace ana {
         return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
     }
 
-    art::Ptr<recob::Track> mcp2trk(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk ,detinfo::DetectorClocksData clockData, art::FindManyP<recob::Hit> fmp) {
+    art::Ptr<recob::Track> mcp2trk(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk ,detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp) {
         std::unordered_map<art::Ptr<recob::Track>, unsigned> map_trk_nhit;
         for (art::Ptr<recob::Track> p_trk : vp_trk)
             map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp.at(p_trk.key())).size();
@@ -243,7 +243,7 @@ namespace ana {
         return p_trk_from_mcp;
     }
 
-    std::vector<art::Ptr<recob::Hit>> mcp2hits(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Hit>> const& vp_hit, detinfo::DetectorClocksData clockData, bool use_eve) {
+    std::vector<art::Ptr<recob::Hit>> mcp2hits(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Hit>> const& vp_hit, detinfo::DetectorClocksData const& clockData, bool use_eve) {
         std::vector<art::Ptr<recob::Hit>> vp_hit_from_mcp;
         for (art::Ptr<recob::Hit> p_hit : vp_hit)
             for (sim::TrackIDE ide : (use_eve ? bt_serv->HitToEveTrackIDEs(clockData, p_hit) : bt_serv->HitToTrackIDEs(clockData, p_hit)))
