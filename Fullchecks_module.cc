@@ -86,10 +86,14 @@ private:
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside };
 
     float MuonTrackLength;
+    int MuonTrackIsNotBroken;
+    enum EnumIsBroken { kBroken, kLastOfBroken, kNotBroken };
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
     ana::Point MuonTrueEndPoint;    
     float MuonTrueEndPointT;
+    ana::Point MuonTrueEndMomentum;
+    float MuonTrueEndEnergy;
     ana::Points MuonSpacePoints;
     ana::Point MuonEndSpacePoint;
 
@@ -190,8 +194,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         << "  Lower Bounds: " << geoLow.Min() << " -> " << geoLow.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
-        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm" << std::endl
-        << "  Michel Tick Radius: " << fMichelTickRadius << " ticks" << std::endl
+        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm (" << fMichelTickRadius << " ticks)" << std::endl
         << "  Nearby Space Radius: " << fNearbySpaceRadius << " cm" << std::endl
         << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
 
@@ -215,6 +218,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     tMuon->Branch("HasMichel", &MuonHasMichel);
 
     tMuon->Branch("TrackLength", &MuonTrackLength);
+    tMuon->Branch("TrackIsNotBroken", &MuonTrackIsNotBroken);
     tMuon->Branch("EndIsInWindowT", &MuonEndIsInWindowT);
     tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ);
     tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
@@ -230,6 +234,10 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
     tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT);
+    tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x);
+    tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y);
+    tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z);
+    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy);
     MuonSpacePoints.SetBranches(tMuon, "Space");
     MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
 
@@ -318,7 +326,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (!mcp) continue;
         if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-
         art::Ptr<recob::Hit> deephit = GetDeepestHit(ana::mcp2hits(mcp, vp_hit, clockData, false));
         if (!LOG(deephit)) continue;
         MuonTrueEndHit = GetHit(*deephit);
@@ -361,9 +368,27 @@ void ana::Fullchecks::analyze(art::Event const& e) {
 
         MuonIsAnti = mcp->PdgCode() < 0;
         MuonTrackLength = p_trk->Length();
+
+        std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
+        if (vp_trk_from_mcp.empty())
+            std::cout << "\033[1;91m" "NO TRK FROM MCP FROM TRK" "\033[0m" << std::endl;
+        if (vp_trk_from_mcp.size() == 1)
+            MuonTrackIsNotBroken = kNotBroken;
+        else {
+            bool IsDeepestTrack = true;
+            for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
+                IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+            if (IsDeepestTrack)
+                MuonTrackIsNotBroken = kLastOfBroken;
+            else
+                MuonTrackIsNotBroken = kBroken;
+        }
+
         MuonEndProcess = mcp->EndProcess();
         MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
-        MuonTrueEndPointT = mcp->EndPosition().T();
+        MuonTrueEndPointT = mcp->EndT();
+        MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
+        MuonTrueEndEnergy = mcp->EndE();
 
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
