@@ -246,9 +246,11 @@ namespace ana {
 
     std::vector<art::Ptr<recob::Track>> mcp2trks(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
         std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp;
-        for (art::Ptr<recob::Track> p_trk : vp_trk)
-            if (mcp->TrackId() == trk2mcp(p_trk, clockData, fmp_trk2hit)->TrackId())
+        for (art::Ptr<recob::Track> p_trk : vp_trk) {
+            simb::MCParticle const* mcp_from_trk = trk2mcp(p_trk, clockData, fmp_trk2hit);
+            if (mcp_from_trk && mcp_from_trk->TrackId() == mcp->TrackId())
                 vp_trk_from_mcp.push_back(p_trk);
+        }
         return vp_trk_from_mcp;
     }
 
