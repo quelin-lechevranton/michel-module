@@ -233,18 +233,18 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
-    tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT);
-    tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x);
-    tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y);
-    tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z);
-    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy);
+    tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT); // ns
+    tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x); // GeV
+    tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y); // GeV
+    tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z); // GeV
+    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); // GeV
     MuonSpacePoints.SetBranches(tMuon, "Space");
     MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
 
-    tMuon->Branch("MichelTrackLength", &MichelTrackLength);
-    tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
-    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
-    tMuon->Branch("SphereEnergy", &SphereEnergy);
+    tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
+    tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
+    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
+    tMuon->Branch("SphereEnergy", &SphereEnergy); // MeV
 
     tMuon->Branch("SphereTruePositive", &SphereTruePositive);
     tMuon->Branch("SphereFalsePositive", &SphereFalsePositive);
@@ -372,17 +372,24 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
         if (vp_trk_from_mcp.empty())
             std::cout << "\033[1;91m" "NO TRK FROM MCP FROM TRK" "\033[0m" << std::endl;
-        if (vp_trk_from_mcp.size() == 1)
-            MuonTrackIsNotBroken = kNotBroken;
         else {
-            bool IsDeepestTrack = true;
-            for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
-                IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
-            if (IsDeepestTrack)
-                MuonTrackIsNotBroken = kLastOfBroken;
-            else
-                MuonTrackIsNotBroken = kBroken;
+            if (std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) == vp_trk_from_mcp.end())
+                std::cout << "\033[1;91m" "TRK NO IN VEC TRK FROM MCP" "\033[0m" << std::endl;
+            else {
+                if (vp_trk_from_mcp.size() == 1)
+                    MuonTrackIsNotBroken = kNotBroken;
+                else {
+                    bool IsDeepestTrack = true;
+                    for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
+                        IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+                    if (IsDeepestTrack)
+                        MuonTrackIsNotBroken = kLastOfBroken;
+                    else
+                        MuonTrackIsNotBroken = kBroken;
+                }
+            }
         }
+        
 
         MuonEndProcess = mcp->EndProcess();
         MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
