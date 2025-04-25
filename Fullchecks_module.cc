@@ -375,8 +375,11 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
 
         if (vp_trk_from_mcp.size()) {
-            bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) == vp_trk_from_mcp.end();
-            std::cout << "\033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m" << std::endl;
+            bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
+            std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
+            std::cout << " [ ";
+            for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
+            std::cout << "]" << std::endl;
             if (vp_trk_from_mcp.size() == 1)
                 MuonTrackIsNotBroken = kNotBroken;
             else {
