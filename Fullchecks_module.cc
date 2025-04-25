@@ -311,6 +311,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
     }
 
+    std::unordered_map<int, unsigned> particle_encounter;
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
@@ -370,25 +371,24 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         MuonTrackLength = p_trk->Length();
 
         std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-        if (vp_trk_from_mcp.empty())
-            std::cout << "\033[1;91m" "NO TRK FROM MCP FROM TRK" "\033[0m" << std::endl;
-        else {
-            if (std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) == vp_trk_from_mcp.end())
-                std::cout << "\033[1;91m" "TRK NO IN VEC TRK FROM MCP" "\033[0m" << std::endl;
+
+        std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
+
+        if (vp_trk_from_mcp.size()) {
+            bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) == vp_trk_from_mcp.end();
+            std::cout << "\033[1;9" << isin ? 2 : 1 << "m" << isin ? "in" : "not in" << "\033[0m" << std::endl;
+            if (vp_trk_from_mcp.size() == 1)
+                MuonTrackIsNotBroken = kNotBroken;
             else {
-                if (vp_trk_from_mcp.size() == 1)
-                    MuonTrackIsNotBroken = kNotBroken;
-                else {
-                    bool IsDeepestTrack = true;
-                    for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
-                        IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
-                    if (IsDeepestTrack)
-                        MuonTrackIsNotBroken = kLastOfBroken;
-                    else
-                        MuonTrackIsNotBroken = kBroken;
-                }
+                bool IsDeepestTrack = true;
+                for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
+                    IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+                if (IsDeepestTrack)
+                    MuonTrackIsNotBroken = kLastOfBroken;
+                else
+                    MuonTrackIsNotBroken = kBroken;
             }
-        }
+        } else std::cout << "\033[1;91m" "oups" "\033[0m" << std::endl;
         
 
         MuonEndProcess = mcp->EndProcess();
