@@ -87,7 +87,7 @@ private:
 
     float MuonTrackLength;
     int MuonTrackIsNotBroken;
-    enum EnumIsBroken { kBroken, kLastOfBroken, kNotBroken };
+    enum EnumIsBroken { kBadAssociation = -1, kBroken, kLastOfBroken, kNotBroken };
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
     ana::Point MuonTrueEndPoint;    
@@ -327,29 +327,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         if (!mcp) continue;
         if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-
-        std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
-
-        if (vp_trk_from_mcp.size()) {
-            bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
-            std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
-            std::cout << " [ ";
-            for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
-            std::cout << "]" << std::endl;
-            if (vp_trk_from_mcp.size() == 1)
-                MuonTrackIsNotBroken = kNotBroken;
-            else {
-                bool IsDeepestTrack = true;
-                for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
-                    IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
-                if (IsDeepestTrack)
-                    MuonTrackIsNotBroken = kLastOfBroken;
-                else
-                    MuonTrackIsNotBroken = kBroken;
-            }
-        } else std::cout << "\033[1;91m" "oups" "\033[0m" << std::endl;
-
         art::Ptr<recob::Hit> deephit = GetDeepestHit(ana::mcp2hits(mcp, vp_hit, clockData, false));
         if (!LOG(deephit)) continue;
         MuonTrueEndHit = GetHit(*deephit);
@@ -394,15 +371,13 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         MuonTrackLength = p_trk->Length();
 
         std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-
-        std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
-
+        // std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
         if (vp_trk_from_mcp.size()) {
-            bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
-            std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
-            std::cout << " [ ";
+            // bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
+            // std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
+            // std::cout << " [ ";
             for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
-            std::cout << "]" << std::endl;
+            // std::cout << "]" << std::endl;
             if (vp_trk_from_mcp.size() == 1)
                 MuonTrackIsNotBroken = kNotBroken;
             else {
@@ -414,9 +389,7 @@ void ana::Fullchecks::analyze(art::Event const& e) {
                 else
                     MuonTrackIsNotBroken = kBroken;
             }
-        } else std::cout << "\033[1;91m" "oups" "\033[0m" << std::endl;
-        std::cout << std::endl;
-        
+        } else MuonTrackIsNotBroken = kBadAssociation;
 
         MuonEndProcess = mcp->EndProcess();
         MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
@@ -822,7 +795,7 @@ art::Ptr<recob::Hit> ana::Fullchecks::GetDeepestHit(std::vector<art::Ptr<recob::
     if (HitLowMin) return HitLowMin;
     else {
         if (HitUpMax) return HitUpMax;
-        else return art::Ptr<recob::Hit>();
+        else return art::Ptr<recob::Hit>{};
     }
 }
 
