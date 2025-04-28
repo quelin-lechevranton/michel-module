@@ -44,6 +44,7 @@ private:
     const detinfo::LArPropertiesService* asLarProp;
 
     // Input Parameters
+    bool pWireGeo;
     bool pWireEnds;
     bool pTPCBounds;
     bool pTPCChannels;
@@ -63,6 +64,7 @@ private:
 
 ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
+    pWireGeo(p.get<bool>("WireGeo", false)),
     pWireEnds(p.get<bool>("WireEnds", false)),
     pTPCBounds(p.get<bool>("TPCBounds", false)),
     pTPCChannels(p.get<bool>("TPCChannels", false)),
@@ -104,14 +106,13 @@ void ana::Detchecks::beginJob()
         << "Number of channels: " << asWire->Nchannels() << std::endl
         << "--- DetectorProperties ---" << std::endl
         << "Number of ticks: " << detProp.ReadOutWindowSize() << std::endl
-        << "Channel pitch: " << "(0.5)" << " cm/channel" << std::endl
-        << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << std::endl
         << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << std::endl
+        << "--- DetectorClocks ---" << std::endl
+        << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << std::endl
+        << "Time to tick: " << clockData.Time2Tick(1.) << " tick/?s" << std::endl
         // << "Tick to X" << detProp.ConvertTicksToX(??) << " cm/tick" << std::endl
         <<  "--- LArProperties ---" << std::endl
         << "Atomic mass of the liquid " << larProp->AtomicMass() << " g/mol" << std::endl;
-
-
 
     // std::cout << "Cryostat:" << std::endl
     //     << "\t" << "coordinates: " << asGeo->Cryostat(cryoid).Min() 
@@ -167,6 +168,53 @@ void ana::Detchecks::beginJob()
 
     // std::cout << "----------------------TEST----------------------" << std::endl;
 
+    std::cout << "\033[93m" "Cryostat Bounds: " "\033[0m" << std::endl;
+    for (unsigned c=0; c<asGeo->Ncryostats(); c++) {
+        geo::CryostatGeo cryogeo = asGeo->Cryostat(geo::CryostatID{c});
+        std::cout << cryogeo.Min() << " -> " << cryogeo.Max() << std::endl;
+
+        // std::cout << "\t{" << c << ", {"
+        //     << cryogeo.MinX() << ", " << cryogeo.MaxX() << ", "
+        //     << cryogeo.MinY() << ", " << cryogeo.MaxY() << ", "
+        //     << cryogeo.MinZ() << ", " << cryogeo.MaxZ() << " }"
+        //     << "}," << std::endl;
+        // }
+    }
+
+    if (pWireGeo) {
+        std::cout << "\033[93m" "Wire Geometry:" "\033[0m" << std::endl;
+        for (unsigned t=0; t<asGeo->NTPC(); t++) {
+            geo::TPCID tpcid{cryoid, t};
+            geo::TPCGeo tpcgeo = asGeo->TPC(tpcid);
+
+            std::cout << "TPC#" << t << ": " << tpcgeo.Min() << " -> " << tpcgeo.Max() << std::endl;
+
+            geo::PlaneID Uid{tpcid, geo::kU};
+            std::cout << "  U plane" << std::endl;
+            std::cout << "\t" << "number of wires: " << asWire->Nwires(Uid) << std::endl;
+            geo::WireGeo Uw0 = asWire->Wire(geo::WireID{Uid, 0});
+            geo::WireGeo Uw1 = asWire->Wire(geo::WireID{Uid, 1});
+            std::cout << "\t" << "wires Z->Y angle: " << Uw0.ThetaZ(true) << "º" << std::endl;
+            std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Uw0, Uw1) << " cm" << std::endl;
+            
+            geo::PlaneID Vid{tpcid, geo::kV};
+            std::cout << "  V plane" << std::endl;
+            std::cout << "\t" << "number of wires: " << asWire->Nwires(Vid) << std::endl;
+            geo::WireGeo Vw0 = asWire->Wire(geo::WireID{Vid, 0});
+            geo::WireGeo Vw1 = asWire->Wire(geo::WireID{Vid, 1});
+            std::cout << "\t" << "wires Z->Y angle: " << Vw0.ThetaZ(true) << "º" << std::endl;
+            std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Vw0, Vw1) << " cm" << std::endl;
+
+            geo::PlaneID Wid{tpcid, geo::kW};
+            std::cout << "  W plane" << std::endl;
+            std::cout << "\t" << "number of wires: " << asWire->Nwires(Wid) << std::endl;
+            geo::WireGeo Ww0 = asWire->Wire(geo::WireID{Wid, 0});
+            geo::WireGeo Ww1 = asWire->Wire(geo::WireID{Wid, 1});
+            std::cout << "\t" << "wires Z->Y angle: " << Ww0.ThetaZ(true) << "º" << std::endl;
+            std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Ww0, Ww1) << " cm" << std::endl;
+        }
+    }
+
     if (pWireEnds) {
         std::cout << "\033[93m" "Wire Ends:" "\033[0m" << std::endl;
         for (unsigned int tpc=0; tpc<asGeo->NTPC(); tpc++) {
@@ -217,7 +265,7 @@ void ana::Detchecks::beginJob()
     }
 
     if (pTPCChannels) {
-        std::cout << "\033[93m" "TPC Bounds: {TPC, {{view, {ch min, ch max}}, ...}}" "\033[0m" << std::endl;
+        std::cout << "\033[93m" "TPC Channels: {TPC, {{view, {ch min, ch max}}, ...}}" "\033[0m" << std::endl;
         for (unsigned tpc=0; tpc<asGeo->NTPC(); tpc++) {
             geo::TPCID tpcid{cryoid, tpc};
             std::cout << "\t{" << tpc << ", {\r" << std::flush;
