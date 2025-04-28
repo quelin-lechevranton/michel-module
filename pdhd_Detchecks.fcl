@@ -1,0 +1,37 @@
+#include "services_protodunehd.fcl" 
+
+process_name: RunDetchecks
+
+services: {
+    TFileService: { fileName: "pdhd_Detchecks_out.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::protodunehd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::protodunehd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "Detchecks"
+
+            WireEnds: false
+            TPCBounds: false
+            TPCChannels: true
+            pCollectionZ: false
+            ViewUCoord: false
+            ViewVCoord: false
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}

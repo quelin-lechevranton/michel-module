@@ -41,7 +41,7 @@ private:
     const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
-
+    const detinfo::LArPropertiesService* asLarProp;
 
     // Input Parameters
     bool pWireEnds;
@@ -80,6 +80,7 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
+    asLarProp = &*art::ServiceHandle<detinfo::LArPropertiesService>();
 }
 
 void ana::Detchecks::analyze(art::Event const& e)
@@ -89,17 +90,28 @@ void ana::Detchecks::analyze(art::Event const& e)
 
 void ana::Detchecks::beginJob()
 {
-    auto const clockData = asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(clockData);
+    detinfo::DetectorClocksData const clockData = asDetClocks->DataForJob();
+    detinfo::DetectorPropertiesData const detProp = asDetProp->DataForJob(clockData);
+    detinfo::LArProperties const * larProp = asLarProp->provider();
 
     geo::CryostatID cryoid{0};
     std::cout << "\033[93m" << "Detchecks::beginJob: ============================================================" << "\033[0m" << std::endl
+        << "--- Geometry ---" << std::endl
         << "Detector name: " << asGeo->DetectorName() << std::endl
+        << "Number of cryostats: " << asGeo->Ncryostats() << std::endl
+        << "Number of TPCs: " << asGeo->NTPC() << std::endl
+        << "--- WireReadout ---" << std::endl
         << "Number of channels: " << asWire->Nchannels() << std::endl
+        << "--- DetectorProperties ---" << std::endl
         << "Number of ticks: " << detProp.ReadOutWindowSize() << std::endl
         << "Channel pitch: " << "(0.5)" << " cm/channel" << std::endl
         << "Sampling rate: " << detinfo::sampling_rate(clockData) << " ns/tick" << std::endl
-        << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << std::endl;
+        << "Drift velocity: " << detProp.DriftVelocity() << " cm/µs" << std::endl
+        // << "Tick to X" << detProp.ConvertTicksToX(??) << " cm/tick" << std::endl
+        <<  "--- LArProperties ---" << std::endl
+        << "Atomic mass of the liquid " << larProp->AtomicMass() << " g/mol" << std::endl;
+
+
 
     // std::cout << "Cryostat:" << std::endl
     //     << "\t" << "coordinates: " << asGeo->Cryostat(cryoid).Min() 
