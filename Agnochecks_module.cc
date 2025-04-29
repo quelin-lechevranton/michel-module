@@ -199,7 +199,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
         int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
 
-        plane2axis[p] = { .ay = dy * w0.CosThetaZ(), .az = dz * w0.SinThetaZ() };
+        plane2axis[p] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
 
         plane2pitch[p] = geo::WireGeo::WirePitch(w0, w1);
     }
@@ -546,10 +546,11 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
             ana::Hit hit = GetHit(*p_hit);
-            if (geoDet == kPDVD)
+            if (geoDet == kPDVD) {
                 if (hit.slice() != MuonEndHit.slice()) continue;
-            else
+            } else {
                 if (hit.tpc != MuonEndHit.tpc) continue;
+            }
 
             float dz = (hit.space - MuonEndHit.space);
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
@@ -779,7 +780,7 @@ ana::Hit ana::Agnochecks::GetHit(recob::Hit const& hit) {
     // slice = 2*(wireid.TPC/4) + wireid.TPC%2;
     return ana::Hit{
         wireid.TPC,
-        axis.ay * wiregeo.GetCenter().Y() + axis.az * wiregeo.GetCenter().Z(),
+        float(axis.ay * wiregeo.GetCenter().Y() + axis.az * wiregeo.GetCenter().Z()),
         hit.Channel(),
         hit.PeakTime(),
         hit.Integral()
@@ -803,11 +804,16 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 
 art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::Hit>> vp_hit, bool increasing_z, geo::View_t view) {
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
-    switch (geoDet) {
-        case kPDVD:
-            float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-            art::Ptr<recob::Hit> HitUpMax, HitLowMin;
 
+
+    switch (geoDet) {
+        float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
+        art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+
+        art::Ptr<recob::Hit> DeepestHit;
+        double mz = increasing_z ? std::numeric_limits<double>::min() : std::numeric_limits<double>::max();
+
+        case kPDVD:
             // tacking min of ticks in lower volume and max of ticks in upper volume
             for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
@@ -830,11 +836,10 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             if (HitLowMin) return HitLowMin;
             else if (HitUpMax) return HitUpMax;
             break;
+        
         case kPDHD:
-            art::Ptr<recob::Hit> DeepestHit;
-            // searching for max z if increazing else for min z
-            double mz = increasing_z ? std::numeric_limits<double>::min() : std::numeric_limits<double>::max();
             
+            // searching for max z if increazing else for min z
             for (unsigned i=0; i<vp_hit.size(); i++) {
                 art::Ptr<recob::Hit> p_hit = vp_hit[i];
                 if (p_hit->View() != view) continue;
