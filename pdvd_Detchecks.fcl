@@ -26,9 +26,10 @@ physics: {
         checks: {
             module_type:    "Detchecks"
 
+            WireGeo: true
             WireEnds: false
-            TPCBounds: false
-            TPCChannels: true
+            TPCBounds: true
+            TPCChannels: false
             pCollectionZ: false
             ViewUCoord: false
             ViewVCoord: false

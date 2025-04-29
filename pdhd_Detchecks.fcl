@@ -1,4 +1,6 @@
+#include "services_dune.fcl"
 #include "services_protodunehd.fcl" 
+#include "tools_dune.fcl"	
 
 process_name: RunDetchecks
 
@@ -24,9 +26,10 @@ physics: {
         checks: {
             module_type:    "Detchecks"
 
+            WireGeo: true
             WireEnds: false
-            TPCBounds: false
-            TPCChannels: true
+            TPCBounds: true
+            TPCChannels: false
             pCollectionZ: false
             ViewUCoord: false
             ViewVCoord: false

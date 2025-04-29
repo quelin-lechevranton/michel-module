@@ -16,7 +16,6 @@
 #include "larcore/Geometry/Geometry.h"
 #include "larcore/Geometry/WireReadout.h"
 
-
 #include "larsim/MCCheater/ParticleInventoryService.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
@@ -44,31 +43,34 @@ namespace ana {
             return min+r <= x && x <= max-r;
         }
 
-
         friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
             return os << "[" << b.min << ", " << b.max << "]";
         }
     };
 
+    struct axis {
+        double ay, az;
+    };
+
     float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
 
     struct Hit {
-        // unsigned view;
-        unsigned slice;
-        float z;
+        unsigned tpc;
+        float space;
         unsigned channel;
         float tick;
         float adc;
-        Hit() : slice(0), z(0), channel(0), tick(0), adc(0) {}
-        Hit(unsigned s, float z, unsigned c, float t, float a) :
-            slice(s), z(z), channel(c), tick(t), adc(a) {}
+        Hit() : tpc(0), space(0), channel(0), tick(0), adc(0) {}
+        Hit(unsigned T, float s, unsigned c, float t, float a) :
+            tpc(T), space(s), channel(c), tick(t), adc(a) {}
 
+        unsigned slice() { return 2*(tpc/4) + tpc%2; }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
-            return os << "sl:" << hit.slice << " z:" << hit.z << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
+            return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
         void SetBranches(TTree* t, const char* pre="") {
-            t->Branch(Form("%sHitSlice", pre), &slice);
-            t->Branch(Form("%sHitZ", pre), &z);
+            t->Branch(Form("%sHitTPC", pre), &tpc);
+            t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
             t->Branch(Form("%sHitADC", pre), &adc);
@@ -76,25 +78,24 @@ namespace ana {
     };
     struct Hits {
         unsigned N;
-        // std::vector<unsigned> view;
-        std::vector<unsigned> slice;
-        std::vector<float> z;
+        std::vector<unsigned> tpc;
+        std::vector<float> space;
         std::vector<unsigned> channel;
         std::vector<float> tick;
         std::vector<float> adc;
-        Hits() : N(0), slice(), z(), channel(), tick(), adc() {}
+        Hits() : N(0), tpc(), space(), channel(), tick(), adc() {}
         void push_back(Hit const& hit) {
             N++;
-            slice.push_back(hit.slice);
-            z.push_back(hit.z);
+            tpc.push_back(hit.tpc);
+            space.push_back(hit.space);
             channel.push_back(hit.channel);
             tick.push_back(hit.tick);
             adc.push_back(hit.adc);
         }
         void clear() {
             N = 0;
-            slice.clear();
-            z.clear();
+            tpc.clear();
+            space.clear();
             channel.clear();
             tick.clear();
             adc.clear();
@@ -109,8 +110,8 @@ namespace ana {
 
         void SetBranches(TTree *t, const char* pre="") {
             t->Branch(Form("%sNHit", pre), &N);
-            t->Branch(Form("%sHitSlice", pre), &slice);
-            t->Branch(Form("%sHitZ", pre), &z);
+            t->Branch(Form("%sHitTPC", pre), &tpc);
+            t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
             t->Branch(Form("%sHitADC", pre), &adc);
@@ -118,7 +119,7 @@ namespace ana {
 
 
 
-        Hit at(unsigned i) const { return Hit{slice[i], z[i], channel[i], tick[i], adc[i]}; }
+        Hit at(unsigned i) const { return Hit{tpc[i], space[i], channel[i], tick[i], adc[i]}; }
         struct iterator {
             const Hits* hits;
             unsigned i;
@@ -136,7 +137,6 @@ namespace ana {
             unsigned i = std::distance(channel.begin(), it_chan);
             if (i == std::distance(tick.begin(), it_tick)) return i;
             return N;
-
         }
     };
     struct Point {
