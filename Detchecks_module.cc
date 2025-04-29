@@ -194,6 +194,8 @@ void ana::Detchecks::beginJob()
             std::cout << "\t" << "number of wires: " << asWire->Nwires(Uid) << std::endl;
             geo::WireGeo Uw0 = asWire->Wire(geo::WireID{Uid, 0});
             geo::WireGeo Uw1 = asWire->Wire(geo::WireID{Uid, 1});
+            std::cout << "\t" << "wire #0: " << Uw0.GetStart() << " -> " << Uw0.GetEnd() << std::endl;
+            std::cout << "\t" << "wire #1: " << Uw1.GetStart() << " -> " << Uw1.GetEnd() << std::endl;
             std::cout << "\t" << "wires Z->Y angle: " << Uw0.ThetaZ(true) << "º" << std::endl;
             std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Uw0, Uw1) << " cm" << std::endl;
             
@@ -202,6 +204,8 @@ void ana::Detchecks::beginJob()
             std::cout << "\t" << "number of wires: " << asWire->Nwires(Vid) << std::endl;
             geo::WireGeo Vw0 = asWire->Wire(geo::WireID{Vid, 0});
             geo::WireGeo Vw1 = asWire->Wire(geo::WireID{Vid, 1});
+            std::cout << "\t" << "wire #0: " << Vw0.GetStart() << " -> " << Vw0.GetEnd() << std::endl;
+            std::cout << "\t" << "wire #1: " << Vw1.GetStart() << " -> " << Vw1.GetEnd() << std::endl;
             std::cout << "\t" << "wires Z->Y angle: " << Vw0.ThetaZ(true) << "º" << std::endl;
             std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Vw0, Vw1) << " cm" << std::endl;
 
@@ -210,6 +214,8 @@ void ana::Detchecks::beginJob()
             std::cout << "\t" << "number of wires: " << asWire->Nwires(Wid) << std::endl;
             geo::WireGeo Ww0 = asWire->Wire(geo::WireID{Wid, 0});
             geo::WireGeo Ww1 = asWire->Wire(geo::WireID{Wid, 1});
+            std::cout << "\t" << "wire #0: " << Ww0.GetStart() << " -> " << Ww0.GetEnd() << std::endl;
+            std::cout << "\t" << "wire #1: " << Ww1.GetStart() << " -> " << Ww1.GetEnd() << std::endl;
             std::cout << "\t" << "wires Z->Y angle: " << Ww0.ThetaZ(true) << "º" << std::endl;
             std::cout << "\t" << "channel pitch: " << geo::WireGeo::WirePitch(Ww0, Ww1) << " cm" << std::endl;
         }
