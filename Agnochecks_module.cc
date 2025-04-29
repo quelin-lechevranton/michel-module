@@ -192,16 +192,20 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     // geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
     // geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
 
-    for (geo::PlaneID p : asWire->PlaneIDs()) {
-        geo::WireGeo w0 = asWire->Wire(geo::WireID{p, 0});
-        geo::WireGeo w1 = asWire->Wire(geo::WireID{p, 1});
 
-        int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
-        int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
+    for (unsigned t=0; t<asGeo->NTPC(); t++) {
+        for (unsigned p=0; p<asWire->Nplanes(); p++) {
+            geo::PlaneID pid{0, t, p};
+            geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
+            geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
 
-        plane2axis[p] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
+            int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
+            int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
 
-        plane2pitch[p] = geo::WireGeo::WirePitch(w0, w1);
+            plane2axis[pid] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
+
+            plane2pitch[pid] = geo::WireGeo::WirePitch(w0, w1);
+        }
     }
 
 
