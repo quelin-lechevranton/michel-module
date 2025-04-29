@@ -49,6 +49,7 @@ private:
     bool pTPCBounds;
     bool pTPCChannels;
     bool pChannelPitch;
+    bool pPlaneAxis;
     bool pCollectionZ;
     bool pViewUCoord;
     bool pViewVCoord;
@@ -68,6 +69,7 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     pWireEnds(p.get<bool>("WireEnds", false)),
     pTPCBounds(p.get<bool>("TPCBounds", false)),
     pTPCChannels(p.get<bool>("TPCChannels", false)),
+    pPlaneAxis(p.get<bool>("PlaneAxis", false)),
     pChannelPitch(p.get<bool>("ChannelPitch", false)),
     pCollectionZ(p.get<bool>("CollectionZ", false)),
     pViewUCoord(p.get<bool>("ViewUCoord", false)),
@@ -289,6 +291,22 @@ void ana::Detchecks::beginJob()
                 std::cout << "\t\t{" << view << ", {" << min << ", " << max << "} }" << std::endl;
             }
             std::cout << "\t}}," << std::endl;
+        }
+    }
+
+
+    if (pPlaneAxis) {
+        std::cout << "\033[93m" "Plane Axis: {{tpc, plane}, {dy, dz, theta}} s.t. space = dy * cos(theta) *Y + dz * sin(theta) * Z" "\033[0m" << std::endl;
+        for (unsigned t=0; t<asGeo->NTPC(); t++) {
+            for (unsigned p=0; p<asWire->Nplanes(); p++) {
+                geo::WireGeo w0 = asWire->Wire(geo::WireID{0, t, p, 0});
+                geo::WireGeo w1 = asWire->Wire(geo::WireID{0, t, p, 1});
+
+                int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
+                int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
+
+                std::cout << "\t{{" << t << ", " << p << "}, {" << dy << ", " << dz << ", " << w0.ThetaZ() << "}}," << std::endl;
+            }
         }
     }
 

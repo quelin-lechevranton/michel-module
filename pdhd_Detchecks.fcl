@@ -30,7 +30,9 @@ physics: {
             WireEnds: false
             TPCBounds: true
             TPCChannels: false
-            pCollectionZ: false
+            PlaneAxis: true
+            ChannelPitch: false
+            CollectionZ: false
             ViewUCoord: false
             ViewVCoord: false
         }

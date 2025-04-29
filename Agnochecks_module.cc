@@ -805,14 +805,15 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::Hit>> vp_hit, bool increasing_z, geo::View_t view) {
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
 
+    // PDVD
+    float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
+    art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+
+    // PDHD
+    art::Ptr<recob::Hit> DeepestHit;
+    double mz = increasing_z ? std::numeric_limits<double>::min() : std::numeric_limits<double>::max();
 
     switch (geoDet) {
-        float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-        art::Ptr<recob::Hit> HitUpMax, HitLowMin;
-
-        art::Ptr<recob::Hit> DeepestHit;
-        double mz = increasing_z ? std::numeric_limits<double>::min() : std::numeric_limits<double>::max();
-
         case kPDVD:
             // tacking min of ticks in lower volume and max of ticks in upper volume
             for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -838,7 +839,6 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             break;
         
         case kPDHD:
-            
             // searching for max z if increazing else for min z
             for (unsigned i=0; i<vp_hit.size(); i++) {
                 art::Ptr<recob::Hit> p_hit = vp_hit[i];
