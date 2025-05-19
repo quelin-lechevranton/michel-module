@@ -87,7 +87,7 @@ private:
 
     float MuonTrackLength;
     int MuonTrackIsNotBroken;
-    enum EnumIsBroken { kBadAssociation = -1, kBroken, kLastOfBroken, kNotBroken };
+    enum EnumIsBroken { kBadAssociation=-1, kBroken, kLastOfBroken, kNotBroken };
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
     ana::Point MuonTrueEndPoint;    
@@ -144,10 +144,10 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
     fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)), // in ticks
     fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
 {
-    asGeo = &*art::ServiceHandle<geo::Geometry>();
-    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
 
 
     auto const clockData = asDetClocks->DataForJob();
@@ -159,7 +159,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
                             instance    = prod[2],
                             type        = prod[3];
 
-        const art::InputTag tag = art::InputTag(label,instance);
+        const art::InputTag tag = art::InputTag{label,instance};
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
@@ -169,7 +169,7 @@ ana::Fullchecks::Fullchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
-        tag_r3d = art::InputTag("reco3d", "");
+        tag_r3d = art::InputTag{"reco3d", ""};
     }
 
     fChannelPitch = geo::WireGeo::WirePitch(
@@ -294,7 +294,6 @@ void ana::Fullchecks::analyze(art::Event const& e) {
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
-
     auto const & vh_r3d = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_r3d);
     std::vector<art::Ptr<recob::SpacePoint>> vp_r3d;
     art::fill_ptr_vector(vp_r3d, vh_r3d);
@@ -408,22 +407,20 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         }
 
         // and all muon track points
-        for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
-            if (!p_trk->HasValidPoint(i_tpt)) continue;
-            MuonTrackPoints.push_back(p_trk->LocationAtPoint(i_tpt));
-        }
+        for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++)
+            if (p_trk->HasValidPoint(i_tpt))
+                MuonTrackPoints.push_back(p_trk->LocationAtPoint(i_tpt));
 
-        // and all muon space points
-        MuonEndSpacePoint = ana::Point{geoUp.MaxX(), 0., 0.};
-        art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
-        std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
-        for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
-            MuonSpacePoints.push_back(p_spt->position());
-
-            if (p_spt->position().x() < MuonEndSpacePoint.x)
-                MuonEndSpacePoint = ana::Point{p_spt->position()};
-        }
-        MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoUp.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
+        // // and all muon space points
+        // MuonEndSpacePoint = ana::Point{geoUp.MaxX(), 0., 0.};
+        // art::Ptr<recob::PFParticle> p_pfp = fop_trk2pfp.at(p_trk.key());
+        // std::vector<art::Ptr<recob::SpacePoint>> v_spt_muon = fmp_pfp2spt.at(p_pfp.key());
+        // for (art::Ptr<recob::SpacePoint> const& p_spt : v_spt_muon) {
+        //     MuonSpacePoints.push_back(p_spt->position());
+        //     if (p_spt->position().x() < MuonEndSpacePoint.x)
+        //         MuonEndSpacePoint = ana::Point{p_spt->position()};
+        // }
+        // MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoUp.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         bool has_numu = false, has_nue = false;
@@ -465,38 +462,38 @@ void ana::Fullchecks::analyze(art::Event const& e) {
         else MuonHasMichel = kNoMichel;
 
 
-        // get induction hits nearby muon end point
-        float induction_pitch = 0.765; // cm/channel
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-            if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
+        // // get induction hits nearby muon end point
+        // float induction_pitch = 0.765; // cm/channel
+        // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        //     if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
 
-            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
-            bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
+        //     art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
+        //     bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
-            if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
+        //     if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            if (p_hit->View() == geo::kU) {
-                float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_pitch;
-                float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
-                float dr2 = dz*dz + dt*dt;
+        //     if (p_hit->View() == geo::kU) {
+        //         float dz = (p_hit->Channel() - MuonEndUHit.channel) * induction_pitch;
+        //         float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
+        //         float dr2 = dz*dz + dt*dt;
 
-                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+        //         if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyUHits.push_back(GetHit(*p_hit));
-            }
-            if (p_hit->View() == geo::kV) {
-                float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_pitch;
-                float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
-                float dr2 = dz*dz + dt*dt;
+        //         NearbyUHits.push_back(GetHit(*p_hit));
+        //     }
+        //     if (p_hit->View() == geo::kV) {
+        //         float dz = (p_hit->Channel() - MuonEndVHit.channel) * induction_pitch;
+        //         float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
+        //         float dr2 = dz*dz + dt*dt;
 
-                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+        //         if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyVHits.push_back(GetHit(*p_hit));
-            }
-        }
+        //         NearbyVHits.push_back(GetHit(*p_hit));
+        //     }
+        // }
 
 
-        // get all hits nearby muon end point
+        // get collection hits nearby muon end point
         std::vector<art::Ptr<recob::Hit>> NearbyPHits;
         for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;

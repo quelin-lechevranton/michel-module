@@ -124,15 +124,14 @@ private:
 
     ana::Hits MichelHits, SphereHits;
 
-    float MichelTrueEnergy, MichelHitEnergy, SphereEnergy;
-    unsigned SphereTruePositive, SphereFalsePositive;
-    float SphereEnergyTruePositive, SphereEnergyFalsePositive;
+    float MichelTrueEnergy, MichelHitEnergy, SphereEnergy, TrueSphereEnergy;
+    // unsigned SphereTruePositive, SphereFalsePositive;
+    // float SphereEnergyTruePositive, SphereEnergyFalsePositive;
 
 
     void resetEvent();
     void resetMuon();
 
-    bool IsInUpperVolume(raw::ChannelID_t ch);
     bool IsUpright(recob::Track const& T);
     ana::Hit GetHit(recob::Hit const& hit);
 
@@ -151,10 +150,10 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)), // in ticks
     fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
 {
-    asGeo = &*art::ServiceHandle<geo::Geometry>();
-    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
 
 
     auto const clockData = asDetClocks->DataForJob();
@@ -166,7 +165,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
                             instance    = prod[2],
                             type        = prod[3];
 
-        const art::InputTag tag = art::InputTag(label,instance);
+        const art::InputTag tag = art::InputTag{label,instance};
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
@@ -176,7 +175,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
-        tag_r3d = art::InputTag("reco3d", "");
+        tag_r3d = art::InputTag{"reco3d", ""};
     }
 
     fChannelPitch = geo::WireGeo::WirePitch(
@@ -277,11 +276,12 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
     tMuon->Branch("SphereEnergy", &SphereEnergy); // MeV
+    tMuon->Branch("TrueSphereEnergy", &TrueSphereEnergy); // MeV
 
-    tMuon->Branch("SphereTruePositive", &SphereTruePositive);
-    tMuon->Branch("SphereFalsePositive", &SphereFalsePositive);
-    tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive);
-    tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive);
+    // tMuon->Branch("SphereTruePositive", &SphereTruePositive);
+    // tMuon->Branch("SphereFalsePositive", &SphereFalsePositive);
+    // tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive);
+    // tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive);
 
     MichelHits.SetBranches(tMuon, "Michel");
     SphereHits.SetBranches(tMuon, "Sphere");
@@ -381,13 +381,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         if (!LOG(deephit)) continue;
         MuonEndHit = GetHit(*deephit);
 
-        deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kU);
-        if (!LOG(deephit)) continue;
-        MuonEndUHit = GetHit(*deephit);
+        // !! GetDeepestHit not ready for View != W
 
-        deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kV);
-        if (!LOG(deephit)) continue;
-        MuonEndVHit = GetHit(*deephit);
+        // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kU);
+        // if (!LOG(deephit)) continue;
+        // MuonEndUHit = GetHit(*deephit);
+
+        // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kV);
+        // if (!LOG(deephit)) continue;
+        // MuonEndVHit = GetHit(*deephit);
 
         resetMuon();
             
@@ -540,6 +542,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
 
         // get all hits nearby muon end point
+        Hits TrueSphereHits;
         std::vector<art::Ptr<recob::Hit>> NearbyPHits;
         for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
@@ -555,6 +558,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             } else {
                 if (hit.tpc != MuonEndHit.tpc) continue;
             }
+
+
+
 
             float dz = (hit.space - MuonEndHit.space);
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
@@ -573,6 +579,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
             if (!mcp_michel) continue;
             if (from_track) continue;
+
+            float dzt = (hit.space - MuonTrueEndHit.space);
+            float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
+            float dr2t = dz*dz + dt*dt;
+
+            if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius) {
+                TrueSphereHits.push_back(hit);
+            }
+
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
             SphereHits.push_back(hit);
@@ -580,15 +595,16 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             // checking if the hit is associated to the michel MCParticle
             // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
             // if (std::find(v_hit_michel.begin(), v_hit_michel.end(), &*p_hit) != v_hit_michel.end()) {
-            if (MichelHits.find(*p_hit) != MichelHits.N) {
-                SphereTruePositive++;
-                SphereEnergyTruePositive += hit.adc;
-            } else {
-                SphereFalsePositive++;
-                SphereEnergyFalsePositive += hit.adc;
-            }
+            // if (MichelHits.find(*p_hit) != MichelHits.N) {
+            //     SphereTruePositive++;
+            //     SphereEnergyTruePositive += hit.adc;
+            // } else {
+            //     SphereFalsePositive++;
+            //     SphereEnergyFalsePositive += hit.adc;
+            // }
         } // end of loop over event hits
         SphereEnergy = SphereHits.energy();
+        TrueSphereEnergy = TrueSphereHits.energy();
 
         /*
 
@@ -769,11 +785,12 @@ void ana::Agnochecks::resetMuon() {
 
     SphereHits.clear();
     SphereEnergy = 0;
+    TrueSphereEnergy = 0;
 
-    SphereTruePositive = 0;
-    SphereFalsePositive = 0;
-    SphereEnergyTruePositive = 0;
-    SphereEnergyFalsePositive = 0;
+    // SphereTruePositive = 0;
+    // SphereFalsePositive = 0;
+    // SphereEnergyTruePositive = 0;
+    // SphereEnergyFalsePositive = 0;
 }
 
 ana::Hit ana::Agnochecks::GetHit(recob::Hit const& hit) {
@@ -790,12 +807,7 @@ ana::Hit ana::Agnochecks::GetHit(recob::Hit const& hit) {
         hit.Integral()
     };
 }
-bool ana::Agnochecks::IsInUpperVolume(raw::ChannelID_t ch) {
-    if (ch == raw::InvalidChannelID) return false;
-    // if (geoDet == kPDVD)
-        return ch >= asWire->PlaneWireToChannel(geo::WireID{geo::PlaneID{geo::TPCID{0, 8}, geo::kU}, 0});
-    // return false
-}
+
 bool ana::Agnochecks::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
@@ -823,7 +835,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
 
-                if (IsInUpperVolume(p_hit->Channel())) {
+                if (p_hit->WireID().TPC >= 8) {
                     if (p_hit->PeakTime() > TickUpMax) {
                         TickUpMax = p_hit->PeakTime();
                         HitUpMax = p_hit;
@@ -841,11 +853,35 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             if (HitLowMin) return HitLowMin;
             else if (HitUpMax) return HitUpMax;
             break;
-        
         case kPDHD:
+
+            // double mz, mt, mz2, mt2;
+            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            //     if (p_hit->View() != view) continue;
+
+            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            //     double t = p_hit->PeakTime();
+
+            //     mz += z;
+            //     mt += t;
+            //     mz2 += z*z;
+            //     mt2 += t*t;
+            // }
+
+            // double cov;
+            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            //     if (p_hit->View() != view) continue;
+
+            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            //     double t = p_hit->PeakTime();
+
+            //     cov += z - mz
+
+            // }
+
+
             // searching for max z if increazing else for min z
-            for (unsigned i=0; i<vp_hit.size(); i++) {
-                art::Ptr<recob::Hit> p_hit = vp_hit[i];
+            for (art::Ptr<recob::Hit> p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
 
                 // projection of the track on the Z direction

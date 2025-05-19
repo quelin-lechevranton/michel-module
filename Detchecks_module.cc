@@ -48,8 +48,8 @@ private:
     bool pWireEnds;
     bool pTPCBounds;
     bool pTPCChannels;
-    bool pChannelPitch;
     bool pPlaneAxis;
+    bool pChannelPitch;
     bool pCollectionZ;
     bool pViewUCoord;
     bool pViewVCoord;
@@ -65,6 +65,13 @@ private:
 
 ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
+
+    asGeo(&*art::ServiceHandle<geo::Geometry>()),
+    asWire(&art::ServiceHandle<geo::WireReadout>()->Get()),
+    asDetProp(&*art::ServiceHandle<detinfo::DetectorPropertiesService>()),
+    asLarProp(&*art::ServiceHandle<detinfo::LArPropertiesService>()),
+    asDetClocks(&*art::ServiceHandle<detinfo::DetectorClocksService>()),
+
     pWireGeo(p.get<bool>("WireGeo", false)),
     pWireEnds(p.get<bool>("WireEnds", false)),
     pTPCBounds(p.get<bool>("TPCBounds", false)),
@@ -75,16 +82,10 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     pViewUCoord(p.get<bool>("ViewUCoord", false)),
     pViewVCoord(p.get<bool>("ViewVCoord", false))
 
-
     // fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
     // fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
 {
     // Basic Utilities
-    asGeo = &*art::ServiceHandle<geo::Geometry>();
-    asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
-    asLarProp = &*art::ServiceHandle<detinfo::LArPropertiesService>();
 }
 
 void ana::Detchecks::analyze(art::Event const& e)
@@ -305,7 +306,7 @@ void ana::Detchecks::beginJob()
                 int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
                 int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
 
-                std::cout << "\t{{" << t << ", " << p << "}, {" << dy << ", " << dz << ", " << w0.ThetaZ() << "}}," << std::endl;
+                std::cout << "\t{{" << t << ", " << p << "}, {" << dy << ", " << dz << ", " << w0.ThetaZ(true) << "}}," << std::endl;
             }
         }
     }
