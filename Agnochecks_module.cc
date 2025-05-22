@@ -97,8 +97,8 @@ private:
     enum EnumIsBroken { kBadAssociation=-1, kBroken, kLastOfBroken, kNotBroken };
     ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
-    ana::Point MuonTrueEndPoint;    
-    float MuonTrueEndPointT;
+    // ana::Point MuonTrueEndPoint;    
+    // float MuonTrueEndPointT;
     ana::Point MuonTrueEndMomentum;
     float MuonTrueEndEnergy;
     ana::Points MuonSpacePoints;
@@ -134,11 +134,14 @@ private:
 
     bool IsUpright(recob::Track const& T);
     ana::Hit GetHit(art::Ptr<recob::Hit> const p_hit);
-
     art::Ptr<recob::Hit> GetDeepestHit(
-        std::vector<art::Ptr<recob::Hit>>,
+        std::vector<art::Ptr<recob::Hit>> const&,
         bool increazing_z,
         geo::View_t = geo::kW
+    );
+    ana::Hit GetTrueEndHit(
+        std::vector<art::Ptr<recob::Hit>> const&,
+        ana::Point
     );
 };
 
@@ -290,8 +293,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
     MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
-    MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
-    tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT); // ns
+    // MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
+    // tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT); // ns
     tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x); // GeV
     tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y); // GeV
     tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z); // GeV
@@ -399,7 +402,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             increasing_z = p_trk->Start().Z() > p_trk->End().Z();
         }
 
-        art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon, increasing_z);
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(
+            ana::mcp2hits(mcp, vp_hit, clockData, false),
+            mcp->EndZ() > mcp->Vz()
+        );
+        if (!LOG(deephit)) continue;
+        MuonTrueEndHit = GetHit(deephit);
+
+        deephit = GetDeepestHit(vp_hit_muon, increasing_z);
         if (!LOG(deephit)) continue;
         MuonEndHit = GetHit(deephit);
 
@@ -458,21 +468,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         } else MuonTrackIsNotBroken = kBadAssociation;
 
         MuonEndProcess = mcp->EndProcess();
-        MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
-        double min_dz = std::numeric_limits<double>::max();
-        art::Ptr<recob::Hit> p_min_dz{};
-        for (art::Ptr<recob::Hit> p_hit : ana::mcp2hits(mcp, vp_hit, clockData, false)) {
-            if (p_hit->View() != geo::kW) continue;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            double dz = abs(z - MuonTrueEndPoint.z);
-            if (min_dz > dz) {
-                min_dz = dz;
-                p_min_dz = p_hit;
-            }
-        }
-        MuonTrueEndHit = GetHit(p_min_dz);
-
-        MuonTrueEndPointT = mcp->EndT();
+        // MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
+        // MuonTrueEndPointT = mcp->EndT();
         MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
         MuonTrueEndEnergy = mcp->EndE();
 
@@ -859,7 +856,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 
 
 art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
-    std::vector<art::Ptr<recob::Hit>> vp_hit,
+    std::vector<art::Ptr<recob::Hit>> const& vp_hit,
     bool increasing_z,
     geo::View_t view
 ) {
@@ -893,16 +890,21 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
     } else if (geoDet == kPDHD) {
 
         // test if the muon crosses the cathod
+        unsigned n_left=0, n_right=0;
         double mz_left=0, mz_right=0;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            if (tpc == 1 || tpc == 5)
+            if (tpc == 1 || tpc == 5) {
                 mz_left += z;
-            else if (tpc == 2 || tpc == 6)
+                n_left ++;
+            } else if (tpc == 2 || tpc == 6) {
                 mz_right += z;
+                n_right ++;
+            }
         }
+        mz_left /= n_left; mz_right /= n_right;
         std::pair<unsigned, unsigned> tpcs;
         if (
             (increasing_z && mz_left > mz_right)
@@ -984,6 +986,22 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         return DeepestHit;
     }
     return art::Ptr<recob::Hit>{};
+}
+
+ana::Hit ana::Agnochecks::GetTrueEndHit( std::vector<art::Ptr<recob::Hit>> const& vp_hit, ana::Point end_z) {
+    double min_dz = std::numeric_limits<double>::max();
+    art::Ptr<recob::Hit> p_min_dz{};
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+        double dz = abs(z - end_z);
+        if (min_dz > dz) {
+            min_dz = dz;
+            p_min_dz = p_hit;
+        }
+    }
+    std::cout << min_dz << std::endl;
+    return GetHit(p_min_dz);
 }
 
 DEFINE_ART_MODULE(ana::Agnochecks)
