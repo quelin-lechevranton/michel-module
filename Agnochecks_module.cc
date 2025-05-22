@@ -139,10 +139,6 @@ private:
         bool increazing_z,
         geo::View_t = geo::kW
     );
-    ana::Hit GetTrueEndHit(
-        std::vector<art::Ptr<recob::Hit>> const&,
-        ana::Point
-    );
 };
 
 
@@ -944,6 +940,8 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         art::Ptr<recob::Hit> DeepestHit;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            if (tpc != tpcs.first && tpc != tpcs.second) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
 
@@ -988,20 +986,20 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
     return art::Ptr<recob::Hit>{};
 }
 
-ana::Hit ana::Agnochecks::GetTrueEndHit( std::vector<art::Ptr<recob::Hit>> const& vp_hit, ana::Point end_z) {
-    double min_dz = std::numeric_limits<double>::max();
-    art::Ptr<recob::Hit> p_min_dz{};
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        if (p_hit->View() != geo::kW) continue;
-        double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-        double dz = abs(z - end_z);
-        if (min_dz > dz) {
-            min_dz = dz;
-            p_min_dz = p_hit;
-        }
-    }
-    std::cout << min_dz << std::endl;
-    return GetHit(p_min_dz);
-}
+// ana::Hit ana::Agnochecks::GetTrueEndHit( std::vector<art::Ptr<recob::Hit>> const& vp_hit, ana::Point end_z) {
+//     double min_dz = std::numeric_limits<double>::max();
+//     art::Ptr<recob::Hit> p_min_dz{};
+//     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         if (p_hit->View() != geo::kW) continue;
+//         double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+//         double dz = abs(z - end_z);
+//         if (min_dz > dz) {
+//             min_dz = dz;
+//             p_min_dz = p_hit;
+//         }
+//     }
+//     std::cout << min_dz << std::endl;
+//     return GetHit(p_min_dz);
+// }
 
 DEFINE_ART_MODULE(ana::Agnochecks)
