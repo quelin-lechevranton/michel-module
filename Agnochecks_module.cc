@@ -858,108 +858,99 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 ) {
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
 
-    // PDVD
+    if (geoDet == kPDVD) {
+        float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
+        art::Ptr<recob::Hit> HitUpMax, HitLowMin;
 
-    // PDHD
+        // tacking min of ticks in lower volume and max of ticks in upper volume
+        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
 
-    switch (geoDet) {
-        case kPDVD:
-            float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-            art::Ptr<recob::Hit> HitUpMax, HitLowMin;
-
-            // tacking min of ticks in lower volume and max of ticks in upper volume
-            for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-                if (p_hit->View() != view) continue;
-
-                if (p_hit->WireID().TPC >= 8) {
-                    if (p_hit->PeakTime() > TickUpMax) {
-                        TickUpMax = p_hit->PeakTime();
-                        HitUpMax = p_hit;
-                    }
-                } else {
-                    if (p_hit->PeakTime() < TickLowMin) {
-                        TickLowMin = p_hit->PeakTime();
-                        HitLowMin = p_hit;
-                    }
+            if (p_hit->WireID().TPC >= 8) {
+                if (p_hit->PeakTime() > TickUpMax) {
+                    TickUpMax = p_hit->PeakTime();
+                    HitUpMax = p_hit;
+                }
+            } else {
+                if (p_hit->PeakTime() < TickLowMin) {
+                    TickLowMin = p_hit->PeakTime();
+                    HitLowMin = p_hit;
                 }
             }
+        }
 
-            // if there is hits in lower volume, muon end is in upper volume
-            // else muon end is in upper volume
-            if (HitLowMin) return HitLowMin;
-            else if (HitUpMax) return HitUpMax;
-            break;
-        case kPDHD:
-            art::Ptr<recob::Hit> DeepestHit;
+        // if there is hits in lower volume, muon end is in upper volume
+        // else muon end is in upper volume
+        if (HitLowMin) return HitLowMin;
+        else if (HitUpMax) return HitUpMax;
+    } else if (geoDet == kPDHD) {
+        art::Ptr<recob::Hit> DeepestHit;
 
-            unsigned n=0;
-            double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
-            for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-                if (p_hit->View() != view) continue;
-                double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-                double t = p_hit->PeakTime();
-                mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
-                n++;
-            }
-            mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
-            double cov = mzt - mz*mt;
-            double varz = mz2 - mz*mz;
+        unsigned n=0;
+        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double t = p_hit->PeakTime();
+            mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
+            n++;
+        }
+        mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
+        double cov = mzt - mz*mt;
+        double varz = mz2 - mz*mz;
 
-            // t ~ m*z + p
-            double m = cov / varz;
-            double p = mt - m*mz;
+        // t ~ m*z + p
+        double m = cov / varz;
+        double p = mt - m*mz;
 
-            double extrem_s = increasing_z ?
-                extrem_s = std::numeric_limits<double>::lowest() // search max_s
-                : extrem_s = std::numeric_limits<double>::max(); // search min_s
+        double extrem_s = increasing_z ?
+            std::numeric_limits<double>::lowest() // search max_s
+            : std::numeric_limits<double>::max(); // search min_s
 
-            for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-                if (p_hit->View() != view) continue;
-                double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-                double t = p_hit->PeakTime();
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double t = p_hit->PeakTime();
 
-                // projection on the axis of the track
-                double s = (z - m*(t-p)) / (1 + m*m);
-                if (increasing_z) {
-                    if (extrem_s < s) {
-                        extrem_s = s;
-                        DeepestHit = p_hit;
-                    }
-                } else {
-                    if (extrem_s > s) {
-                        extrem_s = s;
-                        DeepestHit = p_hit;
-                    }
+            // projection on the axis of the track
+            double s = (z - m*(t-p)) / (1 + m*m);
+            if (increasing_z) {
+                if (extrem_s < s) {
+                    extrem_s = s;
+                    DeepestHit = p_hit;
+                }
+            } else {
+                if (extrem_s > s) {
+                    extrem_s = s;
+                    DeepestHit = p_hit;
                 }
             }
+        }
 
-            // double mz = increasing_z ?
-            //     std::numeric_limits<double>::lowest()
-            //     : std::numeric_limits<double>::max();
-            // // searching for max z if increazing else for min z
-            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-            //     if (p_hit->View() != view) continue;
+        // double mz = increasing_z ?
+        //     std::numeric_limits<double>::lowest()
+        //     : std::numeric_limits<double>::max();
+        // // searching for max z if increazing else for min z
+        // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        //     if (p_hit->View() != view) continue;
 
-            //     // projection of the track on the Z direction
-            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
-            //     if (increasing_z) {
-            //         if (mz < z) {
-            //             mz = z;
-            //             DeepestHit = p_hit;
-            //         }
-            //     } else {
-            //         if (mz > z) {
-            //             mz = z;
-            //             DeepestHit = p_hit;
-            //         }
-            //     }
-            // }
-            return DeepestHit;
-        default: break;
+        //     // projection of the track on the Z direction
+        //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
+        //     if (increasing_z) {
+        //         if (mz < z) {
+        //             mz = z;
+        //             DeepestHit = p_hit;
+        //         }
+        //     } else {
+        //         if (mz > z) {
+        //             mz = z;
+        //             DeepestHit = p_hit;
+        //         }
+        //     }
+        // }
+        return DeepestHit;
     }
     return art::Ptr<recob::Hit>{};
 }
-
-
 
 DEFINE_ART_MODULE(ana::Agnochecks)
