@@ -36,14 +36,11 @@ private:
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
 
-    int geoDet;
-    enum EnumDet { kPDVD, kPDHD };
-
-    // geo::BoxBoundedGeo geoUp, geoLow;
-
-    // protoana::ProtoDUNETruthUtils truthUtil;
     // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+
+    int geoDet;
+    enum EnumDet { kPDVD, kPDHD };
 
     // Detector Properties
     // float fADC2MeV;
@@ -188,9 +185,6 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
-    // geoLow = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, 0}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2-1}).Max()};
-    // geoUp = geo::BoxBoundedGeo{asGeo->TPC(geo::TPCID{0, asGeo->NTPC()/2}).Min(), asGeo->TPC(geo::TPCID{0, asGeo->NTPC()-1}).Max()};
-
 
     for (unsigned t=0; t<asGeo->NTPC(); t++) {
         for (unsigned p=0; p<asWire->Nplanes(); p++) {
@@ -202,14 +196,14 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
             int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
 
             plane2axis[pid] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
-
             plane2pitch[pid] = geo::WireGeo::WirePitch(w0, w1);
         }
     }
 
-
-    if (asGeo->DetectorName().find("vd") != std::string::npos) geoDet = kPDVD;
-    else if (asGeo->DetectorName().find("hd") != std::string::npos) geoDet = kPDHD;
+    if (asGeo->DetectorName().find("vd") != std::string::npos)
+        geoDet = kPDVD;
+    else if (asGeo->DetectorName().find("hd") != std::string::npos)
+        geoDet = kPDHD;
     else {
         std::cout << "\033[1;91m" "unknown geometry: " << asGeo->DetectorName() << "\033[0m" << std::endl;
         exit(1);
@@ -221,8 +215,6 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
         << "  Tick Window: " << wireWindow << std::endl;
-        // << "  Upper Bounds: " << geoUp.Min() << " -> " << geoUp.Max() << std::endl
-        // << "  Lower Bounds: " << geoLow.Min() << " -> " << geoLow.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelSpaceRadius << " cm (" << fMichelTickRadius << " ticks)" << std::endl
@@ -325,7 +317,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
-
 
     auto const & vh_r3d = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_r3d);
     std::vector<art::Ptr<recob::SpacePoint>> vp_r3d;
@@ -855,49 +846,68 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             break;
         case kPDHD:
 
-            // double mz, mt, mz2, mt2;
-            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-            //     if (p_hit->View() != view) continue;
-
-            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            //     double t = p_hit->PeakTime();
-
-            //     mz += z;
-            //     mt += t;
-            //     mz2 += z*z;
-            //     mt2 += t*t;
-            // }
-
-            // double cov;
-            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-            //     if (p_hit->View() != view) continue;
-
-            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            //     double t = p_hit->PeakTime();
-
-            //     cov += z - mz
-
-            // }
-
-
-            // searching for max z if increazing else for min z
+            unsigned n;
+            double mz, mt, mz2, mt2, mzt;
             for (art::Ptr<recob::Hit> p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
+                double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+                double t = p_hit->PeakTime();
+                mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
+                n++;
+            }
+            mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
 
-                // projection of the track on the Z direction
-                double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
+            double cov = mzt - mz*mt;
+            double varz = mz2 - mz*mz;
+
+            // t ~ m*z + p
+            double m = cov / varz;
+            double p = mt - m*mz;
+
+            double extrem_s;
+            if (increasing_z)
+                extrem_s = std::numeric_limits<double>::lowest(); // search max_s
+            else
+                extrem_s = std::numeric_limits<double>::max(); // search min_s
+
+            for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+                if (p_hit->View() != view) continue;
+                double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+                double t = p_hit->PeakTime();
+
+                // projection on the axis of the track
+                double s = (z - m*(t-p)) / (1 + m*m);
                 if (increasing_z) {
-                    if (mz < z) {
-                        mz = z;
+                    if (extrem_s < s) {
+                        extrem_s = s;
                         DeepestHit = p_hit;
                     }
                 } else {
-                    if (mz > z) {
-                        mz = z;
+                    if (extrem_s > s) {
+                        extrem_s = s;
                         DeepestHit = p_hit;
                     }
                 }
             }
+
+            // // searching for max z if increazing else for min z
+            // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            //     if (p_hit->View() != view) continue;
+
+            //     // projection of the track on the Z direction
+            //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
+            //     if (increasing_z) {
+            //         if (mz < z) {
+            //             mz = z;
+            //             DeepestHit = p_hit;
+            //         }
+            //     } else {
+            //         if (mz > z) {
+            //             mz = z;
+            //             DeepestHit = p_hit;
+            //         }
+            //     }
+            // }
             return DeepestHit;
     }
     return art::Ptr<recob::Hit>{};
