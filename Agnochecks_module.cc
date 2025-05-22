@@ -35,6 +35,7 @@ private:
     const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
+    geo::BoxBoundedGeo geoHighX, geoLowX;
 
     // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
@@ -59,7 +60,9 @@ private:
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
-    art::InputTag tag_mcp, tag_sed, tag_wir, tag_hit, tag_clu, tag_trk, tag_spt, tag_pfp, tag_r3d;
+    art::InputTag tag_mcp, tag_sed, tag_wir,
+        tag_hit, tag_clu, tag_trk,
+        tag_spt, tag_pfp, tag_r3d;
 
     // Input Parameters
     bool fLog;
@@ -132,7 +135,11 @@ private:
     bool IsUpright(recob::Track const& T);
     ana::Hit GetHit(recob::Hit const& hit);
 
-    art::Ptr<recob::Hit> GetDeepestHit(std::vector<art::Ptr<recob::Hit>>, bool, geo::View_t = geo::kW);
+    art::Ptr<recob::Hit> GetDeepestHit(
+        std::vector<art::Ptr<recob::Hit>>,
+        bool increazing_z,
+        geo::View_t = geo::kW
+    );
 };
 
 
@@ -175,6 +182,16 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         tag_r3d = art::InputTag{"reco3d", ""};
     }
 
+    if (asGeo->DetectorName().find("vd") != std::string::npos)
+        geoDet = kPDVD;
+    else if (asGeo->DetectorName().find("hd") != std::string::npos)
+        geoDet = kPDHD;
+    else {
+        std::cout << "\033[1;91m" "unknown geometry: "
+            << asGeo->DetectorName() << "\033[0m" << std::endl;
+        exit(1);
+    }
+
     fChannelPitch = geo::WireGeo::WirePitch(
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0}),
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1})
@@ -185,6 +202,29 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    switch (geoDet) {
+        case kPDVD:
+            geoLowX = geo::BoxBoundedGeo{
+                asGeo->TPC(geo::TPCID{0, 0}).Min(), 
+                asGeo->TPC(geo::TPCID{0, 7}).Max()
+            };
+            geoHighX = geo::BoxBoundedGeo{
+                asGeo->TPC(geo::TPCID{0, 8}).Min(),
+                asGeo->TPC(geo::TPCID{0, 15}).Max()
+            };
+            break;
+        case kPDHD:
+            geoLowX = geo::BoxBoundedGeo{
+                asGeo->TPC(geo::TPCID{0, 1}).Min(),
+                asGeo->TPC(geo::TPCID{0, 5}).Max()
+            };
+            geoHighX = geo::BoxBoundedGeo{
+                asGeo->TPC(geo::TPCID{0, 2}).Min(),
+                asGeo->TPC(geo::TPCID{0, 6}).Max()
+            };
+            break;
+        default: break;
+    }
 
     for (unsigned t=0; t<asGeo->NTPC(); t++) {
         for (unsigned p=0; p<asWire->Nplanes(); p++) {
@@ -200,24 +240,19 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         }
     }
 
-    if (asGeo->DetectorName().find("vd") != std::string::npos)
-        geoDet = kPDVD;
-    else if (asGeo->DetectorName().find("hd") != std::string::npos)
-        geoDet = kPDHD;
-    else {
-        std::cout << "\033[1;91m" "unknown geometry: " << asGeo->DetectorName() << "\033[0m" << std::endl;
-        exit(1);
-    }
-
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
-        << "  Detector: " << std::vector<std::string>{"PDVD", "PDHD"}[geoDet] << " (" << asGeo->DetectorName() << ")" << std::endl
+        << "  Detector: " << std::vector<std::string>{"PDVD", "PDHD"}[geoDet]
+        << " (" << asGeo->DetectorName() << ")" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
-        << "  Tick Window: " << wireWindow << std::endl;
+        << "  Tick Window: " << wireWindow << std::endl
+        << "  HighX Bounds: " << geoHighX.Min() << " -> " << geoHighX.Max() << std::endl
+        << "  LowX Bounds: " << geoLowX.Min() << " -> " << geoLowX.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
-        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm (" << fMichelTickRadius << " ticks)" << std::endl
+        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm"
+        << " (" << fMichelTickRadius << " ticks)" << std::endl
         << "  Nearby Space Radius: " << fNearbySpaceRadius << " cm" << std::endl
         << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
 
@@ -343,14 +378,16 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // no short tracks
         if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
 
-        // simb::MCParticle const* mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
 
         // tracks associated to a MCTruth muon
         if (!mcp) continue;
         if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        art::Ptr<recob::Hit> deephit = GetDeepestHit(ana::mcp2hits(mcp, vp_hit, clockData, false), mcp->EndZ() > mcp->Vz()); 
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(
+            ana::mcp2hits(mcp, vp_hit, clockData, false), 
+            mcp->EndZ() > mcp->Vz()
+        ); 
         if (!LOG(deephit)) continue;
         MuonTrueEndHit = GetHit(*deephit);
 
@@ -373,7 +410,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         MuonEndHit = GetHit(*deephit);
 
         // !! GetDeepestHit not ready for View != W
-
         // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kU);
         // if (!LOG(deephit)) continue;
         // MuonEndUHit = GetHit(*deephit);
@@ -386,8 +422,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             
         // fiducial cuts
         MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
-        // MuonEndIsInVolumeYZ = geoUp.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius) and geoUp.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
-        MuonEndIsInVolumeYZ = true;
+        MuonEndIsInVolumeYZ = geoHighX.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius)
+            && geoHighX.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
 
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
@@ -413,9 +449,13 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 bool IsDeepestTrack = true;
                 for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
                     if (geoDet == kPDVD)
-                        IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X() && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+                        IsDeepestTrack = IsDeepestTrack
+                            && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X()
+                            && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
                     else if (geoDet == kPDHD)
-                        IsDeepestTrack = IsDeepestTrack && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y() && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
+                        IsDeepestTrack = IsDeepestTrack
+                            && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y()
+                            && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
                 if (IsDeepestTrack)
                     MuonTrackIsNotBroken = kLastOfBroken;
                 else
@@ -455,7 +495,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         //     if (p_spt->position().x() < MuonEndSpacePoint.x)
         //         MuonEndSpacePoint = ana::Point{p_spt->position()};
         // }
-        // MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoUp.MaxX() and abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
+        // MuonEndHasGood3DAssociation = MuonEndSpacePoint.x != geoUp.MaxX()
+        //     && abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         bool has_numu = false, has_nue = false;
@@ -468,12 +509,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 case 14: has_numu = true; break;
                 case 12: has_nue = true; break;
                 case 11: mcp_michel = mcp_dau; break;
+                default: break;
             }
         }
         if (mcp_michel and has_numu and has_nue) {
             bool isin = false;
             for (unsigned t=0; t<asGeo->NTPC(); t++) {
-                isin = isin || asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
+                isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
+                if (isin) break;
             }
             if (isin)
                 MuonHasMichel = kHasMichelInside; 
@@ -573,11 +616,10 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
             float dzt = (hit.space - MuonTrueEndHit.space);
             float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
-            float dr2t = dz*dz + dt*dt;
-
-            if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius) {
+            float dr2t = dzt*dzt + dtt*dtt;
+            if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
                 TrueSphereHits.push_back(hit);
-            }
+
 
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
@@ -809,19 +851,22 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 
 
 
-art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::Hit>> vp_hit, bool increasing_z, geo::View_t view) {
+art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
+    std::vector<art::Ptr<recob::Hit>> vp_hit,
+    bool increasing_z,
+    geo::View_t view
+) {
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
 
     // PDVD
-    float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-    art::Ptr<recob::Hit> HitUpMax, HitLowMin;
 
     // PDHD
-    art::Ptr<recob::Hit> DeepestHit;
-    double mz = increasing_z ? std::numeric_limits<double>::min() : std::numeric_limits<double>::max();
 
     switch (geoDet) {
         case kPDVD:
+            float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
+            art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+
             // tacking min of ticks in lower volume and max of ticks in upper volume
             for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
@@ -845,9 +890,10 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             else if (HitUpMax) return HitUpMax;
             break;
         case kPDHD:
+            art::Ptr<recob::Hit> DeepestHit;
 
-            unsigned n;
-            double mz, mt, mz2, mt2, mzt;
+            unsigned n=0;
+            double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
             for (art::Ptr<recob::Hit> p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
                 double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
@@ -856,7 +902,6 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
                 n++;
             }
             mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
-
             double cov = mzt - mz*mt;
             double varz = mz2 - mz*mz;
 
@@ -864,11 +909,9 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             double m = cov / varz;
             double p = mt - m*mz;
 
-            double extrem_s;
-            if (increasing_z)
-                extrem_s = std::numeric_limits<double>::lowest(); // search max_s
-            else
-                extrem_s = std::numeric_limits<double>::max(); // search min_s
+            double extrem_s = increasing_z ?
+                extrem_s = std::numeric_limits<double>::lowest() // search max_s
+                : extrem_s = std::numeric_limits<double>::max(); // search min_s
 
             for (art::Ptr<recob::Hit> p_hit : vp_hit) {
                 if (p_hit->View() != view) continue;
@@ -890,6 +933,9 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
                 }
             }
 
+            // double mz = increasing_z ?
+            //     std::numeric_limits<double>::lowest()
+            //     : std::numeric_limits<double>::max();
             // // searching for max z if increazing else for min z
             // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             //     if (p_hit->View() != view) continue;
@@ -909,6 +955,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(std::vector<art::Ptr<recob::
             //     }
             // }
             return DeepestHit;
+        default: break;
     }
     return art::Ptr<recob::Hit>{};
 }

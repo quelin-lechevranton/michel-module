@@ -69,8 +69,8 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     asGeo(&*art::ServiceHandle<geo::Geometry>()),
     asWire(&art::ServiceHandle<geo::WireReadout>()->Get()),
     asDetProp(&*art::ServiceHandle<detinfo::DetectorPropertiesService>()),
-    asLarProp(&*art::ServiceHandle<detinfo::LArPropertiesService>()),
     asDetClocks(&*art::ServiceHandle<detinfo::DetectorClocksService>()),
+    asLarProp(&*art::ServiceHandle<detinfo::LArPropertiesService>()),
 
     pWireGeo(p.get<bool>("WireGeo", false)),
     pWireEnds(p.get<bool>("WireEnds", false)),
