@@ -858,6 +858,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 ) {
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
 
+    art::Ptr<recob::Hit> DeepestHit;
     if (geoDet == kPDVD) {
         // float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
         // art::Ptr<recob::Hit> HitUpMax, HitLowMin;
@@ -897,75 +898,49 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 
         // basic linear regression on the hits that are in the last volume
         unsigned n=0;
-        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        double mz=0, mt=0, mt2=0, mzt=0;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             if (in_bot && tpc >= 8) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
-            mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
+            mz += z; mt += t; mt2 += t*t, mzt += z*t;
             n++;
         }
-        mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
+        mz /= n; mt /= n; mt2 /= n; mzt /= n;
         double cov = mzt - mz*mt;
-        double varz = mz2 - mz*mz;
+        double vart = mt2 - mt*mt;
 
-        // t ~ m*z + p
-        double m = cov / varz;
-        double p = mt - m*mz;
+        // z ~ m*t + p
+        double m = cov / vart;
+        double p = mz - m*mt;
 
-        double extrem_s = increasing_z ?
-            std::numeric_limits<double>::lowest() // search max_s
-            : std::numeric_limits<double>::max(); // search min_s
+        double extrem_s = in_bot ?
+            std::numeric_limits<double>::max() // search min_s
+            : std::numeric_limits<double>::lowest(); // search max_s
 
-        art::Ptr<recob::Hit> DeepestHit;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
-            if (tpc != tpcs.first && tpc != tpcs.second) continue;
+            if (in_bot && tpc >= 8) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
 
             // projection on the axis of the track
-            double s = (z + m*(t-p)) / (1 + m*m);
-            if (increasing_z) {
-                if (extrem_s < s) {
+            double s = (t + m*(z-p)) / (1 + m*m);
+            if (in_bot) {
+                if (extrem_s > s) {
                     extrem_s = s;
                     DeepestHit = p_hit;
                 }
             } else {
-                if (extrem_s > s) {
+                if (extrem_s < s) {
                     extrem_s = s;
                     DeepestHit = p_hit;
                 }
             }
         }
-
-        // double mz = increasing_z ?
-        //     std::numeric_limits<double>::lowest()
-        //     : std::numeric_limits<double>::max();
-        // // searching for max z if increazing else for min z
-        // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        //     if (p_hit->View() != view) continue;
-
-        //     // projection of the track on the Z direction
-        //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
-        //     if (increasing_z) {
-        //         if (mz < z) {
-        //             mz = z;
-        //             DeepestHit = p_hit;
-        //         }
-        //     } else {
-        //         if (mz > z) {
-        //             mz = z;
-        //             DeepestHit = p_hit;
-        //         }
-        //     }
-        // }
-        return DeepestHit;
-
-
     } else if (geoDet == kPDHD) {
 
         // test if the muon crosses the cathod
@@ -998,17 +973,17 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 
         // basic linear regression on the hits that are in the last volume
         unsigned n=0;
-        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        double mz=0, mt=0, mz2=0, mzt=0;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             if (tpc != tpcs.first && tpc != tpcs.second) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
-            mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
+            mz += z; mt += t; mz2 += z*z; mzt += z*t;
             n++;
         }
-        mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
+        mz /= n; mt /= n; mz2 /= n; mzt /= n;
         double cov = mzt - mz*mt;
         double varz = mz2 - mz*mz;
 
@@ -1042,31 +1017,8 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
                 }
             }
         }
-
-        // double mz = increasing_z ?
-        //     std::numeric_limits<double>::lowest()
-        //     : std::numeric_limits<double>::max();
-        // // searching for max z if increazing else for min z
-        // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        //     if (p_hit->View() != view) continue;
-
-        //     // projection of the track on the Z direction
-        //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
-        //     if (increasing_z) {
-        //         if (mz < z) {
-        //             mz = z;
-        //             DeepestHit = p_hit;
-        //         }
-        //     } else {
-        //         if (mz > z) {
-        //             mz = z;
-        //             DeepestHit = p_hit;
-        //         }
-        //     }
-        // }
-        return DeepestHit;
     }
-    return art::Ptr<recob::Hit>{};
+    return DeepestHit;
 }
 
 // ana::Hit ana::Agnochecks::GetTrueEndHit( std::vector<art::Ptr<recob::Hit>> const& vp_hit, ana::Point end_z) {
