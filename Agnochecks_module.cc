@@ -859,30 +859,113 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
 
     if (geoDet == kPDVD) {
-        float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-        art::Ptr<recob::Hit> HitUpMax, HitLowMin;
+        // float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
+        // art::Ptr<recob::Hit> HitUpMax, HitLowMin;
 
-        // tacking min of ticks in lower volume and max of ticks in upper volume
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        // // tacking min of ticks in lower volume and max of ticks in upper volume
+        // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        //     if (p_hit->View() != view) continue;
+
+        //     if (p_hit->WireID().TPC >= 8) {
+        //         if (p_hit->PeakTime() > TickUpMax) {
+        //             TickUpMax = p_hit->PeakTime();
+        //             HitUpMax = p_hit;
+        //         }
+        //     } else {
+        //         if (p_hit->PeakTime() < TickLowMin) {
+        //             TickLowMin = p_hit->PeakTime();
+        //             HitLowMin = p_hit;
+        //         }
+        //     }
+        // }
+
+        // // if there is hits in lower volume, muon end is in upper volume
+        // // else muon end is in upper volume
+        // if (HitLowMin) return HitLowMin;
+        // else if (HitUpMax) return HitUpMax;
+
+        // test if the muon goes into the bottom volume
+        bool in_bot = false;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            if (tpc < 8) {
+                bool in_bot = true;
+                break;
+            }
+        }
 
-            if (p_hit->WireID().TPC >= 8) {
-                if (p_hit->PeakTime() > TickUpMax) {
-                    TickUpMax = p_hit->PeakTime();
-                    HitUpMax = p_hit;
+        // basic linear regression on the hits that are in the last volume
+        unsigned n=0;
+        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            if (in_bot && tpc >= 8) continue;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double t = p_hit->PeakTime();
+            mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
+            n++;
+        }
+        mz /= n; mt /= n; mz2 /= n; mt2 /= n; mzt /= n;
+        double cov = mzt - mz*mt;
+        double varz = mz2 - mz*mz;
+
+        // t ~ m*z + p
+        double m = cov / varz;
+        double p = mt - m*mz;
+
+        double extrem_s = increasing_z ?
+            std::numeric_limits<double>::lowest() // search max_s
+            : std::numeric_limits<double>::max(); // search min_s
+
+        art::Ptr<recob::Hit> DeepestHit;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            if (tpc != tpcs.first && tpc != tpcs.second) continue;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double t = p_hit->PeakTime();
+
+            // projection on the axis of the track
+            double s = (z + m*(t-p)) / (1 + m*m);
+            if (increasing_z) {
+                if (extrem_s < s) {
+                    extrem_s = s;
+                    DeepestHit = p_hit;
                 }
             } else {
-                if (p_hit->PeakTime() < TickLowMin) {
-                    TickLowMin = p_hit->PeakTime();
-                    HitLowMin = p_hit;
+                if (extrem_s > s) {
+                    extrem_s = s;
+                    DeepestHit = p_hit;
                 }
             }
         }
 
-        // if there is hits in lower volume, muon end is in upper volume
-        // else muon end is in upper volume
-        if (HitLowMin) return HitLowMin;
-        else if (HitUpMax) return HitUpMax;
+        // double mz = increasing_z ?
+        //     std::numeric_limits<double>::lowest()
+        //     : std::numeric_limits<double>::max();
+        // // searching for max z if increazing else for min z
+        // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        //     if (p_hit->View() != view) continue;
+
+        //     // projection of the track on the Z direction
+        //     double z = asWire->Wire(p_hit->WireID()).GetCenter().Z(); 
+        //     if (increasing_z) {
+        //         if (mz < z) {
+        //             mz = z;
+        //             DeepestHit = p_hit;
+        //         }
+        //     } else {
+        //         if (mz > z) {
+        //             mz = z;
+        //             DeepestHit = p_hit;
+        //         }
+        //     }
+        // }
+        return DeepestHit;
+
+
     } else if (geoDet == kPDHD) {
 
         // test if the muon crosses the cathod
