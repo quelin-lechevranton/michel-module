@@ -133,7 +133,7 @@ private:
     void resetMuon();
 
     bool IsUpright(recob::Track const& T);
-    ana::Hit GetHit(recob::Hit const& hit);
+    ana::Hit GetHit(art::Ptr<recob::Hit> const p_hit);
 
     art::Ptr<recob::Hit> GetDeepestHit(
         std::vector<art::Ptr<recob::Hit>>,
@@ -360,11 +360,12 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
     resetEvent();
 
-    for (recob::Hit const& hit : *vh_hit) {
-        switch (hit.View()) {
-            case geo::kU: EventUHits.push_back(GetHit(hit)); break;
-            case geo::kV: EventVHits.push_back(GetHit(hit)); break;
-            case geo::kW: EventHits.push_back(GetHit(hit)); break;
+    // for (recob::Hit const& hit : *vh_hit) {
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        switch (p_hit->View()) {
+            case geo::kU: EventUHits.push_back(GetHit(p_hit)); break;
+            case geo::kV: EventVHits.push_back(GetHit(p_hit)); break;
+            case geo::kW: EventHits.push_back(GetHit(p_hit)); break;
             default: break;
         }
     }
@@ -384,13 +385,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         if (!mcp) continue;
         if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        art::Ptr<recob::Hit> deephit = GetDeepestHit(
-            ana::mcp2hits(mcp, vp_hit, clockData, false), 
-            mcp->EndZ() > mcp->Vz()
-        ); 
-        if (!LOG(deephit)) continue;
-        MuonTrueEndHit = GetHit(*deephit);
-
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         if (!LOG(vp_hit_muon.size())) continue;
@@ -405,18 +399,18 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             increasing_z = p_trk->Start().Z() > p_trk->End().Z();
         }
 
-        deephit = GetDeepestHit(vp_hit_muon, increasing_z);
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon, increasing_z);
         if (!LOG(deephit)) continue;
-        MuonEndHit = GetHit(*deephit);
+        MuonEndHit = GetHit(deephit);
 
         // !! GetDeepestHit not ready for View != W
         // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kU);
         // if (!LOG(deephit)) continue;
-        // MuonEndUHit = GetHit(*deephit);
+        // MuonEndUHit = GetHit(deephit);
 
         // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kV);
         // if (!LOG(deephit)) continue;
-        // MuonEndVHit = GetHit(*deephit);
+        // MuonEndVHit = GetHit(deephit);
 
         resetMuon();
             
@@ -465,6 +459,19 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         MuonEndProcess = mcp->EndProcess();
         MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
+        double min_dz = std::numeric_limits<double>::max();
+        art::Ptr<recob::Hit> p_min_dz{};
+        for (art::Ptr<recob::Hit> p_hit : ana::mcp2hits(mcp, vp_hit, clockData, false)) {
+            if (p_hit->View() != geo::kW) continue;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double dz = abs(z - MuonTrueEndPoint.z);
+            if (min_dz > dz) {
+                min_dz = dz;
+                p_min_dz = p_hit;
+            }
+        }
+        MuonTrueEndHit = GetHit(p_min_dz);
+
         MuonTrueEndPointT = mcp->EndT();
         MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
         MuonTrueEndEnergy = mcp->EndE();
@@ -472,9 +479,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
-                case geo::kU: MuonUHits.push_back(GetHit(*p_hit_muon)); break;
-                case geo::kV: MuonVHits.push_back(GetHit(*p_hit_muon)); break;
-                case geo::kW: MuonHits.push_back(GetHit(*p_hit_muon)); break;
+                case geo::kU: MuonUHits.push_back(GetHit(p_hit_muon)); break;
+                case geo::kV: MuonVHits.push_back(GetHit(p_hit_muon)); break;
+                case geo::kW: MuonHits.push_back(GetHit(p_hit_muon)); break;
                 default: break;
             }
         }
@@ -537,7 +544,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
                 if (p_hit_michel->View() != geo::kW) continue;
 
-                MichelHits.push_back(GetHit(*p_hit_michel));
+                MichelHits.push_back(GetHit(p_hit_michel));
             }
             MichelHitEnergy = MichelHits.energy();
         }
@@ -561,7 +568,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
                 if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyUHits.push_back(GetHit(*p_hit));
+                NearbyUHits.push_back(GetHit(p_hit));
             }
             if (p_hit->View() == geo::kV) {
                 float dz = (p_hit->Channel() - MuonEndVHit.channel) * pitch;
@@ -570,7 +577,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
                 if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyVHits.push_back(GetHit(*p_hit));
+                NearbyVHits.push_back(GetHit(p_hit));
             }
         }
 
@@ -586,7 +593,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
             if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            ana::Hit hit = GetHit(*p_hit);
+            ana::Hit hit = GetHit(p_hit);
             if (geoDet == kPDVD) {
                 if (hit.slice() != MuonEndHit.slice()) continue;
             } else {
@@ -826,18 +833,18 @@ void ana::Agnochecks::resetMuon() {
     // SphereEnergyFalsePositive = 0;
 }
 
-ana::Hit ana::Agnochecks::GetHit(recob::Hit const& hit) {
-    geo::WireID wireid = hit.WireID();
+ana::Hit ana::Agnochecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
+    geo::WireID wireid = p_hit->WireID();
     geo::WireGeo wiregeo = asWire->Wire(wireid);
 
-    ana::axis axis = plane2axis[hit.WireID()];
+    ana::axis axis = plane2axis[p_hit->WireID()];
     // slice = 2*(wireid.TPC/4) + wireid.TPC%2;
     return ana::Hit{
         wireid.TPC,
         float(axis.ay * wiregeo.GetCenter().Y() + axis.az * wiregeo.GetCenter().Z()),
-        hit.Channel(),
-        hit.PeakTime(),
-        hit.Integral()
+        p_hit->Channel(),
+        p_hit->PeakTime(),
+        p_hit->Integral()
     };
 }
 
@@ -884,12 +891,34 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         if (HitLowMin) return HitLowMin;
         else if (HitUpMax) return HitUpMax;
     } else if (geoDet == kPDHD) {
-        art::Ptr<recob::Hit> DeepestHit;
 
+        // test if the muon crosses the cathod
+        double mz_left=0, mz_right=0;
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            if (tpc == 1 || tpc == 5)
+                mz_left += z;
+            else if (tpc == 2 || tpc == 6)
+                mz_right += z;
+        }
+        std::vector<unsigned> tpcs{2};
+        if (
+            (increasing_z && mz_left > mz_right)
+            || (!increasing_z && mz_left < mz_right)
+        )
+            tpcs = (std::vector<unsigned>) {1, 5};
+        else 
+            tpcs = (std::vector<unsigned>) {2, 6};
+
+        // basic linear regression on the hits that are in the last volume
         unsigned n=0;
         double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
+            unsigned tpc = p_hit->WireID().TPC;
+            if (tpc != tpcs[0] && tpc != tpcs[1]) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
             mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
@@ -907,6 +936,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             std::numeric_limits<double>::lowest() // search max_s
             : std::numeric_limits<double>::max(); // search min_s
 
+        art::Ptr<recob::Hit> DeepestHit;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
