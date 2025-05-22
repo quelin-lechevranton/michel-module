@@ -903,14 +903,17 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             else if (tpc == 2 || tpc == 6)
                 mz_right += z;
         }
-        std::vector<unsigned> tpcs{2};
+        std::pair<unsigned, unsigned> tpcs;
         if (
             (increasing_z && mz_left > mz_right)
             || (!increasing_z && mz_left < mz_right)
-        )
-            tpcs = (std::vector<unsigned>) {1, 5};
-        else 
-            tpcs = (std::vector<unsigned>) {2, 6};
+        ) {
+            tpcs.first = 1;
+            tpcs.second = 5;
+        } else {
+            tpcs.first = 2;
+            tpcs.second = 6;
+        }
 
         // basic linear regression on the hits that are in the last volume
         unsigned n=0;
@@ -918,7 +921,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
-            if (tpc != tpcs[0] && tpc != tpcs[1]) continue;
+            if (tpc != tpcs.first && tpc != tpcs.second) continue;
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double t = p_hit->PeakTime();
             mz += z; mt += t; mz2 += z*z; mt2 += t*t, mzt += z*t;
