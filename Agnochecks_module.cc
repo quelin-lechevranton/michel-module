@@ -894,10 +894,10 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             if (tpc == 1 || tpc == 5) {
                 mz_left += z;
-                n_left ++;
+                n_left++;
             } else if (tpc == 2 || tpc == 6) {
                 mz_right += z;
-                n_right ++;
+                n_right++;
             }
         }
         mz_left /= n_left; mz_right /= n_right;
@@ -946,7 +946,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             double t = p_hit->PeakTime();
 
             // projection on the axis of the track
-            double s = (z - m*(t-p)) / (1 + m*m);
+            double s = (z + m*(t-p)) / (1 + m*m);
             if (increasing_z) {
                 if (extrem_s < s) {
                     extrem_s = s;
