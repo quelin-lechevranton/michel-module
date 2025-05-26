@@ -158,7 +158,6 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
 
-
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
 
@@ -329,19 +328,27 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
 
-    auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
+    // auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
+    auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
+    if (!vh_hit.isValid()) return;
     std::vector<art::Ptr<recob::Hit>> vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
-    auto const & vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
+    // auto const & vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
+    auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
+    if (!vh_trk.isValid()) return;
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
-    auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    // auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    auto const & vh_spt = e.getHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    if (!vh_spt.isValid()) return;
     std::vector<art::Ptr<recob::SpacePoint>> vp_spt;
     art::fill_ptr_vector(vp_spt, vh_spt);
 
-    auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
+    // auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
+    auto const & vh_pfp = e.getHandle<std::vector<recob::PFParticle>>(tag_pfp);
+    if (!vh_pfp.isValid()) return;
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
@@ -849,8 +856,6 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
     return false;
 }
 
-
-
 art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
     std::vector<art::Ptr<recob::Hit>> const& vp_hit,
     bool increasing_z,
@@ -860,30 +865,6 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 
     art::Ptr<recob::Hit> DeepestHit;
     if (geoDet == kPDVD) {
-        // float TickUpMax = wireWindow.min, TickLowMin = wireWindow.max;
-        // art::Ptr<recob::Hit> HitUpMax, HitLowMin;
-
-        // // tacking min of ticks in lower volume and max of ticks in upper volume
-        // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-        //     if (p_hit->View() != view) continue;
-
-        //     if (p_hit->WireID().TPC >= 8) {
-        //         if (p_hit->PeakTime() > TickUpMax) {
-        //             TickUpMax = p_hit->PeakTime();
-        //             HitUpMax = p_hit;
-        //         }
-        //     } else {
-        //         if (p_hit->PeakTime() < TickLowMin) {
-        //             TickLowMin = p_hit->PeakTime();
-        //             HitLowMin = p_hit;
-        //         }
-        //     }
-        // }
-
-        // // if there is hits in lower volume, muon end is in upper volume
-        // // else muon end is in upper volume
-        // if (HitLowMin) return HitLowMin;
-        // else if (HitUpMax) return HitUpMax;
 
         // test if the muon goes into the bottom volume
         bool in_bot = false;
@@ -891,7 +872,7 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             if (tpc < 8) {
-                bool in_bot = true;
+                in_bot = true;
                 break;
             }
         }
