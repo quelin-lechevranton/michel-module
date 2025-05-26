@@ -76,12 +76,13 @@ private:
 
     // Output Variables
     TTree* tEvent;
+    bool EventIsReal;
     unsigned iEvent=0;
     unsigned EventNMuon;
     std::vector<unsigned> EventiMuon;
 
     ana::Hits EventHits;
-    ana::Hits EventUHits, EventVHits;
+    // ana::Hits EventUHits, EventVHits;
 
 
     TTree* tMuon;
@@ -94,18 +95,18 @@ private:
 
     float MuonTrackLength;
     int MuonTrackIsNotBroken;
-    enum EnumIsBroken { kBadAssociation=-1, kBroken, kLastOfBroken, kNotBroken };
-    ana::Points MuonTrackPoints;
+    enum EnumIsBroken { kBroken, kLastOfBroken, kNotBroken };
+    // ana::Points MuonTrackPoints;
     ana::Point MuonEndTrackPoint;
     // ana::Point MuonTrueEndPoint;    
     // float MuonTrueEndPointT;
     ana::Point MuonTrueEndMomentum;
     float MuonTrueEndEnergy;
-    ana::Points MuonSpacePoints;
-    ana::Point MuonEndSpacePoint;
+    // ana::Points MuonSpacePoints;
+    // ana::Point MuonEndSpacePoint;
 
     ana::Hits MuonHits;
-    ana::Hits MuonUHits, MuonVHits;
+    // ana::Hits MuonUHits, MuonVHits;
     ana::Hit MuonEndHit;
     ana::Hit MuonEndUHit, MuonEndVHit;
     ana::Hit MuonTrueEndHit;
@@ -113,7 +114,7 @@ private:
     bool MuonEndHasGood3DAssociation;
 
     ana::Hits NearbyHits;
-    ana::Hits NearbyUHits, NearbyVHits;
+    // ana::Hits NearbyUHits, NearbyVHits;
     // ana::Points NearbySpacePoints;
     // ana::Points NearbyHitSpacePoints;
     // ana::Points NearbyHitPoints;
@@ -256,12 +257,13 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
 
     tEvent = tfs->make<TTree>("event","");
 
+    tEvent->Branch("isReal", &EventIsReal);
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
     EventHits.SetBranches(tEvent);
-    EventUHits.SetBranches(tEvent, "U");
-    EventVHits.SetBranches(tEvent, "V");
+    // EventUHits.SetBranches(tEvent, "U");
+    // EventVHits.SetBranches(tEvent, "V");
 
     tMuon = tfs->make<TTree>("muon","");
 
@@ -280,13 +282,13 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
 
     MuonHits.SetBranches(tMuon);
-    MuonUHits.SetBranches(tMuon, "U");
-    MuonVHits.SetBranches(tMuon, "V");
+    // MuonUHits.SetBranches(tMuon, "U");
+    // MuonVHits.SetBranches(tMuon, "V");
     MuonEndHit.SetBranches(tMuon, "End");
     MuonEndUHit.SetBranches(tMuon, "EndU");
     MuonEndVHit.SetBranches(tMuon, "EndV");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
-    MuonTrackPoints.SetBranches(tMuon, "Track");
+    // MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     // MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
     // tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT); // ns
@@ -294,8 +296,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y); // GeV
     tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z); // GeV
     tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); // GeV
-    MuonSpacePoints.SetBranches(tMuon, "Space");
-    MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
+    // MuonSpacePoints.SetBranches(tMuon, "Space");
+    // MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
 
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
@@ -311,8 +313,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     MichelHits.SetBranches(tMuon, "Michel");
     SphereHits.SetBranches(tMuon, "Sphere");
     NearbyHits.SetBranches(tMuon, "Nearby");
-    NearbyUHits.SetBranches(tMuon, "NearbyU");
-    NearbyVHits.SetBranches(tMuon, "NearbyV");
+    // NearbyUHits.SetBranches(tMuon, "NearbyU");
+    // NearbyVHits.SetBranches(tMuon, "NearbyV");
     // NearbySpacePoints.SetBranches(tMuon, "NearbySpace");
     // NearbyHitSpacePoints.SetBranches(tMuon, "NearbyHitSpace");
     // NearbyHitPoints.SetBranches(tMuon, "NearbyHit");
@@ -328,25 +330,21 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
 
-    // auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
     std::vector<art::Ptr<recob::Hit>> vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
-    // auto const & vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
-    // auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
     auto const & vh_spt = e.getHandle<std::vector<recob::SpacePoint>>(tag_spt);
     if (!vh_spt.isValid()) return;
     std::vector<art::Ptr<recob::SpacePoint>> vp_spt;
     art::fill_ptr_vector(vp_spt, vh_spt);
 
-    // auto const & vh_pfp = e.getValidHandle<std::vector<recob::PFParticle>>(tag_pfp);
     auto const & vh_pfp = e.getHandle<std::vector<recob::PFParticle>>(tag_pfp);
     if (!vh_pfp.isValid()) return;
 
@@ -366,21 +364,23 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
     resetEvent();
 
+    EventIsReal = e.isRealData();
+
     // for (recob::Hit const& hit : *vh_hit) {
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
         switch (p_hit->View()) {
-            case geo::kU: EventUHits.push_back(GetHit(p_hit)); break;
-            case geo::kV: EventVHits.push_back(GetHit(p_hit)); break;
+            // case geo::kU: EventUHits.push_back(GetHit(p_hit)); break;
+            // case geo::kV: EventVHits.push_back(GetHit(p_hit)); break;
             case geo::kW: EventHits.push_back(GetHit(p_hit)); break;
             default: break;
         }
     }
 
-    std::unordered_map<int, unsigned> particle_encounter;
+    // std::unordered_map<int, unsigned> particle_encounter;
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        if (fLog) printf("e%ut%u\r", iEvent, p_trk->ID()), fflush(stdout);
+        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
 
         // no short tracks
         if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
@@ -388,12 +388,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
 
         // tracks associated to a MCTruth muon
-        if (!mcp) continue;
-        if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
+        // if (!mcp) continue;
+        // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
         std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         if (!LOG(vp_hit_muon.size())) continue;
+
+        resetMuon();
 
         bool increasing_z;
         // track end point is the deepest
@@ -405,14 +407,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             increasing_z = p_trk->Start().Z() > p_trk->End().Z();
         }
 
-        art::Ptr<recob::Hit> deephit = GetDeepestHit(
-            ana::mcp2hits(mcp, vp_hit, clockData, false),
-            mcp->EndZ() > mcp->Vz()
-        );
-        if (!LOG(deephit)) continue;
-        MuonTrueEndHit = GetHit(deephit);
+        if (mcp) {
+            art::Ptr<recob::Hit> deephit = GetDeepestHit(
+                ana::mcp2hits(mcp, vp_hit, clockData, false),
+                mcp->EndZ() > mcp->Vz()
+            );
+            if (deephit) MuonTrueEndHit = GetHit(deephit);
+        } else MuonTrueEndHit = ana::Hit{};
 
-        deephit = GetDeepestHit(vp_hit_muon, increasing_z);
+        art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon, increasing_z);
         if (!LOG(deephit)) continue;
         MuonEndHit = GetHit(deephit);
 
@@ -420,12 +423,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kU);
         // if (!LOG(deephit)) continue;
         // MuonEndUHit = GetHit(deephit);
-
         // deephit = GetDeepestHit(vp_hit_muon, increasing_z, geo::kV);
         // if (!LOG(deephit)) continue;
         // MuonEndVHit = GetHit(deephit);
-
-        resetMuon();
             
         // fiducial cuts
         MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
@@ -435,62 +435,72 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
 
         // we found a muon candidate!
-        if (fLog) printf("\t\033[1;93m" "e%um%u (%u)" "\033[0m\n", iEvent, EventNMuon, iMuon);
+        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
 
         EventiMuon.push_back(iMuon);
 
-        MuonIsAnti = mcp->PdgCode() < 0;
+        MuonIsAnti = mcp ? mcp->PdgCode() < 0 : false;
         MuonTrackLength = p_trk->Length();
 
-        std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-        // std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
-        if (vp_trk_from_mcp.size()) {
-            // bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
-            // std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
-            // std::cout << " [ ";
-            // for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
-            // std::cout << "]" << std::endl;
-            if (vp_trk_from_mcp.size() == 1)
-                MuonTrackIsNotBroken = kNotBroken;
-            else {
-                bool IsDeepestTrack = true;
-                for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
-                    if (geoDet == kPDVD)
-                        IsDeepestTrack = IsDeepestTrack
-                            && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X()
-                            && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
-                    else if (geoDet == kPDHD)
-                        IsDeepestTrack = IsDeepestTrack
-                            && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y()
-                            && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
-                if (IsDeepestTrack)
-                    MuonTrackIsNotBroken = kLastOfBroken;
-                else
-                    MuonTrackIsNotBroken = kBroken;
-            }
-        } else MuonTrackIsNotBroken = kBadAssociation;
+        if (mcp) {
+            std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
+            // std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
+            if (vp_trk_from_mcp.size()) {
+                // bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
+                // std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
+                // std::cout << " [ ";
+                // for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
+                // std::cout << "]" << std::endl;
+                if (vp_trk_from_mcp.size() == 1)
+                    MuonTrackIsNotBroken = kNotBroken;
+                else {
+                    bool IsDeepestTrack = true;
+                    for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
+                        if (geoDet == kPDVD)
+                            IsDeepestTrack = IsDeepestTrack
+                                && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X()
+                                && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+                        else if (geoDet == kPDHD)
+                            IsDeepestTrack = IsDeepestTrack
+                                && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y()
+                                && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
+                    if (IsDeepestTrack)
+                        MuonTrackIsNotBroken = kLastOfBroken;
+                    else
+                        MuonTrackIsNotBroken = kBroken;
+                }
+            } else MuonTrackIsNotBroken = -1;
+        } else MuonTrackIsNotBroken = -1;
 
-        MuonEndProcess = mcp->EndProcess();
-        // MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
-        // MuonTrueEndPointT = mcp->EndT();
-        MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
-        MuonTrueEndEnergy = mcp->EndE();
+        if (mcp) {
+            MuonEndProcess = mcp->EndProcess();
+            // MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
+            // MuonTrueEndPointT = mcp->EndT();
+            MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
+            MuonTrueEndEnergy = mcp->EndE();
+        } else {
+            MuonEndProcess = "";
+            // MuonTrueEndPoint = ana::Point{};
+            // MuonTrueEndPointT = 0;
+            MuonTrueEndMomentum = ana::Point{};
+            MuonTrueEndEnergy = 0;
+        }
 
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
-                case geo::kU: MuonUHits.push_back(GetHit(p_hit_muon)); break;
-                case geo::kV: MuonVHits.push_back(GetHit(p_hit_muon)); break;
+                // case geo::kU: MuonUHits.push_back(GetHit(p_hit_muon)); break;
+                // case geo::kV: MuonVHits.push_back(GetHit(p_hit_muon)); break;
                 case geo::kW: MuonHits.push_back(GetHit(p_hit_muon)); break;
                 default: break;
             }
         }
 
         // and all muon track points
-        for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
-            if (!p_trk->HasValidPoint(i_tpt)) continue;
-            MuonTrackPoints.push_back(p_trk->LocationAtPoint(i_tpt));
-        }
+        // for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
+        //     if (!p_trk->HasValidPoint(i_tpt)) continue;
+        //     MuonTrackPoints.push_back(p_trk->LocationAtPoint(i_tpt));
+        // }
 
         // and all muon space points
         // MuonEndSpacePoint = ana::Point{geoUp.MaxX(), 0., 0.};
@@ -506,80 +516,86 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         //     && abs(MuonEndHit.z - MuonEndSpacePoint.z) < fCoincidenceRadius;
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
-        bool has_numu = false, has_nue = false;
         simb::MCParticle const* mcp_michel = nullptr;
-        for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
-            simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
-            if (!mcp_dau) continue;
+        if (mcp) {
+            bool has_numu = false, has_nue = false;
+            for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
+                simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
+                if (!mcp_dau) continue;
 
-            switch (abs(mcp_dau->PdgCode())) {
-                case 14: has_numu = true; break;
-                case 12: has_nue = true; break;
-                case 11: mcp_michel = mcp_dau; break;
-                default: break;
+                switch (abs(mcp_dau->PdgCode())) {
+                    case 14: has_numu = true; break;
+                    case 12: has_nue = true; break;
+                    case 11: mcp_michel = mcp_dau; break;
+                    default: break;
+                }
             }
+            if (mcp_michel and has_numu and has_nue) {
+                bool isin = false;
+                for (unsigned t=0; t<asGeo->NTPC(); t++) {
+                    isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
+                    if (isin) break;
+                }
+                if (isin)
+                    MuonHasMichel = kHasMichelInside; 
+                else
+                    MuonHasMichel = kHasMichelOutside;
+
+                // recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
+                art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
+                if (trk_michel) 
+                    MichelTrackLength = trk_michel->Length();
+                else
+                    MichelTrackLength = 0;
+
+                MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
+
+                // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
+                std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+                for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
+                    if (p_hit_michel->View() != geo::kW) continue;
+
+                    MichelHits.push_back(GetHit(p_hit_michel));
+                }
+                MichelHitEnergy = MichelHits.energy();
+            }
+            else MuonHasMichel = kNoMichel;
+        } else {
+            MuonHasMichel = -1;
+            MichelTrackLength = -1;
+            MichelHitEnergy = -1;
         }
-        if (mcp_michel and has_numu and has_nue) {
-            bool isin = false;
-            for (unsigned t=0; t<asGeo->NTPC(); t++) {
-                isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
-                if (isin) break;
-            }
-            if (isin)
-                MuonHasMichel = kHasMichelInside; 
-            else
-                MuonHasMichel = kHasMichelOutside;
-
-            // recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
-            art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
-            if (trk_michel) 
-                MichelTrackLength = trk_michel->Length();
-            else
-                MichelTrackLength = 0;
-
-            MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
-
-            // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-            std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-            for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
-                if (p_hit_michel->View() != geo::kW) continue;
-
-                MichelHits.push_back(GetHit(p_hit_michel));
-            }
-            MichelHitEnergy = MichelHits.energy();
-        }
-        else MuonHasMichel = kNoMichel;
 
 
         // get induction hits nearby muon end point
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
-            if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
+        // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        //     if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
 
-            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
-            bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
+        //     art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
+        //     bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
 
-            if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
+        //     if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            float pitch = plane2pitch[p_hit->WireID()];
-            if (p_hit->View() == geo::kU) {
-                float dz = (p_hit->Channel() - MuonEndUHit.channel) * pitch;
-                float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
-                float dr2 = dz*dz + dt*dt;
+        //     float pitch = plane2pitch[p_hit->WireID()];
+        //     if (p_hit->View() == geo::kU) {
+        //         float dz = (p_hit->Channel() - MuonEndUHit.channel) * pitch;
+        //         float dt = (p_hit->PeakTime() - MuonEndUHit.tick) * fTick2cm;
+        //         float dr2 = dz*dz + dt*dt;
 
-                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+        //         if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyUHits.push_back(GetHit(p_hit));
-            }
-            if (p_hit->View() == geo::kV) {
-                float dz = (p_hit->Channel() - MuonEndVHit.channel) * pitch;
-                float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
-                float dr2 = dz*dz + dt*dt;
+        //         NearbyUHits.push_back(GetHit(p_hit));
+        //     }
+        //     if (p_hit->View() == geo::kV) {
+        //         float dz = (p_hit->Channel() - MuonEndVHit.channel) * pitch;
+        //         float dt = (p_hit->PeakTime() - MuonEndVHit.tick) * fTick2cm;
+        //         float dr2 = dz*dz + dt*dt;
 
-                if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
+        //         if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
-                NearbyVHits.push_back(GetHit(p_hit));
-            }
-        }
+        //         NearbyVHits.push_back(GetHit(p_hit));
+        //     }
+        // }
 
 
         // get all hits nearby muon end point
@@ -599,8 +615,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             } else {
                 if (hit.tpc != MuonEndHit.tpc) continue;
             }
-
-
 
 
             float dz = (hit.space - MuonEndHit.space);
@@ -626,7 +640,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             float dr2t = dzt*dzt + dtt*dtt;
             if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
                 TrueSphereHits.push_back(hit);
-
 
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
@@ -797,19 +810,19 @@ void ana::Agnochecks::resetEvent() {
     EventNMuon = 0;
     EventiMuon.clear();
     EventHits.clear();
-    EventUHits.clear();
-    EventVHits.clear();
+    // EventUHits.clear();
+    // EventVHits.clear();
 }
 void ana::Agnochecks::resetMuon() {
-    MuonTrackPoints.clear();
-    MuonSpacePoints.clear();
+    // MuonTrackPoints.clear();
+    // MuonSpacePoints.clear();
     MuonHits.clear();
-    MuonUHits.clear();
-    MuonVHits.clear();
+    // MuonUHits.clear();
+    // MuonVHits.clear();
 
     NearbyHits.clear();
-    NearbyUHits.clear();
-    NearbyVHits.clear();
+    // NearbyUHits.clear();
+    // NearbyVHits.clear();
     // NearbySpacePoints.clear();
     // NearbyHitSpacePoints.clear();
     // NearbyHitPoints.clear();
