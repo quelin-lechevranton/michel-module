@@ -108,7 +108,7 @@ private:
     ana::Hits MuonHits;
     // ana::Hits MuonUHits, MuonVHits;
     ana::Hit MuonEndHit;
-    ana::Hit MuonEndUHit, MuonEndVHit;
+    // ana::Hit MuonEndUHit, MuonEndVHit;
     ana::Hit MuonTrueEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
     bool MuonEndHasGood3DAssociation;
@@ -134,10 +134,15 @@ private:
     void resetMuon();
 
     bool IsUpright(recob::Track const& T);
+    double GetSpace(geo::WireID);
     ana::Hit GetHit(art::Ptr<recob::Hit> const p_hit);
     art::Ptr<recob::Hit> GetDeepestHit(
         std::vector<art::Ptr<recob::Hit>> const&,
         bool increazing_z,
+        geo::View_t = geo::kW
+    );
+    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> GetEndsHits(
+        std::vector<art::Ptr<recob::Hit>> const&,
         geo::View_t = geo::kW
     );
 };
@@ -285,8 +290,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     // MuonUHits.SetBranches(tMuon, "U");
     // MuonVHits.SetBranches(tMuon, "V");
     MuonEndHit.SetBranches(tMuon, "End");
-    MuonEndUHit.SetBranches(tMuon, "EndU");
-    MuonEndVHit.SetBranches(tMuon, "EndV");
+    // MuonEndUHit.SetBranches(tMuon, "EndU");
+    // MuonEndVHit.SetBranches(tMuon, "EndV");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
     // MuonTrackPoints.SetBranches(tMuon, "Track");
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
@@ -846,15 +851,21 @@ void ana::Agnochecks::resetMuon() {
     // SphereEnergyFalsePositive = 0;
 }
 
-ana::Hit ana::Agnochecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
-    geo::WireID wireid = p_hit->WireID();
-    geo::WireGeo wiregeo = asWire->Wire(wireid);
 
-    ana::axis axis = plane2axis[p_hit->WireID()];
-    // slice = 2*(wireid.TPC/4) + wireid.TPC%2;
+double ana::Agnochecks::GetSpace(geo::WireID wid) {
+    return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
+}
+
+ana::Hit ana::Agnochecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
+    geo::WireID wid = p_hit->WireID();
+    // if (geoDet == kPDHD)
+    //     for (int t : (int[]){0, 4, 3, 7})
+    //         if (wireid.TPC == t)
+    //             return ana::Hit{};
+    
     return ana::Hit{
-        wireid.TPC,
-        float(axis.ay * wiregeo.GetCenter().Y() + axis.az * wiregeo.GetCenter().Z()),
+        wid.TPC,
+        float(GetSpace(wid)),
         p_hit->Channel(),
         p_hit->PeakTime(),
         p_hit->Integral()
@@ -895,10 +906,10 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         double mz=0, mt=0, mt2=0, mzt=0;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
-            unsigned tpc = p_hit->WireID().TPC;
-            if (in_bot && tpc >= 8) continue;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            double t = p_hit->PeakTime();
+            if (in_bot && p_hit->WireID().TPC >= 8) continue;
+            // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double z = GetSpace(p_hit->WireID());
+            double t = p_hit->PeakTime() * fTick2cm;
             mz += z; mt += t; mt2 += t*t, mzt += z*t;
             n++;
         }
@@ -917,9 +928,10 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
-            if (in_bot && tpc >= 8) continue;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            double t = p_hit->PeakTime();
+            if (in_bot && p_hit->WireID().TPC >= 8) continue;
+            // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double z = GetSpace(p_hit->WireID());
+            double t = p_hit->PeakTime() * fTick2cm;
 
             // projection on the axis of the track
             double s = (t + m*(z-p)) / (1 + m*m);
@@ -943,7 +955,8 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double z = GetSpace(p_hit->WireID());
             if (tpc == 1 || tpc == 5) {
                 mz_left += z;
                 n_left++;
@@ -972,8 +985,9 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             if (tpc != tpcs.first && tpc != tpcs.second) continue;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            double t = p_hit->PeakTime();
+            // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double z = GetSpace(p_hit->WireID());
+            double t = p_hit->PeakTime() * fTick2cm;
             mz += z; mt += t; mz2 += z*z; mzt += z*t;
             n++;
         }
@@ -989,13 +1003,13 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
             std::numeric_limits<double>::lowest() // search max_s
             : std::numeric_limits<double>::max(); // search min_s
 
-        art::Ptr<recob::Hit> DeepestHit;
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
             unsigned tpc = p_hit->WireID().TPC;
             if (tpc != tpcs.first && tpc != tpcs.second) continue;
-            double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-            double t = p_hit->PeakTime();
+            // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
+            double z = GetSpace(p_hit->WireID());
+            double t = p_hit->PeakTime() * fTick2cm;
 
             // projection on the axis of the track
             double s = (z + m*(t-p)) / (1 + m*m);
@@ -1013,6 +1027,112 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
         }
     }
     return DeepestHit;
+}
+
+
+std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetEndsHits(
+    std::vector<art::Ptr<recob::Hit>> const& vp_hit,
+    geo::View_t view
+) {
+    using HitPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+    if (vp_hit.empty()) return HitPair{};
+
+    auto cathodeSide =
+        geoDet == kPDVD ?
+        [](geo::TPCID::TPCID_t tpc) -> int { return int(tpc >= 8); }
+        : [](geo::TPCID::TPCID_t tpc) -> int { return tpc == 1 || tpc == 5 ? 1 : (tpc == 2 || tpc == 6 ? 0 : -1); };
+
+    struct LinearRegression {
+        unsigned n=0;
+        double mz=0, mt=0, mt2=0, mzt=0;
+        void add(double z, double t) {
+            mz+=z; mt+=t; mt2+=t*t; mzt+=z*t;
+        }
+        void normalize() {
+            mz/=n; mt/=n; mt2/=n; mzt/=n;
+        }
+        double cov() const { return mzt - mz*mt; }
+        double vart() const { return mt2 - mt*mt; }
+        double m() const { return cov() / vart(); }
+        double p() const { return mz - m()*mt; }
+        double projection(double z, double t) const {
+            return (t + m()*(z-p())) / (1 + m()*m());
+        }
+    } reg_side0, reg_side1;
+
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        geo::WireID wireid = p_hit->WireID();
+        int side = cathodeSide(wireid.TPC);
+        if (side == -1) continue;
+        // double z = asWire->Wire(wireid).GetCenter().Z();
+        double z = GetSpace(p_hit->WireID());
+        double t = p_hit->PeakTime() * fTick2cm;
+        if (side == 0) {
+            reg_side0.add(z, t);
+        } else if (side == 1) {
+            reg_side1.add(z, t);
+        }
+    }
+    reg_side0.normalize();
+    reg_side1.normalize();
+
+    struct ProjectionEnds {
+        HitPair hits;
+        double min = std::numeric_limits<double>::max();
+        double max = std::numeric_limits<double>::lowest();
+        void test(double s, art::Ptr<recob::Hit> const& h) {
+            if (s < min) {
+                min=s;
+                hits.first = h;
+            } else if (s > max) {
+                max=s;
+                hits.second = h;
+            }
+        }
+    } ends_side0, ends_side1;
+
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        geo::WireID wireid = p_hit->WireID();
+        int side = cathodeSide(wireid.TPC);
+        if (side == -1) continue;
+        // double z = asWire->Wire(wireid).GetCenter().Z();
+        double z = GetSpace(p_hit->WireID());
+        double t = p_hit->PeakTime() * fTick2cm;
+        if (side == 0) {
+            double s = reg_side0.projection(z, t);
+            ends_side0.test(s, p_hit);
+        } else if (side == 1) {
+            double s = reg_side1.projection(z, t);
+            ends_side1.test(s, p_hit);
+        }
+    }
+
+    auto d2 = [this](art::Ptr<recob::Hit> h1, art::Ptr<recob::Hit> h2) {
+        // double z1 = asWire->Wire(h1->WireID()).GetCenter().Z();
+        double z1 = GetSpace(h1->WireID());
+        double t1 = h1->PeakTime() * fTick2cm;
+        // double z2 = asWire->Wire(h2->WireID()).GetCenter().Z();
+        double z2 = GetSpace(h2->WireID());
+        double t2 = h2->PeakTime() * fTick2cm;
+        return pow(z1-z2,2) + pow(t1-t2,2);
+    };
+
+    std::vector<double> distances(4, 0);
+    distances[0] = d2(ends_side0.hits.first, ends_side1.hits.first);
+    distances[1] = d2(ends_side0.hits.first, ends_side1.hits.second);
+    distances[2] = d2(ends_side0.hits.second, ends_side1.hits.first);
+    distances[3] = d2(ends_side0.hits.second, ends_side1.hits.second);
+
+    switch(std::distance(distances.begin(), std::min_element(distances.begin(), distances.end()))) {
+        case 0: return HitPair{ends_side0.hits.second, ends_side1.hits.second};
+        case 1: return HitPair{ends_side0.hits.second, ends_side1.hits.first};
+        case 2: return HitPair{ends_side0.hits.first, ends_side1.hits.second};
+        case 3: return HitPair{ends_side0.hits.first, ends_side1.hits.first};
+        default: break;
+    }
+    return HitPair{};
 }
 
 // ana::Hit ana::Agnochecks::GetTrueEndHit( std::vector<art::Ptr<recob::Hit>> const& vp_hit, ana::Point end_z) {

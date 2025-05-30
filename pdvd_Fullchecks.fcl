@@ -5,7 +5,7 @@
 process_name: RunFullchecks
 
 services: {
-    TFileService: { fileName: "pdvd_Fullchecks_out_cosmics_10.root" }
+    TFileService: { fileName: "pdvd_Fullchecks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout

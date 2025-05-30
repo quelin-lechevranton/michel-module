@@ -5,7 +5,7 @@
 process_name: RunMuchecks
 
 services: {
-    TFileService: { fileName: "pdvd_Muchecks_out_100_r20_in_nh_ep.root" }
+    TFileService: { fileName: "pdvd_Muchecks_out.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout

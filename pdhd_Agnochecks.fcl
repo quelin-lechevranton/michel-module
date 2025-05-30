@@ -5,7 +5,7 @@
 process_name: RunAgnochecks
 
 services: {
-    TFileService: { fileName: "pdhd_Agnochecks_cosmics_10.root" }
+    TFileService: { fileName: "pdhd_Agnochecks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout

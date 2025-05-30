@@ -5,7 +5,7 @@
 process_name: RunTruechecks
 
 services: {
-    TFileService: { fileName: "pdvd_Truechecks_out_100_r50_in.root" }
+    TFileService: { fileName: "pdvd_Truechecks_out.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
