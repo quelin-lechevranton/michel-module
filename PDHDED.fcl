@@ -1,17 +1,17 @@
 #include "services_dune.fcl"
-#include "services_protodunevd.fcl" 
+#include "services_protodunehd.fcl" 
 #include "tools_dune.fcl"	
 
 process_name: RunPDHDED
 
 services: {
-    TFileService: { fileName: "PDHDED.root" }
+    TFileService: { fileName: "pdhd_PDHDED.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
-    DetectorPropertiesService:  @local::protodunevd_detproperties
+    DetectorPropertiesService:  @local::protodunehd_detproperties
     FileCatalogMetadata:        @local::art_file_catalog_mc
-                                @table::protodunevd_reco_services
+                                @table::protodunehd_reco_services
     LArPropertiesService:       @local::dunefd_properties
 }
 
@@ -28,7 +28,7 @@ physics: {
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
                 ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
-                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
+                ["Reco",       "wclsdatahd",    "gauss",  "recob::Wire"],
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
