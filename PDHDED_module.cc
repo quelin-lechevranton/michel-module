@@ -179,8 +179,8 @@ void ana::PDHDED::analyze(art::Event const& e) {
     std::cout << "e" << e.event() << "\r" << std::flush;
 
     TCanvas *c = new TCanvas(
-        Form("e%u", e), 
-        Form("e%u", e)
+        Form("e%u", e.event()), 
+        Form("e%u", e.event())
     );
     // cs.push_back(c);
 
@@ -203,7 +203,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
         unsigned n;
         float min, max;
         binning(unsigned n, float m, float M) : n(n), min(m), max(M) {}
-        binning(float m, float M, float s) : n((M-n)/s), min(m), max(M) {}
+        binning(float m, float M, float s) : n((M-m)/s), min(m), max(M) {}
         float step(void) const { return (max-min)/n; }
     }   binZ{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
         binT{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
