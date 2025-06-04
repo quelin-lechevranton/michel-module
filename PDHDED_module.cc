@@ -178,10 +178,11 @@ void ana::PDHDED::analyze(art::Event const& e) {
 
     std::cout << "e" << e.event() << "\r" << std::flush;
 
-    TCanvas *c = new TCanvas(
-        Form("e%u", e.event()), 
-        Form("e%u", e.event())
-    );
+    // TCanvas *c = new TCanvas(
+    //     Form("e%u", e.event()), 
+    //     Form("e%u", e.event())
+    // );
+    TCanvas *c = tfs->make<TCanvas>(Form("c%u", e.event()),Form("c%u", e.event()));
     // cs.push_back(c);
 
     std::map<unsigned, int> map_tpc_sec = {
@@ -281,7 +282,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
         gs[s]->Draw(draw_opt);
     }
 
-    c->Draw();
+    // c->Draw();
     // std::vector<TPad*> ps = drawFrame(c);
     // drawGraph(ps, EventHits, "p", kGray, kFullSquare, .3);
     // // drawHisto(ps, EventHits);
@@ -310,9 +311,9 @@ void ana::PDHDED::analyze(art::Event const& e) {
 
     // c->Write();
 
-    std::cout << "next event? (enter)"; 
-    std::string input;
-    std::getline(std::cin, input);
+    // std::cout << "next event? (enter)"; 
+    // std::string input;
+    // std::getline(std::cin, input);
 }
 
 void ana::PDHDED::beginJob() {}
