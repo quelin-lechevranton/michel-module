@@ -246,7 +246,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Detector: " << std::vector<std::string>{"PDVD", "PDHD"}[geoDet]
-        << " (" << asGeo->DetectorName() << ")" << std::endl
+        << "  (" << asGeo->DetectorName() << ")" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
@@ -927,7 +927,6 @@ art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
 
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != view) continue;
-            unsigned tpc = p_hit->WireID().TPC;
             if (in_bot && p_hit->WireID().TPC >= 8) continue;
             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
             double z = GetSpace(p_hit->WireID());
