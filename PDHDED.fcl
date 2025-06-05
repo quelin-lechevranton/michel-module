@@ -5,7 +5,7 @@
 process_name: RunPDHDED
 
 services: {
-    TFileService: { fileName: "pdhd_PDHDED.root" }
+    TFileService: { fileName: "PDHDED.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout

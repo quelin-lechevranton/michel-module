@@ -63,6 +63,10 @@ private:
         tag_hit, tag_clu, tag_trk,
         tag_spt, tag_pfp, tag_r3d;
 
+
+    unsigned cn=0;
+
+
     // std::vector<TCanvas*> cs;
     double GetSpace(geo::WireID);
 };
@@ -177,10 +181,6 @@ void ana::PDHDED::analyze(art::Event const& e) {
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
     // std::cout << "e" << e.event() << "\r" << std::flush;
-    std::cout << "e.run: " << e.run() << std::endl
-        << "e.subRun: " << e.subRun() << std::endl
-        << "e.event: " << e.event() << std::endl
-        << "e.id: " << e.id() << std::endl;
 
     // TCanvas *c = new TCanvas(
     //     Form("e%u", e.event()), 
@@ -188,8 +188,8 @@ void ana::PDHDED::analyze(art::Event const& e) {
     // );
 
     TCanvas *c = tfs->make<TCanvas>(
-        Form("c_r%us%ue%u", e.run(), e.subRun(), e.event()),
-        Form("c_r%us%ue%u", e.run(), e.subRun(), e.event())
+        Form("c%u", cn++),
+        Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event())
     );
     // cs.push_back(c);
 
@@ -226,13 +226,13 @@ void ana::PDHDED::analyze(art::Event const& e) {
             0.5*(s+1), 1.
         );
 
-        double pad_margin = axis_label ? 0.1 : 0.05;
-        p->SetMargin(pad_margin, pad_margin, pad_margin, pad_margin);
-        if (!axis_label) {
-            if (s) p->SetLeftMargin(pad_margin / 2);
-            else p->SetRightMargin(pad_margin / 2);
-        }
-        if (axis_label) p->SetTicks(1, 1); // ticks on top and right
+        // double pad_margin = axis_label ? 0.1 : 0.05;
+        // p->SetMargin(pad_margin, pad_margin, pad_margin, pad_margin);
+        // if (!axis_label) {
+        //     if (s) p->SetLeftMargin(pad_margin / 2);
+        //     else p->SetRightMargin(pad_margin / 2);
+        // }
+        // if (axis_label) p->SetTicks(1, 1); // ticks on top and right
 
         TH2F* f = new TH2F(
             Form("frame_s%u", s),
@@ -244,17 +244,17 @@ void ana::PDHDED::analyze(art::Event const& e) {
         f->SetDirectory(nullptr);
         // f->SetTitleSize(0, "xyz"); // no title for all axis
 
-        if (axis_label) {
-            f->SetTitleFont(font);
-            f->SetLabelFont(font);
-            f->SetTitleSize(font_size, "xy");
-            f->SetLabelSize(font_size, "xy");
-            f->SetTitleOffset(1.5, "xy");
-        } else f->SetTitleOffset(0.4, "xy");
-        for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
-            ax->CenterTitle();
-            if (!axis_label) ax->SetNdivisions(0); // remove ticks and label
-        }
+        // if (axis_label) {
+        //     f->SetTitleFont(font);
+        //     f->SetLabelFont(font);
+        //     f->SetTitleSize(font_size, "xy");
+        //     f->SetLabelSize(font_size, "xy");
+        //     f->SetTitleOffset(1.5, "xy");
+        // } else f->SetTitleOffset(0.4, "xy");
+        // for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
+        //     ax->CenterTitle();
+        //     if (!axis_label) ax->SetNdivisions(0); // remove ticks and label
+        // }
 
         c->cd();
         p->Draw();
@@ -280,6 +280,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
         g->SetLineWidth(width);
     }
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
         int s = map_tpc_sec[p_hit->WireID().TPC];
         if (s == -1) continue;
         gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
