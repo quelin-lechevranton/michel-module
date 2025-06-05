@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////
-// Class:       PDHDED
+// Class:       PDED
 // Plugin Type: analyzer (Unknown Unknown)
 // File:        PDHDED_module.cc
 //
@@ -8,7 +8,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 #include "utils.h"
-#include <TCanvas.h>
+#include <TCan_secas.h>
 #include <TH2F.h>
 #include <TGraph.h>
 #include <TMarker.h>
@@ -17,16 +17,16 @@
 #include <TText.h>
 
 namespace ana {
-    class PDHDED;
+    class PDED;
 }
 
-class ana::PDHDED : public art::EDAnalyzer {
+class ana::PDED : public art::EDAnalyzer {
 public:
-    explicit PDHDED(fhicl::ParameterSet const& p);
-    PDHDED(PDHDED const&) = delete;
-    PDHDED(PDHDED&&) = delete;
-    PDHDED& operator=(PDHDED const&) = delete;
-    PDHDED& operator=(PDHDED&&) = delete;
+    explicit PDED(fhicl::ParameterSet const& p);
+    PDED(PDED const&) = delete;
+    PDED(PDED&&) = delete;
+    PDED& operator=(PDED const&) = delete;
+    PDED& operator=(PDED&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -43,7 +43,7 @@ private:
     const detinfo::DetectorClocksService* asDetClocks;
     geo::BoxBoundedGeo geoHighX, geoLowX;
 
-    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    // art::ServiceHandle<cheat::ParticleIn_secentoryService> pi_serv;
     // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     int geoDet;
@@ -76,13 +76,13 @@ private:
     unsigned cn=0;
 
 
-    // std::vector<TCanvas*> cs;
+    // std::vector<TCan_secas*> cs;
     double GetSpace(geo::WireID);
     // void drawGraph(std::vector<TPad*>, std::vector<art::Ptr<recob::Hit>>, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3);
 };
 
 
-ana::PDHDED::PDHDED(fhicl::ParameterSet const& p)
+ana::PDED::PDED(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products"))
 {
@@ -199,7 +199,7 @@ ana::PDHDED::PDHDED(fhicl::ParameterSet const& p)
     
 }
 
-void ana::PDHDED::analyze(art::Event const& e) {
+void ana::PDED::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
@@ -235,12 +235,12 @@ void ana::PDHDED::analyze(art::Event const& e) {
 
     // std::cout << "e" << e.event() << "\r" << std::flush;
 
-    // TCanvas *c = new TCanvas(
+    // TCan_secas *c = new TCan_secas(
     //     Form("e%u", e.event()), 
     //     Form("e%u", e.event())
     // );
 
-    TCanvas *c = tfs->make<TCanvas>(
+    TCan_secas *c = tfs->make<TCan_secas>(
         Form("c%u", cn++),
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
@@ -262,7 +262,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
     }   b_z{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
         b_t{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
 
-    unsigned nv = 0;
+    unsigned n_sec = 0;
     std::function<TH2F(unsigned)> frame;
     Style_t font_size;
     struct { Float_t l, r, b, t; } pad_margin;
@@ -272,9 +272,9 @@ void ana::PDHDED::analyze(art::Event const& e) {
     Style_t const font = 43;
     if (geoDet == kPDVD) {
         c->Divide(4, 2);
-        nv = 8;
-        frame = [b_z, b_t](unsigned i) -> TH2F {
-            return TH2F(Form("f%u", i), ";Z;T",
+        n_sec = 8;
+        frame = [b_z, b_t](unsigned s) -> TH2F {
+            return TH2F(Form("f%u", s), ";Z;T",
                     b_z.n, b_z.min, b_z.max,
                     b_t.n, b_t.min, b_t.max);
         };
@@ -286,9 +286,9 @@ void ana::PDHDED::analyze(art::Event const& e) {
         Y = "T";
     } else if (geoDet == kPDHD) {
         c->Divide(2, 1);
-        nv = 2;
-        frame = [b_z, b_t](unsigned i) -> TH2F {
-            return TH2F(Form("f%u", i), ";T;Z",
+        n_sec = 2;
+        frame = [b_z, b_t](unsigned s) -> TH2F {
+            return TH2F(Form("f%u", s), ";T;Z",
                     b_t.n, b_t.min, b_t.max,
                     b_z.n, b_z.min, b_z.max);
         };
@@ -300,14 +300,14 @@ void ana::PDHDED::analyze(art::Event const& e) {
         Y = "S";
     }
         
-    for (unsigned i; i<nv; i++) {
-        c->cd(i+1);
+    for (unsigned s=0; s<n_sec; s++) {
+        c->cd(s+1);
         gPad->SetMargin(
             pad_margin.l, pad_margin.r,
             pad_margin.b, pad_margin.t
         );
         gPad->SetTicks(1, 1);
-        TH2F* f = new TH2F(frame(i));
+        TH2F* f = new TH2F(frame(s));
         f->SetStats(kFALSE);
         f->SetTitleFont(font, "xyz");
         f->SetLabelFont(font, "xyz");
@@ -321,7 +321,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
         TText* t = new TText(
             gPad->GetLeftMargin(),
             1-gPad->GetTopMargin()+0.01,
-            Form("TPC %u & %u", sec2tpc[i].first, sec2tpc[i].second)
+            Form("TPC %u & %u", sec2tpc[s].first, sec2tpc[s].second)
         );
         t->SetNDC();
         t->SetTextFont(font);
@@ -329,11 +329,11 @@ void ana::PDHDED::analyze(art::Event const& e) {
         t->SetTextAlign(kHAlignLeft + kVAlignBottom);
         t->Draw();
 
-        if ((geoDet == kPDHD && i==1) || (geoDet == kPDVD && i==3)) {
+        if ((geoDet == kPDHD && s==1) || (geoDet == kPDVD && s==3)) {
             TText* tt = new TText(
                 1-gPad->GetRightMargin(),
                 1-gPad->GetTopMargin()+0.01,
-                Form("r%us%ue%u", e.run(), e.subRun(), e.event())
+                Form("R%u-SR%u-E%u", e.run(), e.subRun(), e.event())
             );
             tt->SetNDC();
             tt->SetTextFont(font);
@@ -411,34 +411,34 @@ void ana::PDHDED::analyze(art::Event const& e) {
     //     gs[s]->Draw(draw_opt);
     // }
 
-    // gStyle->SetPalette(kCividis);
-    // TArrayI const& colors = TColor::GetPalette();
+    gStyle->SetPalette(kCividis);
+    TArrayI const& colors = TColor::GetPalette();
 
-    // struct range {
-    //     float min, max;
-    //     range(float m, float M) : min(m), max(M) {}
-    //     float normalize(float x) const {
-    //         if (x <= min) return 0.F;
-    //         if (x >= max) return 1.F;
-    //         return (x-min) / (max-min);
-    //     }
-    // } r_adc{0.F, 100.F};
+    struct range {
+        float min, max;
+        range(float m, float M) : min(m), max(M) {}
+        float normalize(float x) const {
+            if (x <= min) return 0.F;
+            if (x >= max) return 1.F;
+            return (x-min) / (max-min);
+        }
+    } r_adc{0.F, 100.F};
 
-    // TMarker* m = new TMarker();
-    // m->SetMarkerStyle(kFullCircle);
-    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-    //     if (p_hit->View() != geo::kW) continue;
-    //     int s = tpc2sec[p_hit->WireID().TPC];
-    //     if (s == -1) continue;
-    //     float const x = r_adc.normalize(p_hit->Integral());
-    //     m->SetMarkerSize(2*x+0.1);
-    //     m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
-    //     // ps[s]->cd();
-    //     // m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+    TMarker* m = new TMarker();
+    m->SetMarkerStyle(kFullCircle);
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        int s = tpc2sec[p_hit->WireID().TPC];
+        if (s == -1) continue;
+        float const x = r_adc.normalize(p_hit->Integral());
+        m->SetMarkerSize(2*x+0.1);
+        m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
+        // ps[s]->cd();
+        // m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
 
-    //     c->cd(s+1);
-    //     m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-    // }
+        c->cd(s+1);
+        m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+    }
 
     // unsigned g=0;
     // for (art::Ptr<recob::Track> p_trk : vp_trk) {
@@ -451,14 +451,14 @@ void ana::PDHDED::analyze(art::Event const& e) {
     c->Write();
 }
 
-void ana::PDHDED::beginJob() {}
-void ana::PDHDED::endJob() {}
+void ana::PDED::beginJob() {}
+void ana::PDED::endJob() {}
 
-double ana::PDHDED::GetSpace(geo::WireID wid) {
+double ana::PDED::GetSpace(geo::WireID wid) {
     return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
 }
 
-// void ana::PDHDED::drawGraph(std::vector<TPad*> ps, std::vector<art::Ptr<recob::Hit>> vp_hit, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3) {
+// void ana::PDED::drawGraph(std::vector<TPad*> ps, std::vector<art::Ptr<recob::Hit>> vp_hit, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3) {
 //     std::map<unsigned, int> static tpc2sec = {
 //         {0, -1},
 //         {1, 0},
@@ -495,4 +495,4 @@ double ana::PDHDED::GetSpace(geo::WireID wid) {
 //     }
 // }
 
-DEFINE_ART_MODULE(ana::PDHDED)
+DEFINE_ART_MODULE(ana::PDED)
