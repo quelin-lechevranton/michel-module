@@ -14,6 +14,7 @@
 #include <TMarker.h>
 #include <TStyle.h>
 #include <TColor.h>
+#include <TText.h>
 
 namespace ana {
     class PDHDED;
@@ -193,9 +194,11 @@ void ana::PDHDED::analyze(art::Event const& e) {
 
     TCanvas *c = tfs->make<TCanvas>(
         Form("c%u", cn++),
-        Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event())
+        Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
+        1300,800
     );
     // cs.push_back(c);
+
 
     std::map<unsigned, int> map_tpc_sec = {
         {0, -1},
@@ -207,10 +210,14 @@ void ana::PDHDED::analyze(art::Event const& e) {
         {6, 1},
         {7, -1}
     };
-    unsigned const n_section = 2;
-    bool const axis_label = true;
-    int const font = 43; // 80 = courrier, 3 = font size in pixel
-    float const font_size = 20;
+    std::map<int, std::pair<unsigned, unsigned>> map_sec_tpc = {
+        {0, {1, 5}},
+        {1, {2, 6}}
+    };
+    // unsigned const n_section = 2;
+    // bool const axis_label = true;
+    // int const font = 43; // 80 = courrier, 3 = font size in pixel
+    // float const font_size = 20;
 
     struct binning {
         unsigned n;
@@ -221,41 +228,125 @@ void ana::PDHDED::analyze(art::Event const& e) {
     }   b_z{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
         b_t{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
 
-    std::vector<TPad*> ps{n_section};
-    for (unsigned s=0; s<n_section; s++) {
-        TPad* p = ps[s] = new TPad(
-            Form("pad_s%u", s),
-            Form("pad_s%u", s),
-            0.5*s, 0.,
-            0.5*(s+1), 1.
-        );
-        p->SetMargin(0.15, 0.05, 0.1, 0.05);
-        p->SetTicks(1, 1);
 
-        TH2F* f = new TH2F(
-            Form("frame_s%u", s),
-            axis_label ? ";T;Z" : "", 
-            b_t.n, b_t.min, b_t.max,
-            b_z.n, b_z.min, b_z.max
-        );
+    unsigned nv = 0;
+    Style_t const font = 43;
+    //  if PDVD:
+    //     c.Divide(4, 2)
+    //     nv = 8
+    //     def fargs(i):
+    //         return [ f'f{i}', ';Z;T',
+    //                 100, 0, 300,
+    //                 100, 0, 6000]
+    //     tpcss = [[0,2], [1,3], [4,6], [5,7], [8,10], [9,11], [12,14], [13,15]]
+    //     font_size = 12
+    //     pad_margin = [.14, .04, .09, .06]
+    //     title_offset_x = 1.3
+    //     title_offset_y = 1.7
+    //     X = 'S'
+    //     Y = 'T'
+    // elif PDHD:
+        c->Divide(2, 1);
+        nv = 2;
+        // def fargs(i):
+        //     return [ f'f{i}', ';T;Z',
+        //             100, 0, 6000,
+        //             100, -1, 464]
+        // tpcss = [[1,5], [2,6]]
+        Float_t const font_size = 20;
+        // pad_margin = [.1, .04, .09, .06]
+        Float_t const title_offset_x = 1.5;
+        Float_t const title_offset_y = 1.5;
+        // X = "T"
+        // Y = "S"
+
+
+    for (unsigned i; i<nv; i++) {
+        c->cd(i+1);
+        gPad->SetMargin(.1, .04, .09, .06);
+        gPad->SetTicks(1, 1);
+        TH2F* f = 
+            // PDHD
+            new TH2F(
+                Form("f%u",i), ";T;Z",
+                b_t.n, b_t.min, b_t.max,
+                b_z.n, b_z.min, b_z.max
+            );
         f->SetStats(kFALSE);
-        f->SetDirectory(nullptr);
-
-        f->SetTitleFont(font);
-        f->SetLabelFont(font);
-        f->SetTitleSize(font_size, "xy");
-        f->SetLabelSize(font_size, "xy");
-        f->SetTitleOffset(1.5, "xy");
-        for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
-            ax->CenterTitle();
-        }
-
-        c->cd();
-        p->Draw();
-        p->cd();
-        // f->Draw(s ? "rx" : "");
         f->Draw();
+        f->SetTitleFont(font, "xyz");
+        f->SetLabelFont(font, "xyz");
+        f->SetTitleSize(font_size, "xyz");
+        f->SetLabelSize(font_size, "xyz");
+        f->SetTitleOffset(title_offset_x, "x");
+        f->SetTitleOffset(title_offset_y, "y");
+        for (TAxis* ax : {f->GetXaxis(), f->GetYaxis()}) ax->CenterTitle();
+
+        TText* t = new TText(
+            gPad->GetLeftMargin(),
+            1-gPad->GetTopMargin()+0.01,
+            Form("TPC %u & %u", map_sec_tpc[i].first, map_sec_tpc[i].second)
+        );
+        t->SetNDC();
+        t->SetTextFont(font);
+        t->SetTextSize(font_size);
+        t->SetTextAlign(kHAlignLeft + kVAlignBottom);
+        t->Draw();
+
+        // if (PDHD and i==1) or (PDVD and i==3):
+        if (i==1) {
+            TText* tt = new TText(
+                1-gPad->GetRightMargin(),
+                1-gPad->GetTopMargin()+0.01,
+                Form("r%us%ue%u", e.run(), e.subRun(), e.event())
+            );
+            t->SetNDC();
+            t->SetTextFont(font);
+            t->SetTextSize(font_size);
+            t->SetTextAlign(kHAlignRight + kVAlignBottom);
+            t->Draw();
+        }
     }
+
+
+
+
+
+    // std::vector<TPad*> ps{n_section};
+    // for (unsigned s=0; s<n_section; s++) {
+    //     TPad* p = ps[s] = new TPad(
+    //         Form("pad_s%u", s),
+    //         Form("pad_s%u", s),
+    //         0.5*s, 0.,
+    //         0.5*(s+1), 1.
+    //     );
+    //     p->SetMargin(0.15, 0.05, 0.1, 0.05);
+    //     p->SetTicks(1, 1);
+
+    //     TH2F* f = new TH2F(
+    //         Form("frame_s%u", s),
+    //         axis_label ? ";T;Z" : "", 
+    //         b_t.n, b_t.min, b_t.max,
+    //         b_z.n, b_z.min, b_z.max
+    //     );
+    //     f->SetStats(kFALSE);
+    //     f->SetDirectory(nullptr);
+
+    //     f->SetTitleFont(font);
+    //     f->SetLabelFont(font);
+    //     f->SetTitleSize(font_size, "xy");
+    //     f->SetLabelSize(font_size, "xy");
+    //     f->SetTitleOffset(1.5, "xy");
+    //     for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
+    //         ax->CenterTitle();
+    //     }
+
+    //     c->cd();
+    //     p->Draw();
+    //     p->cd();
+    //     // f->Draw(s ? "rx" : "");
+    //     f->Draw();
+    // }
 
     // Color_t const color = kGray;
     // Style_t const style = kFullSquare;
@@ -307,17 +398,20 @@ void ana::PDHDED::analyze(art::Event const& e) {
         float const x = r_adc.normalize(p_hit->Integral());
         m->SetMarkerSize(2*x+0.1);
         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
-        ps[s]->cd();
+        // ps[s]->cd();
+        // m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+
+        c->cd(s+1);
         m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
     }
 
-    unsigned g=0;
-    for (art::Ptr<recob::Track> p_trk : vp_trk) {
-        // if (p_trk->Length() > 40) continue;
-        std::vector<art::Ptr<recob::Hit>> vp_hit_from_trk = fmp_trk2hit.at(p_trk.key());
-        drawGraph(ps, vp_hit_from_trk, "l", kOrange-10+g, 0, 0, 1);
-        g++;
-    }
+    // unsigned g=0;
+    // for (art::Ptr<recob::Track> p_trk : vp_trk) {
+    //     // if (p_trk->Length() > 40) continue;
+    //     std::vector<art::Ptr<recob::Hit>> vp_hit_from_trk = fmp_trk2hit.at(p_trk.key());
+    //     drawGraph(ps, vp_hit_from_trk, "l", kOrange-10+g, 0, 0, 1);
+    //     g++;
+    // }
 
     c->Write();
 }
