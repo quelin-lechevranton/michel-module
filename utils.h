@@ -42,9 +42,6 @@ namespace ana {
         bool isInside(T x, float r=0) const { 
             return min+r <= x && x <= max-r;
         }
-        unsigned step2n(T s) const {
-            return static_cast<unsigned>((max - min) / s);
-        }
 
         friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
             return os << "[" << b.min << ", " << b.max << "]";

@@ -11,6 +11,9 @@
 #include <TCanvas.h>
 #include <TH2F.h>
 #include <TGraph.h>
+#include <TMarker.h>
+#include <TStyle.h>
+#include <TColor.h>
 
 namespace ana {
     class PDHDED;
@@ -214,8 +217,8 @@ void ana::PDHDED::analyze(art::Event const& e) {
         binning(unsigned n, float m, float M) : n(n), min(m), max(M) {}
         binning(float m, float M, float s) : n((M-m)/s), min(m), max(M) {}
         float step(void) const { return (max-min)/n; }
-    }   binZ{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
-        binT{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
+    }   b_z{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
+        b_t{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
 
     std::vector<TPad*> ps{n_section};
     for (unsigned s=0; s<n_section; s++) {
@@ -237,8 +240,8 @@ void ana::PDHDED::analyze(art::Event const& e) {
         TH2F* f = new TH2F(
             Form("frame_s%u", s),
             axis_label ? ";T;Z" : "", 
-            binT.n, binT.min, binT.max,
-            binZ.n, binZ.min, binZ.max
+            b_t.n, b_t.min, b_t.max,
+            b_z.n, b_z.min, b_z.max
         );
         f->SetStats(kFALSE);
         f->SetDirectory(nullptr);
@@ -263,60 +266,60 @@ void ana::PDHDED::analyze(art::Event const& e) {
         f->Draw();
     }
 
-    Color_t const color = kGray;
-    Style_t const style = kFullSquare;
-    Size_t const size = 0.3;
-    Width_t const width = 0.3;
-    char const * draw_opt = "p";
-    std::vector<TGraph*> gs{n_section};
-    for (unsigned s=0; s<n_section; s++) {
-        TGraph* g = gs[s] = new TGraph();
-        g->SetName(Form("g%u_%u", 0, s));
-        g->SetEditable(kFALSE);
-        g->SetMarkerColor(color);
-        g->SetMarkerStyle(style);
-        g->SetMarkerSize(size);
-        g->SetLineColor(color);
-        g->SetLineWidth(width);
-    }
+    // Color_t const color = kGray;
+    // Style_t const style = kFullSquare;
+    // Size_t const size = 0.3;
+    // Width_t const width = 0.3;
+    // char const * draw_opt = "p";
+    // std::vector<TGraph*> gs{n_section};
+    // for (unsigned s=0; s<n_section; s++) {
+    //     TGraph* g = gs[s] = new TGraph();
+    //     g->SetName(Form("g%u_%u", 0, s));
+    //     g->SetEditable(kFALSE);
+    //     g->SetMarkerColor(color);
+    //     g->SetMarkerStyle(style);
+    //     g->SetMarkerSize(size);
+    //     g->SetLineColor(color);
+    //     g->SetLineWidth(width);
+    // }
+    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+    //     if (p_hit->View() != geo::kW) continue;
+    //     int s = map_tpc_sec[p_hit->WireID().TPC];
+    //     if (s == -1) continue;
+    //     gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+    // }
+    // for (unsigned s=0; s<n_section; s++) {
+    //     ps[s]->cd();
+    //     if (!gs[s]->GetN()) continue;
+    //     gs[s]->Draw(draw_opt);
+    // }
+
+    gStyle->SetPalette(kCherry);
+    TArrayI const& colors = TColor::GetPalette();
+
+    struct range {
+        float min, max;
+        range(float m, float M) : min(m), max(M) {}
+        float normalize(float x) const {
+            if (x <= min) return 0.F;
+            if (x >= max) return 1.F;
+            return (x-min) / (max-min);
+        }
+    } r_adc{0.F, 100.F};
+
+    TMarker* m = new TMarker();
+    // m->SetMarkerColor(color);
+    m->SetMarkerStyle(kFullCircle);
+    // m->SetMarkerSize(size);
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
         int s = map_tpc_sec[p_hit->WireID().TPC];
         if (s == -1) continue;
-        gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        float const x = r_adc.normalize(p_hit->Integral());
+        m->SetMarkerSize(2*x);
+        m->SetMarkerColor(colors[int(colors.GetSize()*x)]);
+        m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
     }
-    for (unsigned s=0; s<n_section; s++) {
-        ps[s]->cd();
-        if (!gs[s]->GetN()) continue;
-        gs[s]->Draw(draw_opt);
-    }
-
-    // c->Draw();
-    // std::vector<TPad*> ps = drawFrame(c);
-    // drawGraph(ps, EventHits, "p", kGray, kFullSquare, .3);
-    // // drawHisto(ps, EventHits);
-
-    // unsigned o=0;
-    // for (unsigned mu=0; mu<EventNMuon; mu++) {
-    //     muon->GetEntry(EventiMuon->at(mu));
-    //     // if (!MuonHasMichel) continue;
-
-    //     // -- Only Cathode Crossing
-    //     // bool left=false, right=false;
-    //     // for (Hit hit : MuonHits) {
-    //     //     if (hit.tpc == 1 || hit.tpc == 5)
-    //     //         left = true;
-    //     //     if (hit.tpc == 2 || hit.tpc == 6)
-    //     //         right = true;
-    //     //     if (left && right) break;
-    //     // }
-    //     // if (!left || !right) continue;
-
-    //     drawGraph(ps, MuonHits, "l", kOrange-4+o++, 0, 0., 1.);
-    //     drawMarker(ps, TrueEnd, kC6Pistachio, 89, 3);
-    //     drawMarker(ps, MuonEndHit, kC6Cyclamen, kFullCrossX, 2);
-    //     drawGraph(ps, MichelHits, "p", kC6Blue);
-    // }
 
     c->Write();
 
