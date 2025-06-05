@@ -72,6 +72,7 @@ private:
 
     // std::vector<TCanvas*> cs;
     double GetSpace(geo::WireID);
+    void drawGraph(std::vector<TPad*>, std::vector<art::Ptr<recob::Hit>>, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3);
 };
 
 
@@ -228,14 +229,8 @@ void ana::PDHDED::analyze(art::Event const& e) {
             0.5*s, 0.,
             0.5*(s+1), 1.
         );
-
-        // double pad_margin = axis_label ? 0.1 : 0.05;
-        // p->SetMargin(pad_margin, pad_margin, pad_margin, pad_margin);
-        // if (!axis_label) {
-        //     if (s) p->SetLeftMargin(pad_margin / 2);
-        //     else p->SetRightMargin(pad_margin / 2);
-        // }
-        // if (axis_label) p->SetTicks(1, 1); // ticks on top and right
+        p->SetMargin(0.15, 0.05, 0.1, 0.05);
+        p->SetTicks(1, 1);
 
         TH2F* f = new TH2F(
             Form("frame_s%u", s),
@@ -245,19 +240,15 @@ void ana::PDHDED::analyze(art::Event const& e) {
         );
         f->SetStats(kFALSE);
         f->SetDirectory(nullptr);
-        // f->SetTitleSize(0, "xyz"); // no title for all axis
 
-        // if (axis_label) {
-        //     f->SetTitleFont(font);
-        //     f->SetLabelFont(font);
-        //     f->SetTitleSize(font_size, "xy");
-        //     f->SetLabelSize(font_size, "xy");
-        //     f->SetTitleOffset(1.5, "xy");
-        // } else f->SetTitleOffset(0.4, "xy");
-        // for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
-        //     ax->CenterTitle();
-        //     if (!axis_label) ax->SetNdivisions(0); // remove ticks and label
-        // }
+        f->SetTitleFont(font);
+        f->SetLabelFont(font);
+        f->SetTitleSize(font_size, "xy");
+        f->SetLabelSize(font_size, "xy");
+        f->SetTitleOffset(1.5, "xy");
+        for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
+            ax->CenterTitle();
+        }
 
         c->cd();
         p->Draw();
@@ -294,7 +285,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
     //     gs[s]->Draw(draw_opt);
     // }
 
-    gStyle->SetPalette(kCherry);
+    gStyle->SetPalette(kCividis);
     TArrayI const& colors = TColor::GetPalette();
 
     struct range {
@@ -308,24 +299,27 @@ void ana::PDHDED::analyze(art::Event const& e) {
     } r_adc{0.F, 100.F};
 
     TMarker* m = new TMarker();
-    // m->SetMarkerColor(color);
     m->SetMarkerStyle(kFullCircle);
-    // m->SetMarkerSize(size);
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
         int s = map_tpc_sec[p_hit->WireID().TPC];
         if (s == -1) continue;
         float const x = r_adc.normalize(p_hit->Integral());
-        m->SetMarkerSize(2*x);
-        m->SetMarkerColor(colors[int(colors.GetSize()*x)]);
+        m->SetMarkerSize(2*x+0.1);
+        m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
+        ps[s]->cd();
         m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
     }
 
-    c->Write();
+    unsigned g=0;
+    for (art::Ptr<recob::Track> p_trk : vp_trk) {
+        // if (p_trk->Length() > 40) continue;
+        std::vector<art::Ptr<recob::Hit>> vp_hit_from_trk = fmp_trk2hit.at(p_trk.key());
+        drawGraph(ps, vp_hit_from_trk, "l", kOrange-10+g, 0, 0, 1);
+        g++;
+    }
 
-    // std::cout << "next event? (enter)"; 
-    // std::string input;
-    // std::getline(std::cin, input);
+    c->Write();
 }
 
 void ana::PDHDED::beginJob() {}
@@ -333,6 +327,43 @@ void ana::PDHDED::endJob() {}
 
 double ana::PDHDED::GetSpace(geo::WireID wid) {
     return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
+}
+
+void ana::PDHDED::drawGraph(std::vector<TPad*> ps, std::vector<art::Ptr<recob::Hit>> vp_hit, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3) {
+    std::map<unsigned, int> static map_tpc_sec = {
+        {0, -1},
+        {1, 0},
+        {2, 1},
+        {3, -1},
+        {4, -1},
+        {5, 0},
+        {6, 1},
+        {7, -1}
+    };
+    unsigned static ng = 0;
+    ng++;
+    std::vector<TGraph*> gs{ps.size()};
+    for (unsigned s=0; s<ps.size(); s++) {
+        TGraph* g = gs[s] = new TGraph();
+        g->SetName(Form("g%u_%u", ng, s));
+        g->SetEditable(kFALSE);
+        g->SetMarkerColor(color);
+        g->SetMarkerStyle(style);
+        g->SetMarkerSize(size);
+        g->SetLineColor(color);
+        g->SetLineWidth(width);
+    }
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        int s = map_tpc_sec[p_hit->WireID().TPC];
+        if (s == -1) continue;
+        gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+    }
+    for (unsigned s=0; s<ps.size(); s++) {
+        ps[s]->cd();
+        if (!gs[s]->GetN()) continue;
+        gs[s]->Draw(draw_opt);
+    }
 }
 
 DEFINE_ART_MODULE(ana::PDHDED)
