@@ -176,13 +176,21 @@ void ana::PDHDED::analyze(art::Event const& e) {
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
-    std::cout << "e" << e.event() << "\r" << std::flush;
+    // std::cout << "e" << e.event() << "\r" << std::flush;
+    std::cout << "e.run: " << e.run() << std::endl
+        << "e.subRun: " << e.subRun() << std::endl
+        << "e.event: " << e.event() << std::endl
+        << "e.id: " << e.id() << std::endl;
 
     // TCanvas *c = new TCanvas(
     //     Form("e%u", e.event()), 
     //     Form("e%u", e.event())
     // );
-    TCanvas *c = tfs->make<TCanvas>(Form("c%u", e.event()),Form("c%u", e.event()));
+
+    TCanvas *c = tfs->make<TCanvas>(
+        Form("c_r%us%ue%u", e.run(), e.subRun(), e.event()),
+        Form("c_r%us%ue%u", e.run(), e.subRun(), e.event())
+    );
     // cs.push_back(c);
 
     std::map<unsigned, int> map_tpc_sec = {
@@ -309,7 +317,7 @@ void ana::PDHDED::analyze(art::Event const& e) {
     //     drawGraph(ps, MichelHits, "p", kC6Blue);
     // }
 
-    // c->Write();
+    c->Write();
 
     // std::cout << "next event? (enter)"; 
     // std::string input;
