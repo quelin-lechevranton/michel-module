@@ -8,7 +8,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 #include "utils.h"
-#include <TCan_secas.h>
+#include <TCanvas.h>
 #include <TH2F.h>
 #include <TGraph.h>
 #include <TMarker.h>
@@ -76,7 +76,7 @@ private:
     unsigned cn=0;
 
 
-    // std::vector<TCan_secas*> cs;
+    // std::vector<TCanvas*> cs;
     double GetSpace(geo::WireID);
     // void drawGraph(std::vector<TPad*>, std::vector<art::Ptr<recob::Hit>>, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3);
 };
@@ -235,12 +235,12 @@ void ana::PDED::analyze(art::Event const& e) {
 
     // std::cout << "e" << e.event() << "\r" << std::flush;
 
-    // TCan_secas *c = new TCan_secas(
+    // TCanvas *c = new TCanvas(
     //     Form("e%u", e.event()), 
     //     Form("e%u", e.event())
     // );
 
-    TCan_secas *c = tfs->make<TCan_secas>(
+    TCanvas *c = tfs->make<TCanvas>(
         Form("c%u", cn++),
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
@@ -253,6 +253,7 @@ void ana::PDED::analyze(art::Event const& e) {
     // int const font = 43; // 80 = courrier, 3 = font size in pixel
     // float const font_size = 20;
 
+    Style_t const font = 43;
     struct binning {
         unsigned n;
         float min, max;
@@ -268,8 +269,6 @@ void ana::PDED::analyze(art::Event const& e) {
     struct { Float_t l, r, b, t; } pad_margin;
     Float_t title_offset_x, title_offset_y;
     std::string X, Y;
-
-    Style_t const font = 43;
     if (geoDet == kPDVD) {
         c->Divide(4, 2);
         n_sec = 8;
@@ -282,8 +281,6 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.14, 0.04, 0.09, 0.06};
         title_offset_x = 1.3;
         title_offset_y = 1.7;
-        X = "S";
-        Y = "T";
     } else if (geoDet == kPDHD) {
         c->Divide(2, 1);
         n_sec = 2;
@@ -296,8 +293,6 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.1, 0.04, 0.09, 0.06};
         title_offset_x = 1.5;
         title_offset_y = 1.5;
-        X = "T";
-        Y = "S";
     }
         
     for (unsigned s=0; s<n_sec; s++) {
@@ -316,6 +311,7 @@ void ana::PDED::analyze(art::Event const& e) {
         f->SetTitleOffset(title_offset_x, "x");
         f->SetTitleOffset(title_offset_y, "y");
         for (TAxis* ax : {f->GetXaxis(), f->GetYaxis()}) ax->CenterTitle();
+        // f->Draw(s ? "rx" : "");
         f->Draw();
 
         TText* t = new TText(
@@ -333,83 +329,15 @@ void ana::PDED::analyze(art::Event const& e) {
             TText* tt = new TText(
                 1-gPad->GetRightMargin(),
                 1-gPad->GetTopMargin()+0.01,
-                Form("R%u-SR%u-E%u", e.run(), e.subRun(), e.event())
+                Form("R:%u-SR:%u-E:%u", e.run(), e.subRun(), e.event())
             );
             tt->SetNDC();
-            tt->SetTextFont(font);
+            tt->SetTextFont(103); 
             tt->SetTextSize(font_size);
             tt->SetTextAlign(kHAlignRight + kVAlignBottom);
             tt->Draw();
         }
     }
-
-
-
-
-
-    // std::vector<TPad*> ps{n_section};
-    // for (unsigned s=0; s<n_section; s++) {
-    //     TPad* p = ps[s] = new TPad(
-    //         Form("pad_s%u", s),
-    //         Form("pad_s%u", s),
-    //         0.5*s, 0.,
-    //         0.5*(s+1), 1.
-    //     );
-    //     p->SetMargin(0.15, 0.05, 0.1, 0.05);
-    //     p->SetTicks(1, 1);
-
-    //     TH2F* f = new TH2F(
-    //         Form("frame_s%u", s),
-    //         axis_label ? ";T;Z" : "", 
-    //         b_t.n, b_t.min, b_t.max,
-    //         b_z.n, b_z.min, b_z.max
-    //     );
-    //     f->SetStats(kFALSE);
-    //     f->SetDirectory(nullptr);
-
-    //     f->SetTitleFont(font);
-    //     f->SetLabelFont(font);
-    //     f->SetTitleSize(font_size, "xy");
-    //     f->SetLabelSize(font_size, "xy");
-    //     f->SetTitleOffset(1.5, "xy");
-    //     for (TAxis *ax : {f->GetXaxis(), f->GetYaxis()}) {
-    //         ax->CenterTitle();
-    //     }
-
-    //     c->cd();
-    //     p->Draw();
-    //     p->cd();
-    //     // f->Draw(s ? "rx" : "");
-    //     f->Draw();
-    // }
-
-    // Color_t const color = kGray;
-    // Style_t const style = kFullSquare;
-    // Size_t const size = 0.3;
-    // Width_t const width = 0.3;
-    // char const * draw_opt = "p";
-    // std::vector<TGraph*> gs{n_section};
-    // for (unsigned s=0; s<n_section; s++) {
-    //     TGraph* g = gs[s] = new TGraph();
-    //     g->SetName(Form("g%u_%u", 0, s));
-    //     g->SetEditable(kFALSE);
-    //     g->SetMarkerColor(color);
-    //     g->SetMarkerStyle(style);
-    //     g->SetMarkerSize(size);
-    //     g->SetLineColor(color);
-    //     g->SetLineWidth(width);
-    // }
-    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-    //     if (p_hit->View() != geo::kW) continue;
-    //     int s = tpc2sec[p_hit->WireID().TPC];
-    //     if (s == -1) continue;
-    //     gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-    // }
-    // for (unsigned s=0; s<n_section; s++) {
-    //     ps[s]->cd();
-    //     if (!gs[s]->GetN()) continue;
-    //     gs[s]->Draw(draw_opt);
-    // }
 
     gStyle->SetPalette(kCividis);
     TArrayI const& colors = TColor::GetPalette();
@@ -422,7 +350,7 @@ void ana::PDED::analyze(art::Event const& e) {
             if (x >= max) return 1.F;
             return (x-min) / (max-min);
         }
-    } r_adc{0.F, 100.F};
+    } r_adc{0.F, 300.F};
 
     TMarker* m = new TMarker();
     m->SetMarkerStyle(kFullCircle);
@@ -433,11 +361,12 @@ void ana::PDED::analyze(art::Event const& e) {
         float const x = r_adc.normalize(p_hit->Integral());
         m->SetMarkerSize(2*x+0.1);
         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
-        // ps[s]->cd();
-        // m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
 
         c->cd(s+1);
-        m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        if (geoDet == kPDVD)
+            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+        else if (geoDet == kPDHD)
+            m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
     }
 
     // unsigned g=0;
