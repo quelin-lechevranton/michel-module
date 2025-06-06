@@ -10,6 +10,10 @@
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };
+    std::vector<unsigned> n_sec = {
+        8, // PDVD
+        2  // PDHD
+    };
     std::vector<std::map<unsigned, int>> tpc2sec = {
         { // PDVD
             {0, 0}, {2, 0},
@@ -47,7 +51,6 @@ namespace ana {
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0) {
         Style_t const font = 43;
         unsigned n_sec = 0;
-        std::function<TH2F(unsigned)> frame;
         Style_t font_size;
         struct { Float_t l, r, b, t; } pad_margin;
         Float_t title_offset_x, title_offset_y;
@@ -55,11 +58,6 @@ namespace ana {
         if (geoDet == kPDVD) {
             c->Divide(4, 2);
             n_sec = 8;
-            frame = [](unsigned s) -> TH2F {
-                return TH2F(Form("f%u", s), ";Z;T",
-                        600, 0, 300,
-                        600, 0, 6000);
-            };
             font_size = 12;
             pad_margin = {0.14, 0.04, 0.09, 0.06};
             title_offset_x = 1.3;
@@ -67,16 +65,12 @@ namespace ana {
         } else if (geoDet == kPDHD) {
             c->Divide(2, 1);
             n_sec = 2;
-            frame = [](unsigned s) -> TH2F {
-                return TH2F(Form("f%u", s), ";T;Z",
-                        600, 0, 6000,
-                        600, 0, 300);
-            };
             font_size = 20;
             pad_margin = {0.1, 0.04, 0.09, 0.06};
             title_offset_x = 1.5;
             title_offset_y = 1.5;
         }
+
         for (unsigned s=0; s<n_sec; s++) {
             c->cd(s+1);
             gPad->SetMargin(
@@ -84,7 +78,16 @@ namespace ana {
                 pad_margin.b, pad_margin.t
             );
             gPad->SetTicks(1, 1);
-            TH2F* f = new TH2F(frame(s));
+            TH2F* f;
+            if (geoDet == kPDVD) {
+                f = new TH2F(Form("f%u", s), ";Z;T",
+                    600, 0, 300,
+                    600, 0, 6000);
+            } else if (geoDet == kPDHD) {
+                f = new TH2F(Form("f%u", s), ";T;Z",
+                    600, 0, 6000,
+                    600, 0, 300);
+            }
             f->SetStats(kFALSE);
             f->SetTitleFont(43, "xyz");
             f->SetLabelFont(43, "xyz");

@@ -244,24 +244,58 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     };
 
     gStyle->SetPalette(kCividis);
-    TArrayI const& colors = TColor::GetPalette();
-    TMarker* m = new TMarker();
-    m->SetMarkerStyle(kFullCircle);
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        if (p_hit->View() != geo::kW) continue;
-        // int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        // if (s == -1) continue;
-        float const x = std::min(p_hit->Integral() / (geoDet == kPDVD ? 200.F : 1000.F), 1.F);
-        m->SetMarkerSize(2*x+0.1);
-        m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
+    // TArrayI const& colors = TColor::GetPalette();
+    // TMarker* m = new TMarker();
+    // m->SetMarkerStyle(kFullCircle);
+    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+    //     if (p_hit->View() != geo::kW) continue;
+    //     float const x = std::min(p_hit->Integral() / (geoDet == kPDVD ? 200.F : 1000.F), 1.F);
+    //     m->SetMarkerSize(2*x+0.1);
+    //     m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
 
-        // c->cd(s+1);
-        // if (geoDet == kPDVD)
-        //     m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
-        // else if (geoDet == kPDHD)
-        //     m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-        drawMarker(m, p_hit);
+    //     drawMarker(m, p_hit);
+    // }
+
+    if (geoDet == kPDVD) {
+        std::vector<TH2F*> h2(ana::n_sec[geoDet], nullptr);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+                h2[s] = new TH2F(
+                Form("h2_%u", s),
+                "event hits",
+                600, 0, 300,
+                600, 0, 6000
+            );
+        }
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            h2[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), p_hit->Integral());
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            c->cd(s+1);
+            h2[s]->Draw("COL");
+        }
+    } else if (geoDet == kPDHD) {
+        std::vector<TH2F*> h2(ana::n_sec[geoDet], nullptr);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            h2[s] = new TH2F(
+                Form("h2_%u", s),
+                "event hits",
+                600, 0, 6000,
+                600, 0, 300
+            );
+        }
+        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            h2[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), p_hit->Integral());
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            c->cd(s+1);
+            h2[s]->Draw("COL");
+        }
     }
+
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
@@ -285,6 +319,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         std::vector<art::Ptr<recob::Hit>> trk_ends = GetEndsHits(vp_hit_muon);
         if (!LOG(trk_ends.size())) continue;
 
+        TMarker* m = new TMarker();
         m->SetMarkerStyle(kFullTriangleUp);
         m->SetMarkerColor(kOrange+6);
         m->SetMarkerSize(2);
