@@ -331,7 +331,7 @@ void ana::PDED::analyze(art::Event const& e) {
         if (p_hit->View() != geo::kW) continue;
         int s = tpc2sec[p_hit->WireID().TPC];
         if (s == -1) continue;
-        float const x = p_hit->Integral() / (geoDet == kPDVD ? 1000.F : 200.F);
+        float const x = std::min(p_hit->Integral() / (geoDet == kPDVD ? 200.F : 1000.F), 1.F);
         m->SetMarkerSize(2*x+0.1);
         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
 
