@@ -50,7 +50,7 @@ namespace ana {
         std::function<TH2F(unsigned)> frame;
         Style_t font_size;
         struct { Float_t l, r, b, t; } pad_margin;
-        Float_t title_offset_x, title_offset_y, maxadc;
+        Float_t title_offset_x, title_offset_y;
 
         if (geoDet == kPDVD) {
             c->Divide(4, 2);

@@ -246,14 +246,6 @@ void ana::PDED::analyze(art::Event const& e) {
         float step(void) const { return (max-min)/n; }
     }   b_z{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
         b_t{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
-    struct range {
-        float min, max;
-        float normalize(float x) const {
-            if (x <= min) return 0.F;
-            if (x >= max) return 1.F;
-            return (x-min) / (max-min);
-        }
-    } r_adc;
 
     unsigned n_sec = 0;
     std::function<TH2F(unsigned)> frame;
@@ -273,7 +265,6 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.14, 0.04, 0.09, 0.06};
         title_offset_x = 1.3;
         title_offset_y = 1.7;
-        r_adc = {0.F, 1000.F};
     } else if (geoDet == kPDHD) {
         c->Divide(2, 1);
         n_sec = 2;
@@ -286,7 +277,6 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.1, 0.04, 0.09, 0.06};
         title_offset_x = 1.5;
         title_offset_y = 1.5;
-        r_adc = {0.F, 200.F};
     }
         
     for (unsigned s=0; s<n_sec; s++) {
@@ -341,7 +331,7 @@ void ana::PDED::analyze(art::Event const& e) {
         if (p_hit->View() != geo::kW) continue;
         int s = tpc2sec[p_hit->WireID().TPC];
         if (s == -1) continue;
-        float const x = r_adc.normalize(p_hit->Integral());
+        float const x = p_hit->Integral() / (geoDet == kPDVD ? 1000.F : 200.F);
         m->SetMarkerSize(2*x+0.1);
         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
 
