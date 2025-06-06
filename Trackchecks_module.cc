@@ -257,9 +257,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     // }
 
     if (geoDet == kPDVD) {
-        std::vector<TH2F*> h2(ana::n_sec[geoDet], nullptr);
+        std::vector<TH2F*> h2(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-                h2[s] = new TH2F(
+            h2[s] = new TH2F(
                 Form("h2_%u", s),
                 "event hits",
                 600, 0, 300,
@@ -282,12 +282,13 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 Form("h2_%u", s),
                 "event hits",
                 600, 0, 6000,
-                600, 0, 300
+                600, 0, 464
             );
         }
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
             h2[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), p_hit->Integral());
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {

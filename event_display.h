@@ -86,7 +86,7 @@ namespace ana {
             } else if (geoDet == kPDHD) {
                 f = new TH2F(Form("f%u", s), ";T;Z",
                     600, 0, 6000,
-                    600, 0, 300);
+                    600, 0, 464);
             }
             f->SetStats(kFALSE);
             f->SetTitleFont(43, "xyz");
