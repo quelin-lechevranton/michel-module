@@ -100,7 +100,7 @@ private:
     ana::Point MuonEndTrackPoint;
     // ana::Point MuonTrueEndPoint;    
     // float MuonTrueEndPointT;
-    ana::Point MuonTrueEndMomentum;
+    // ana::Point MuonTrueEndMomentum;
     float MuonTrueEndEnergy;
     // ana::Points MuonSpacePoints;
     // ana::Point MuonEndSpacePoint;
@@ -297,10 +297,10 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     MuonEndTrackPoint.SetBranches(tMuon, "EndTrack");
     // MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
     // tMuon->Branch("TrueEndPointT", &MuonTrueEndPointT); // ns
-    tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x); // GeV
-    tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y); // GeV
-    tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z); // GeV
-    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); // GeV
+    // tMuon->Branch("TrueEndMomentumX", &MuonTrueEndMomentum.x); // GeV
+    // tMuon->Branch("TrueEndMomentumY", &MuonTrueEndMomentum.y); // GeV
+    // tMuon->Branch("TrueEndMomentumZ", &MuonTrueEndMomentum.z); // GeV
+    // tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); // GeV
     // MuonSpacePoints.SetBranches(tMuon, "Space");
     // MuonEndSpacePoint.SetBranches(tMuon, "EndSpace");
 
@@ -481,14 +481,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             MuonEndProcess = mcp->EndProcess();
             // MuonTrueEndPoint = ana::Point{mcp->EndPosition().Vect()};
             // MuonTrueEndPointT = mcp->EndT();
-            MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
-            MuonTrueEndEnergy = mcp->EndE();
+            // MuonTrueEndMomentum = ana::Point{mcp->EndMomentum().Vect()};
+            // MuonTrueEndEnergy = mcp->EndE();
         } else {
             MuonEndProcess = "";
             // MuonTrueEndPoint = ana::Point{};
             // MuonTrueEndPointT = 0;
-            MuonTrueEndMomentum = ana::Point{};
-            MuonTrueEndEnergy = 0;
+            // MuonTrueEndMomentum = ana::Point{};
+            // MuonTrueEndEnergy = 0;
         }
 
         // getting all muon hits

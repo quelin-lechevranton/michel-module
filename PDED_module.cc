@@ -46,8 +46,8 @@ private:
     // art::ServiceHandle<cheat::ParticleIn_secentoryService> pi_serv;
     // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
-    int geoDet;
     enum EnumDet { kPDVD, kPDHD };
+    EnumDet geoDet;
 
     // Detector Properties
     // float fADC2MeV;
@@ -76,9 +76,7 @@ private:
     unsigned cn=0;
 
 
-    // std::vector<TCanvas*> cs;
     double GetSpace(geo::WireID);
-    // void drawGraph(std::vector<TPad*>, std::vector<art::Ptr<recob::Hit>>, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3);
 };
 
 
@@ -233,25 +231,11 @@ void ana::PDED::analyze(art::Event const& e) {
     art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
     art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
 
-    // std::cout << "e" << e.event() << "\r" << std::flush;
-
-    // TCanvas *c = new TCanvas(
-    //     Form("e%u", e.event()), 
-    //     Form("e%u", e.event())
-    // );
-
     TCanvas *c = tfs->make<TCanvas>(
         Form("c%u", cn++),
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
     );
-    // cs.push_back(c);
-
-
-    // unsigned const n_section = 2;
-    // bool const axis_label = true;
-    // int const font = 43; // 80 = courrier, 3 = font size in pixel
-    // float const font_size = 20;
 
     Style_t const font = 43;
     struct binning {
@@ -262,6 +246,14 @@ void ana::PDED::analyze(art::Event const& e) {
         float step(void) const { return (max-min)/n; }
     }   b_z{(float) geoHighX.MinZ(), (float) geoHighX.MaxZ(), fChannelPitch},
         b_t{wireWindow.min, wireWindow.max, fChannelPitch / fTick2cm};
+    struct range {
+        float min, max;
+        float normalize(float x) const {
+            if (x <= min) return 0.F;
+            if (x >= max) return 1.F;
+            return (x-min) / (max-min);
+        }
+    } r_adc;
 
     unsigned n_sec = 0;
     std::function<TH2F(unsigned)> frame;
@@ -281,6 +273,7 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.14, 0.04, 0.09, 0.06};
         title_offset_x = 1.3;
         title_offset_y = 1.7;
+        r_adc = {0.F, 1000.F};
     } else if (geoDet == kPDHD) {
         c->Divide(2, 1);
         n_sec = 2;
@@ -293,6 +286,7 @@ void ana::PDED::analyze(art::Event const& e) {
         pad_margin = {0.1, 0.04, 0.09, 0.06};
         title_offset_x = 1.5;
         title_offset_y = 1.5;
+        r_adc = {0.F, 200.F};
     }
         
     for (unsigned s=0; s<n_sec; s++) {
@@ -341,17 +335,6 @@ void ana::PDED::analyze(art::Event const& e) {
 
     gStyle->SetPalette(kCividis);
     TArrayI const& colors = TColor::GetPalette();
-
-    struct range {
-        float min, max;
-        range(float m, float M) : min(m), max(M) {}
-        float normalize(float x) const {
-            if (x <= min) return 0.F;
-            if (x >= max) return 1.F;
-            return (x-min) / (max-min);
-        }
-    } r_adc{0.F, 300.F};
-
     TMarker* m = new TMarker();
     m->SetMarkerStyle(kFullCircle);
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
@@ -386,42 +369,5 @@ void ana::PDED::endJob() {}
 double ana::PDED::GetSpace(geo::WireID wid) {
     return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
 }
-
-// void ana::PDED::drawGraph(std::vector<TPad*> ps, std::vector<art::Ptr<recob::Hit>> vp_hit, char const* draw_opt, int color = kBlack, int style = kFullCircle, float size = .3, float width = .3) {
-//     std::map<unsigned, int> static tpc2sec = {
-//         {0, -1},
-//         {1, 0},
-//         {2, 1},
-//         {3, -1},
-//         {4, -1},
-//         {5, 0},
-//         {6, 1},
-//         {7, -1}
-//     };
-//     unsigned static ng = 0;
-//     ng++;
-//     std::vector<TGraph*> gs{ps.size()};
-//     for (unsigned s=0; s<ps.size(); s++) {
-//         TGraph* g = gs[s] = new TGraph();
-//         g->SetName(Form("g%u_%u", ng, s));
-//         g->SetEditable(kFALSE);
-//         g->SetMarkerColor(color);
-//         g->SetMarkerStyle(style);
-//         g->SetMarkerSize(size);
-//         g->SetLineColor(color);
-//         g->SetLineWidth(width);
-//     }
-//     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//         if (p_hit->View() != geo::kW) continue;
-//         int s = tpc2sec[p_hit->WireID().TPC];
-//         if (s == -1) continue;
-//         gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-//     }
-//     for (unsigned s=0; s<ps.size(); s++) {
-//         ps[s]->cd();
-//         if (!gs[s]->GetN()) continue;
-//         gs[s]->Draw(draw_opt);
-//     }
-// }
 
 DEFINE_ART_MODULE(ana::PDED)
