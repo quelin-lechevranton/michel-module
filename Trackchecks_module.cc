@@ -230,23 +230,38 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     );
     ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event());
 
+    auto drawMarker = [this, c](TMarker* m, art::Ptr<recob::Hit> const& p_hit) {
+        if (geoDet == kPDVD) {
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            c->cd(s+1);
+            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+        } else if (geoDet == kPDHD) {
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) return;
+            c->cd(s+1);
+            m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        }
+    };
+
+
     gStyle->SetPalette(kCividis);
     TArrayI const& colors = TColor::GetPalette();
     TMarker* m = new TMarker();
     m->SetMarkerStyle(kFullCircle);
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        if (s == -1) continue;
+        // int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        // if (s == -1) continue;
         float const x = p_hit->Integral() / (geoDet == kPDVD ? 1000.F : 200.F);
         m->SetMarkerSize(2*x+0.1);
         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
 
-        c->cd(s+1);
-        if (geoDet == kPDVD)
-            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
-        else if (geoDet == kPDHD)
-            m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        // c->cd(s+1);
+        // if (geoDet == kPDVD)
+        //     m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+        // else if (geoDet == kPDHD)
+        //     m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        drawMarker(m, p_hit);
     }
 
     // loop over tracks to find muons
@@ -274,25 +289,33 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         m->SetMarkerStyle(kFullTriangleUp);
         m->SetMarkerColor(kOrange+6);
         m->SetMarkerSize(2);
-        if (geoDet == kPDVD) {
-            m->DrawMarker(GetSpace(trk_ends.front()->WireID()), trk_ends.front()->PeakTime());
-            m->DrawMarker(GetSpace(trk_ends.back()->WireID()), trk_ends.back()->PeakTime());
-        } else if (geoDet == kPDHD) {
-            m->DrawMarker(trk_ends.front()->PeakTime(), GetSpace(trk_ends.front()->WireID()));
-            m->DrawMarker(trk_ends.back()->PeakTime(), GetSpace(trk_ends.back()->WireID()));
-        }
+        // if (geoDet == kPDVD) {
+        //     int s = ana::tpc2sec[geoDet][trk_ends.front()->WireID().TPC];
+        //     c->cd(s+1);
+        //     m->DrawMarker(GetSpace(trk_ends.front()->WireID()), trk_ends.front()->PeakTime());
+        //     s = ana::tpc2sec[geoDet][trk_ends.back()->WireID().TPC];
+        //     c->cd(s+1);
+        //     m->DrawMarker(GetSpace(trk_ends.back()->WireID()), trk_ends.back()->PeakTime());
+        // } else if (geoDet == kPDHD) {
+        //     m->DrawMarker(trk_ends.front()->PeakTime(), GetSpace(trk_ends.front()->WireID()));
+        //     m->DrawMarker(trk_ends.back()->PeakTime(), GetSpace(trk_ends.back()->WireID()));
+        // }
+        drawMarker(m, trk_ends.front());
+        drawMarker(m, trk_ends.back());
 
         if (trk_ends.size() > 2) {
             m->SetMarkerStyle(kFullTriangleDown);
             m->SetMarkerColor(kOrange+2);
             m->SetMarkerSize(2);
-            if (geoDet == kPDVD) {
-                m->DrawMarker(GetSpace(trk_ends[1]->WireID()), trk_ends[1]->PeakTime());
-                m->DrawMarker(GetSpace(trk_ends[2]->WireID()), trk_ends[2]->PeakTime());
-            } else if (geoDet == kPDHD) {
-                m->DrawMarker(trk_ends[1]->PeakTime(), GetSpace(trk_ends[1]->WireID()));
-                m->DrawMarker(trk_ends[2]->PeakTime(), GetSpace(trk_ends[2]->WireID()));
-            }
+            // if (geoDet == kPDVD) {
+            //     m->DrawMarker(GetSpace(trk_ends[1]->WireID()), trk_ends[1]->PeakTime());
+            //     m->DrawMarker(GetSpace(trk_ends[2]->WireID()), trk_ends[2]->PeakTime());
+            // } else if (geoDet == kPDHD) {
+            //     m->DrawMarker(trk_ends[1]->PeakTime(), GetSpace(trk_ends[1]->WireID()));
+            //     m->DrawMarker(trk_ends[2]->PeakTime(), GetSpace(trk_ends[2]->WireID()));
+            // }
+            drawMarker(m, trk_ends[1]);
+            drawMarker(m, trk_ends[2]);
         }
 
         // fiducial cuts
