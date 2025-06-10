@@ -269,11 +269,12 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            h2[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), p_hit->Integral());
+            int q = std::min(p_hit->Integral() / 200, 1.F);
+            h2[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), q);
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             c->cd(s+1);
-            h2[s]->Draw("COL");
+            h2[s]->Draw("same col");
         }
     } else if (geoDet == kPDHD) {
         std::vector<TH2F*> h2(ana::n_sec[geoDet], nullptr);
@@ -289,17 +290,20 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             if (p_hit->View() != geo::kW) continue;
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             if (s == -1) continue;
-            h2[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), p_hit->Integral());
+            int q = std::min(p_hit->Integral() / 1000, 1.F);
+            h2[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), q);
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             c->cd(s+1);
-            h2[s]->Draw("COL");
+            h2[s]->Draw("same col");
         }
     }
 
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
+
+        bool vetoed = p_trk->Length() < fTrackLengthCut;
 
         // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         // tracks associated to a MCTruth muon
@@ -321,34 +325,18 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         if (!LOG(trk_ends.size())) continue;
 
         TMarker* m = new TMarker();
-        m->SetMarkerStyle(kFullTriangleUp);
         m->SetMarkerColor(kOrange+6);
-        m->SetMarkerSize(2);
-        // if (geoDet == kPDVD) {
-        //     int s = ana::tpc2sec[geoDet][trk_ends.front()->WireID().TPC];
-        //     c->cd(s+1);
-        //     m->DrawMarker(GetSpace(trk_ends.front()->WireID()), trk_ends.front()->PeakTime());
-        //     s = ana::tpc2sec[geoDet][trk_ends.back()->WireID().TPC];
-        //     c->cd(s+1);
-        //     m->DrawMarker(GetSpace(trk_ends.back()->WireID()), trk_ends.back()->PeakTime());
-        // } else if (geoDet == kPDHD) {
-        //     m->DrawMarker(trk_ends.front()->PeakTime(), GetSpace(trk_ends.front()->WireID()));
-        //     m->DrawMarker(trk_ends.back()->PeakTime(), GetSpace(trk_ends.back()->WireID()));
-        // }
-        drawMarker(m, trk_ends.front());
-        drawMarker(m, trk_ends.back());
+        if (trk_ends.size() == 2) {
+            m->SetMarkerStyle(vetoed ? kOpenSquare : kFullSquare);
+            drawMarker(m, trk_ends.front());
+            drawMarker(m, trk_ends.back());
+        } else {
+            m->SetMarkerStyle(vetoed ? kOpenTriangleUp : kFullTriangleUp);
+            drawMarker(m, trk_ends.front());
+            drawMarker(m, trk_ends.back());
 
-        if (trk_ends.size() > 2) {
             m->SetMarkerStyle(kFullTriangleDown);
-            m->SetMarkerColor(kOrange+2);
-            m->SetMarkerSize(2);
-            // if (geoDet == kPDVD) {
-            //     m->DrawMarker(GetSpace(trk_ends[1]->WireID()), trk_ends[1]->PeakTime());
-            //     m->DrawMarker(GetSpace(trk_ends[2]->WireID()), trk_ends[2]->PeakTime());
-            // } else if (geoDet == kPDHD) {
-            //     m->DrawMarker(trk_ends[1]->PeakTime(), GetSpace(trk_ends[1]->WireID()));
-            //     m->DrawMarker(trk_ends[2]->PeakTime(), GetSpace(trk_ends[2]->WireID()));
-            // }
+            m->SetMarkerColor(kPink-2);
             drawMarker(m, trk_ends[1]);
             drawMarker(m, trk_ends[2]);
         }
@@ -449,6 +437,8 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //     MichelHitEnergy = -1;
         // }
     } // end of loop over tracks
+
+    c->Write();
 }
 
 void ana::Trackchecks::beginJob() {}
