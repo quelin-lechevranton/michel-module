@@ -303,7 +303,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
 
-        bool vetoed = p_trk->Length() < fTrackLengthCut;
+        bool tooSmall = p_trk->Length() < fTrackLengthCut;
 
         // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         // tracks associated to a MCTruth muon
@@ -321,22 +321,33 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //     if (deephit) MuonTrueEndHit = GetHit(deephit);
         // } else MuonTrueEndHit = ana::Hit{};
 
+
+
         std::vector<art::Ptr<recob::Hit>> trk_ends = GetEndsHits(vp_hit_muon);
         if (!LOG(trk_ends.size())) continue;
 
+        bool outsideFront = !wireWindow.isInside(trk_ends.front()->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.front()->WireID()), fMichelSpaceRadius);
+        bool outsideBack = !wireWindow.isInside(trk_ends.back()->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.back()->WireID()), fMichelSpaceRadius);
+
+
         TMarker* m = new TMarker();
-        m->SetMarkerColor(kOrange+6);
         if (trk_ends.size() == 2) {
-            m->SetMarkerStyle(vetoed ? kOpenSquare : kFullSquare);
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
             drawMarker(m, trk_ends.front());
+            m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
             drawMarker(m, trk_ends.back());
         } else {
-            m->SetMarkerStyle(vetoed ? kOpenTriangleUp : kFullTriangleUp);
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
             drawMarker(m, trk_ends.front());
+            m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
             drawMarker(m, trk_ends.back());
 
             m->SetMarkerStyle(kFullTriangleDown);
-            m->SetMarkerColor(kPink-2);
+            m->SetMarkerColor(tooSmall ? kGray : kPink-2);
             drawMarker(m, trk_ends[1]);
             drawMarker(m, trk_ends[2]);
         }
