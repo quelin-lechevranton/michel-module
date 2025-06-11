@@ -333,100 +333,81 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         // } else MuonTrueEndHit = ana::Hit{};
 
 
-        // std::vector<art::Ptr<recob::Hit>> trk_ends = GetEndsHits(vp_hit_muon);
-        // if (!LOG(trk_ends.size())) continue;
+        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> cathode_crossing;
+        std::vector<art::Ptr<recob::Hit>> tpc_crossing;
 
-        // bool outsideFront = !wireWindow.isInside(trk_ends.front()->PeakTime(), fMichelTickRadius)
-        //     || !geoHighX.InFiducialZ(GetSpace(trk_ends.front()->WireID()), fMichelSpaceRadius);
-        // bool outsideBack = !wireWindow.isInside(trk_ends.back()->PeakTime(), fMichelTickRadius)
-        //     || !geoHighX.InFiducialZ(GetSpace(trk_ends.back()->WireID()), fMichelSpaceRadius);
+        auto trk_ends = GetEndHits(
+            vp_hit_muon,
+            &cathode_crossing,
+            &tpc_crossing
+        );
+        if (!LOG(trk_ends.first.isNonnull())) continue;
 
-        // TMarker* m = new TMarker();
-        // if (trk_ends.size() == 2) {
-        //     m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-        //     m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
-        //     drawMarker(m, trk_ends.front());
-        //     m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
-        //     drawMarker(m, trk_ends.back());
-        // } else {
-        //     m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-        //     m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
-        //     drawMarker(m, trk_ends.front());
-        //     m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
-        //     drawMarker(m, trk_ends.back());
+        bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
+        bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
-        //     m->SetMarkerStyle(kFullTriangleDown);
-        //     m->SetMarkerColor(tooSmall ? kGray : kPink-2);
-        //     drawMarker(m, trk_ends[1]);
-        //     drawMarker(m, trk_ends[2]);
-        // }
+        TMarker* m = new TMarker();
+        if (cathode_crossing.first.isNull()) {
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
+            drawMarker(m, trk_ends.second);
+        } else {
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
+            drawMarker(m, trk_ends.second);
 
-        // auto *ppp_cathode_crossing = new std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>();
-        // auto *pvp_tpc_crossing = new std::vector<art::Ptr<recob::Hit>>();
+            m->SetMarkerStyle(kFullTriangleDown);
+            m->SetMarkerColor(tooSmall ? kGray : kPink-2);
+            drawMarker(m, cathode_crossing.first);
+            drawMarker(m, cathode_crossing.second);
+        }
+        if (tpc_crossing.size()) {
+            m->SetMarkerStyle(kFullCircle);
+            m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
+            for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
+                drawMarker(m, p_hit);
+        }
 
-        // auto trk_ends = GetEndHits(
-        //     vp_hit_muon,
-        //     ppp_cathode_crossing,
-        //     pvp_tpc_crossing
-        // );
-        // if (!LOG(trk_ends.first.isNonnull())) continue;
-
-        // bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
-        //     || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
-        // bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
-        //     || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
-
-        // TMarker* m = new TMarker();
-        // if (ppp_cathode_crossing->first.isNull()) {
-        //     m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-        //     m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
-        //     drawMarker(m, trk_ends.first);
-        //     m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
-        //     drawMarker(m, trk_ends.second);
-        // } else {
-        //     m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-        //     m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
-        //     drawMarker(m, trk_ends.first);
-        //     m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
-        //     drawMarker(m, trk_ends.second);
-
-        //     m->SetMarkerStyle(kFullTriangleDown);
-        //     m->SetMarkerColor(tooSmall ? kGray : kPink-2);
-        //     drawMarker(m, ppp_cathode_crossing->first);
-        //     drawMarker(m, ppp_cathode_crossing->second);
-        // }
-        // if (pvp_tpc_crossing->size()) {
-        //     m->SetMarkerStyle(kFullCircle);
-        //     m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
-        //     for (art::Ptr<recob::Hit> p_tpc_crossing : *pvp_tpc_crossing)
-        //         drawMarker(m, p_tpc_crossing);
-        // }
-
-        // std::vector<TGraph*> gs(ana::n_sec[geoDet]);
-        // for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        //     gs[s] = new TGraph();
-        //     gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
-        //     gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-        //     gs[s]->SetLineWidth(1);
-        //     gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
-        // }
-        // for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
-        //     if (p_hit->View() != geo::kW) continue;
-        //     int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        //     if (s == -1) continue;
-        //     if (geoDet == kPDVD)
-        //         gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
-        //     else if (geoDet == kPDHD)
-        //         gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-        // }
-        // for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        //     c->cd(s+1);
-        //     if (gs[s]->GetN()) gs[s]->Draw("same l");
-        // }
+        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            gs[s] = new TGraph();
+            gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
+            gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
+            gs[s]->SetLineWidth(1);
+            gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
+        }
+        for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
+            if (geoDet == kPDVD)
+                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+            else if (geoDet == kPDHD)
+                gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            c->cd(s+1);
+            if (gs[s]->GetN()) gs[s]->Draw("same l");
+        }
 
 
 
         // if (vp_hit.size() < nmin) return {};
+
+
+        /***********************************
+         * 
+         *  Sort hits
+         * 
+         * ***********************************/
+
+        /*
 
         // split volume at de cathode
         auto cathodeSide =
@@ -612,7 +593,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                     tpc_crossing.push_back(pp_tpc_crossing.second);
                 }
             }
-            if (s == 3)
+            if ((geoDet == kPDVD && s == 3) || (geoDet == kPDHD && s == 1))
                 prev = false; // cathode crossing
             else
                 prev = true;
@@ -691,7 +672,13 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             if (g->GetN()) g->Draw("same l");
         }
 
+        */
 
+        /***********************************
+         * 
+         *  Sort hits
+         * 
+         * ***********************************/
 
 
 
