@@ -341,37 +341,37 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             &cathode_crossing,
             &tpc_crossing
         );
-        if (!LOG(trk_ends.first.isNonnull())) continue;
+        if (trk_ends.first.isNonnull()) {
+            bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
+                || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
+            bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
+                || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
-        bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
-            || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
-        bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
-            || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
+            TMarker* m = new TMarker();
+            if (cathode_crossing.first.isNull()) {
+                m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+                m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
+                drawMarker(m, trk_ends.first);
+                m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
+                drawMarker(m, trk_ends.second);
+            } else {
+                m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+                m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
+                drawMarker(m, trk_ends.first);
+                m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
+                drawMarker(m, trk_ends.second);
 
-        TMarker* m = new TMarker();
-        if (cathode_crossing.first.isNull()) {
-            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-            m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
-            drawMarker(m, trk_ends.second);
-        } else {
-            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-            m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
-            drawMarker(m, trk_ends.second);
-
-            m->SetMarkerStyle(kFullTriangleDown);
-            m->SetMarkerColor(tooSmall ? kGray : kPink-2);
-            drawMarker(m, cathode_crossing.first);
-            drawMarker(m, cathode_crossing.second);
-        }
-        if (tpc_crossing.size()) {
-            m->SetMarkerStyle(kFullCircle);
-            m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
-            for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
-                drawMarker(m, p_hit);
+                m->SetMarkerStyle(kFullTriangleDown);
+                m->SetMarkerColor(tooSmall ? kGray : kPink-2);
+                drawMarker(m, cathode_crossing.first);
+                drawMarker(m, cathode_crossing.second);
+            }
+            if (tpc_crossing.size()) {
+                m->SetMarkerStyle(kFullCircle);
+                m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
+                for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
+                    drawMarker(m, p_hit);
+            }
         }
 
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
@@ -380,7 +380,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
             gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
             gs[s]->SetLineWidth(1);
-            gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
+            gs[s]->SetLineColor(trk_ends.first.isNull() ?
+                kGreen-8 : (tooSmall ? kGray : kOrange+6)
+            );
         }
         for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
             if (p_hit->View() != geo::kW) continue;
