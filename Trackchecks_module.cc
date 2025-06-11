@@ -428,7 +428,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         // if (vp_hit.size() < nmin) return {};
 
-        std::function<int(geo::TPCID::TPCID_t)> cathodeSide =
+        auto cathodeSide =
             geoDet == kPDVD
         ? [](geo::TPCID::TPCID_t tpc) -> int {
                 return int(tpc >= 8);
@@ -438,7 +438,6 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 return (tpc == 1 || tpc == 5) ? 0
                     : ((tpc == 2 || tpc == 6) ? 1 : -1);
             };
-
 
         using HitPtr = art::Ptr<recob::Hit>;
         using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
@@ -450,7 +449,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             switch (cathodeSide(p_hit->WireID().TPC)) {
                 case 0: per_side_vph.first.push_back(p_hit); break;
                 case 1: per_side_vph.second.push_back(p_hit); break;
-                default:
+                default: break;
             }
         }
 
@@ -601,10 +600,14 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
 
         // cathode crossing
-        HitPtrPair trk_ends;
-        HitPtrPair const cathode_crossing = closestHits(
-            per_side_ends.first, per_side_ends.second, 2*fCathodeGap, &trk_ends
-        ); 
+        HitPtrPair trk_ends, cathode_crossing;
+
+        if (per_side_vph.first.size() < nmin)
+            trk_ends = per_side_ends.second;
+        else if (per_side_vph.second.size() < nmin)
+            trk_ends = per_side_ends.first;
+        else
+            cathode_crossing = closestHits(per_side_ends.first, per_side_ends.second, 2*fCathodeGap, &trk_ends);
 
         bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
@@ -639,21 +642,21 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            gs[s] = new TGraph();
-            gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
-            gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-            gs[s]->SetLineWidth(1);
-            gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
+            TGraph* g = gs[s] = new TGraph();
+            g->SetName(Form("g%u_%u", p_trk->ID(), s));
+            g->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
+            g->SetLineWidth(1);
+            g->SetLineColor(tooSmall ? kGray : kOrange+6);
 
             for (HitPtr const& p_hit : per_sec_vph[s]) {
                 if (geoDet == kPDVD)
-                    gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+                    g->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
                 else if (geoDet == kPDHD)
-                    gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+                    g->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
             }
 
             c->cd(s+1);
-            if (gs[s]->GetN()) gs[s]->Draw("same l");
+            if (g->GetN()) g->Draw("same l");
         }
 
 
