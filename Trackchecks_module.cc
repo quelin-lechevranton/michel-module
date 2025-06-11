@@ -599,7 +599,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         HitPtrVec tpc_crossing;
         bool prev = false;
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (per_sec_vph.size() < nmin) {
+            if (per_sec_ends[s].first.isNull()) {
                 prev = false;
                 continue;
             }
@@ -638,7 +638,6 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
 
-
         // PLOT
 
         TMarker* m = new TMarker();
@@ -673,7 +672,13 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             g->SetName(Form("g%u_%u", p_trk->ID(), s));
             g->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
             g->SetLineWidth(1);
-            g->SetLineColor(tooSmall ? kGray : kOrange+6);
+            bool lin = s >= ana::n_sec[geoDet]/2 ?
+                per_side_reg.second.r2() > 0.5 : per_side_reg.first.r2() > 0.5;
+            g->SetLineColor(
+                tooSmall ? kGray : (
+                    lin ? kOrange+6 : kViolet+6
+                )
+            );
 
             for (HitPtr const& p_hit : per_sec_vph[s]) {
                 if (geoDet == kPDVD)
