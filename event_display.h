@@ -48,12 +48,19 @@ namespace ana {
             {1, {2, 6}}
         }
     };
-    inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0) {
+    inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
         Style_t const font = 43;
         unsigned n_sec = 0;
         Style_t font_size;
         struct { Float_t l, r, b, t; } pad_margin;
         Float_t title_offset_x, title_offset_y;
+
+        std::string data;
+        switch(real) {
+            case 0: data = "Simulation"; break;
+            case 1: data = "Real Data"; break;
+            default: data = "Unknown";
+        }
 
         if (geoDet == kPDVD) {
             c->Divide(4, 2);
@@ -113,7 +120,7 @@ namespace ana {
                 TText* tt = new TText(
                     1-gPad->GetRightMargin(),
                     1-gPad->GetTopMargin()+0.01,
-                    Form("R:%u-SR:%u-E:%u", r, sr, e)
+                    Form("%sR:%u-SR:%u-E:%u", data.c_str(), r, sr, e)
                 );
                 tt->SetNDC();
                 tt->SetTextFont(103); 
