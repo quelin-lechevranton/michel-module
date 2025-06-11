@@ -47,7 +47,8 @@ private:
     float fTick2cm; // cm/tick
     float fSamplingRate; // µs/tick
     float fDriftVelocity; // cm/µs
-    float fChannelPitch;
+    float fChannelPitch; // cm/channel
+    float fCathodeGap; // cm
 
     bounds<float> wireWindow;
     // bounds3D<float> lower_bounds, upper_bounds;
@@ -172,6 +173,7 @@ ana::Trackchecks::Trackchecks(fhicl::ParameterSet const& p)
             break;
         default: break;
     }
+    fCathodeGap = geoHighX.MinX() - geoLowX.MaxX();
 
     for (unsigned t=0; t<asGeo->NTPC(); t++) {
         for (unsigned p=0; p<asWire->Nplanes(); p++) {
@@ -409,7 +411,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             gs[s] = new TGraph();
             gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
             gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-            gs[s]->SetLineWidth(2);
+            gs[s]->SetLineWidth(1);
             gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
         }
         for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
@@ -420,7 +422,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             c->cd(s+1);
-            gs[s]->Draw("same l");
+            if (gs[s]->GetN()) gs[s]->Draw("same l");
         }
 
 
@@ -758,9 +760,9 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
 
     if (side0_reg.n < nmin && side1_reg.n < nmin) return {};
 
-    using HitPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+    using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
     struct ProjectionEnds {
-        HitPair hits;
+        HitPtrPair hits;
         double min = std::numeric_limits<double>::max();
         double max = std::numeric_limits<double>::lowest();
         void test(double s, art::Ptr<recob::Hit> const& h) {
@@ -800,47 +802,99 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         }
     }
 
-    auto d2 = [this](art::Ptr<recob::Hit> h1, art::Ptr<recob::Hit> h2) {
-        double z1 = GetSpace(h1->WireID());
-        double t1 = h1->PeakTime() * fTick2cm;
-        double z2 = GetSpace(h2->WireID());
-        double t2 = h2->PeakTime() * fTick2cm;
-        return pow(z1-z2,2) + pow(t1-t2,2);
-    };
-    auto closestHits = [this, d2](HitPair const& hp0, HitPair const& hp1, HitPair *outermostHits = nullptr) -> HitPair {
-        std::vector<double> distances(4, 0);
-        distances[0] = d2(hp0.first, hp1.first);
-        distances[1] = d2(hp0.first, hp1.second);
-        distances[2] = d2(hp0.second, hp1.first);
-        distances[3] = d2(hp0.second, hp1.second);
-        switch(std::distance(distances.begin(), std::min_element(distances.begin(), distances.end()))) {
-            case 0: 
-                if (outermostHits) {
-                    outermostHits->first = hp0.second;
-                    outermostHits->second = hp1.second;
-                }
-                return { hp0.first, hp1.first };
-            case 1:
-                if (outermostHits) {
-                    outermostHits->first = hp0.second;
-                    outermostHits->second = hp1.first;
-                }
-                return { hp0.first, hp1.second };
-            case 2:
-                if (outermostHits) {
-                    outermostHits->first = hp0.first;
-                    outermostHits->second = hp1.second;
-                }
-                return { hp0.second, hp1.first };
-            case 3:
-                if (outermostHits) {
-                    outermostHits->first = hp0.first;
-                    outermostHits->second = hp1.first;
-                }
-                return { hp0.second, hp1.second };
-            default: break;
+    // auto d2 = [this](art::Ptr<recob::Hit> h1, art::Ptr<recob::Hit> h2) -> double {
+    //     double z1 = GetSpace(h1->WireID());
+    //     double t1 = h1->PeakTime() * fTick2cm;
+    //     double z2 = GetSpace(h2->WireID());
+    //     double t2 = h2->PeakTime() * fTick2cm;
+    //     return pow(z1-z2,2) + pow(t1-t2,2);
+    // };
+
+    auto closestHits = [this](HitPtrPair const& hp0, HitPtrPair const& hp1, double dmin, HitPtrPair *outermostHits = nullptr) -> HitPtrPair {
+        std::vector<HitPtrPair> pairs = {
+            { hp0.first, hp1.first },
+            { hp0.first, hp1.second },
+            { hp0.second, hp1.second },
+            { hp0.second, hp1.first }
+        };
+        std::vector<double> d2s(4, 0);
+        for (unsigned i=0; i<4; i++) {
+            double zf = GetSpace(pairs[i].first->WireID());
+            double tf = pairs[i].first->PeakTime() * fTick2cm;
+            double zs = GetSpace(pairs[i].second->WireID());
+            double ts = pairs[i].second->PeakTime() * fTick2cm;
+            d2s[i] = pow(zf-zs,2) + pow(tf-ts,2);
         }
-        return {};
+
+        // find all distances under d2min threshold
+        std::vector<unsigned> candidates_idx;
+        std::vector<double>::iterator it = d2s.begin();
+        while ((it = std::find_if(d2s.begin(), d2s.end(), [dmin](double d2) { return d2 < dmin*dmin; })) != d2s.end())
+            candidates_idx.push_back(std::distance(d2s.begin(), it));
+        
+        // no candidates found
+        if (candidates_idx.empty())
+            return {};
+
+        // get the closest pair
+        unsigned closest_idx = *std::min_element(candidates_idx.begin(), candidates_idx.end(),
+            [&d2s](unsigned i1, unsigned i2) { return d2s[i1] < d2s[i2]; });
+        if (outermostHits) {
+            unsigned outermost_idx = (closest_idx+2) % 4;
+            outermostHits->first = pairs[outermost_idx].first;
+            outermostHits->second = pairs[outermost_idx].second;
+        }
+        return pairs[closest_idx];
+
+        // if (candidates_idx.size() == 1) {
+        //     closest_idx = candidates_idx.front();
+            // if (outermostHits) {
+            //     unsigned outer_idx = (idx+2) % 4;
+            //     outermostHits->first = pairs[outer_idx].first;
+            //     outermostHits->second = pairs[outer_idx].second;
+            // }
+            // return pairs[idx];
+        // }
+        // if (candidates_idx.size() > 1) {
+            // find the pair with the smallest distance
+            // unsigned min_idx = *std::min_element(candidates_idx.begin(), candidates_idx.end(),
+            //     [&d2s](unsigned i1, unsigned i2) { return d2s[i1] < d2s[i2]; });
+            // if (outermostHits) {
+            //     unsigned outer_idx = (min_idx+2) % 4;
+            //     outermostHits->first = pairs[outer_idx].first;
+            //     outermostHits->second = pairs[outer_idx].second;
+            // }
+            // return pairs[min_idx];
+        // }
+            
+        // switch(std::distance(d2s.begin(), std::min_element(d2s.begin(), d2s.end()))) {
+        //     case 0: 
+        //         if (outermostHits) {
+        //             outermostHits->first = hp0.second;
+        //             outermostHits->second = hp1.second;
+        //         }
+        //         return { hp0.first, hp1.first };
+        //     case 1:
+        //         if (outermostHits) {
+        //             outermostHits->first = hp0.second;
+        //             outermostHits->second = hp1.first;
+        //         }
+        //         return { hp0.first, hp1.second };
+        //     case 2:
+        //         if (outermostHits) {
+        //             outermostHits->first = hp0.first;
+        //             outermostHits->second = hp1.second;
+        //         }
+        //         return { hp0.second, hp1.first };
+        //     case 3:
+        //         if (outermostHits) {
+        //             outermostHits->first = hp0.first;
+        //             outermostHits->second = hp1.first;
+        //         }
+        //         return { hp0.second, hp1.second };
+        //     default: break;
+        // }
+        // return {};
     };
 
     // tpc crossing
@@ -852,12 +906,12 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
                 continue;
             }
             if (prev) {
-                HitPair const hp_tpc_crossing = closestHits(
-                    sec_ends[s-1].hits, sec_ends[s].hits
+                HitPtrPair const pp_tpc_crossing = closestHits(
+                    sec_ends[s-1].hits, sec_ends[s].hits, 2
                 );
-                if (pvp_tpc_crossing) {
-                    pvp_tpc_crossing->push_back(hp_tpc_crossing.first);
-                    pvp_tpc_crossing->push_back(hp_tpc_crossing.second);
+                if (pp_tpc_crossing.first.isNonnull() && pvp_tpc_crossing) {
+                    pvp_tpc_crossing->push_back(pp_tpc_crossing.first);
+                    pvp_tpc_crossing->push_back(pp_tpc_crossing.second);
                 }
             }
             if (s == 3)
@@ -874,24 +928,24 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         return side0_ends.hits;
 
     // cathode crossing
-    HitPair ends;
-    HitPair const hp_cathode_crossing = closestHits(
-        side0_ends.hits, side1_ends.hits, &ends
+    HitPtrPair ends;
+    HitPtrPair const pp_cathode_crossing = closestHits(
+        side0_ends.hits, side1_ends.hits, 2*fCathodeGap, &ends
     );
 
-    if (ppp_cathode_crossing) {
-        ppp_cathode_crossing->first = hp_cathode_crossing.first;
-        ppp_cathode_crossing->second = hp_cathode_crossing.second;
+    if (pp_cathode_crossing.first.isNonnull() && ppp_cathode_crossing) {
+        ppp_cathode_crossing->first = pp_cathode_crossing.first;
+        ppp_cathode_crossing->second = pp_cathode_crossing.second;
     }
     return ends;
 
-    // std::vector<double> distances(4, 0);
-    // distances[0] = d2(side0_ends.hits.first, side1_ends.hits.first);
-    // distances[1] = d2(side0_ends.hits.first, side1_ends.hits.second);
-    // distances[2] = d2(side0_ends.hits.second, side1_ends.hits.first);
-    // distances[3] = d2(side0_ends.hits.second, side1_ends.hits.second);
+    // std::vector<double> d2s(4, 0);
+    // d2s[0] = d2(side0_ends.hits.first, side1_ends.hits.first);
+    // d2s[1] = d2(side0_ends.hits.first, side1_ends.hits.second);
+    // d2s[2] = d2(side0_ends.hits.second, side1_ends.hits.first);
+    // d2s[3] = d2(side0_ends.hits.second, side1_ends.hits.second);
 
-    // switch(std::distance(distances.begin(), std::min_element(distances.begin(), distances.end()))) {
+    // switch(std::distance(d2s.begin(), std::min_element(d2s.begin(), d2s.end()))) {
     //     case 0: 
     //         ppp_cathode_crossing->first = side0_ends.hits.first;
     //         ppp_cathode_crossing->second = side1_ends.hits.first;
