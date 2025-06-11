@@ -454,6 +454,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
 
         unsigned const nmin = 4;
+        if (!LOG(per_side_vph.first.size() >= nmin || per_side_vph.second.size() >= nmin)) continue;
 
         // z = m*t + p
         struct LinearRegression {
@@ -601,13 +602,14 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         // cathode crossing
         HitPtrPair trk_ends, cathode_crossing;
-
         if (per_side_vph.first.size() < nmin)
             trk_ends = per_side_ends.second;
         else if (per_side_vph.second.size() < nmin)
             trk_ends = per_side_ends.first;
         else
             cathode_crossing = closestHits(per_side_ends.first, per_side_ends.second, 2*fCathodeGap, &trk_ends);
+        
+        if (!LOG(trk_ends.first.isNonnull())) continue;
 
         bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
@@ -1034,7 +1036,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
 
     std::vector<unsigned> sec_nhit(ana::n_sec[geoDet], 0);
 
-    unsigned nhit=0;
+    // unsigned nhit=0;
     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
         geo::WireID wireid = p_hit->WireID();
