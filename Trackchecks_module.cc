@@ -85,9 +85,9 @@ private:
     // );
     std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> GetEndHits(
         std::vector<art::Ptr<recob::Hit>> const&,
-        geo::View_t = geo::kW,
         std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *ppp_cathode_crossing,
-        std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing
+        std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing,
+        geo::View_t = geo::kW
     );
 };
 
@@ -367,7 +367,6 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         auto trk_ends = GetEndHits(
             vp_hit_muon,
-            geo::kW,
             ppp_cathode_crossing,
             pvp_tpc_crossing
         );
@@ -688,12 +687,12 @@ ana::Hit ana::Trackchecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
 
 std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHits(
     std::vector<art::Ptr<recob::Hit>> const& vp_hit,
-    geo::View_t view,
     std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *ppp_cathode_crossing,
-    std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing
+    std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing,
+    geo::View_t view
 ) {
-    if (vp_hit.empty())
-        return { art::Ptr<recob::Hit>{}, art::Ptr<recob::Hit>{} };
+    unsigned const nmin = 4;
+    if (vp_hit.size() < nmin) return {};
 
     std::function<int(geo::TPCID::TPCID_t)> cathodeSide =
         geoDet == kPDVD
@@ -715,7 +714,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         }
         double cov() const { return mzt - mz*mt; }
         double vart() const { return mt2 - mt*mt; }
-        double m() const { return n>3 ? cov()/vart() : 0; }
+        double m() const { return n<nmin ? 0 : cov()/vart(); }
         double p() const { return mz - m()*mt; }
         double projection(double z, double t) const {
             return (t + m()*(z-p())) / (1 + m()*m());
@@ -731,17 +730,18 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         if (side == -1) continue;
         double z = GetSpace(p_hit->WireID());
         double t = p_hit->PeakTime() * fTick2cm;
-        if (side == 0) {
+        if (side == 0)
             side0_reg.add(z, t);
-        } else if (side == 1) {
+        else if (side == 1)
             side1_reg.add(z, t);
-        }
 
         if (geoDet == kPDVD) // for tpc crossing
             sec_nhit[ana::tpc2sec[geoDet][wireid.TPC]]++;
     }
     side0_reg.normalize();
     side1_reg.normalize();
+
+    if (side0_reg.n < nmin && side1_reg.n < nmin) return {};
 
     using HitPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
     struct ProjectionEnds {
@@ -820,7 +820,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
             case 3:
                 if (outermostHits) {
                     outermostHits->first = hp0.first;
-                    outermostHits->second = hp1.second;
+                    outermostHits->second = hp1.first;
                 }
                 return { hp0.second, hp1.second };
             default: break;
@@ -828,11 +828,9 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         return {};
     };
 
-    unsigned const nmin = 4;
-
     // tpc crossing
     if (geoDet == kPDVD) {
-        bool prev = false;
+        bool prev = false; // is there hits in the previous section?
         for (unsigned sec=0; sec<8; sec++) {
             if (sec_nhit[sec] < nmin) {
                 prev = false;
@@ -855,24 +853,22 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
     }
 
     // no cathode crossing
-    if (side0_reg.n < nmin && side1_reg.n < nmin)
-        return { art::Ptr<recob::Hit>{}, art::Ptr<recob::Hit>{} };
-    else if (side0_reg.n < nmin)
-        return { side1_ends.hits.first, side1_ends.hits.second };
+    if (side0_reg.n < nmin)
+        return side1_ends.hits;
     else if (side1_reg.n < nmin)
-        return { side0_ends.hits.first, side0_ends.hits.second };
+        return side0_ends.hits;
 
     // cathode crossing
-    HitPair *ends = new HitPair;
+    HitPair ends;
     HitPair const hp_cathode_crossing = closestHits(
-        side0_ends.hits, side1_ends.hits, ends
+        side0_ends.hits, side1_ends.hits, &ends
     );
 
     if (ppp_cathode_crossing) {
         ppp_cathode_crossing->first = hp_cathode_crossing.first;
         ppp_cathode_crossing->second = hp_cathode_crossing.second;
     }
-    return *ends;
+    return ends;
 
     // std::vector<double> distances(4, 0);
     // distances[0] = d2(side0_ends.hits.first, side1_ends.hits.first);

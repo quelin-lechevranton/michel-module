@@ -85,7 +85,7 @@ namespace ana {
                 pad_margin.b, pad_margin.t
             );
             gPad->SetTicks(1, 1);
-            TH2F* f;
+            TH2F* f = new TH2F();  // -Werror=maybe-uninitialized
             if (geoDet == kPDVD) {
                 f = new TH2F(Form("f%u", s), ";Z;T",
                     600, 0, 300,
