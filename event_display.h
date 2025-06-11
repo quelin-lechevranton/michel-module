@@ -120,7 +120,7 @@ namespace ana {
                 TText* tt = new TText(
                     1-gPad->GetRightMargin(),
                     1-gPad->GetTopMargin()+0.01,
-                    Form("%sR:%u-SR:%u-E:%u", data.c_str(), r, sr, e)
+                    Form("%s - R:%u - SR:%u - E:%u", data.c_str(), r, sr, e)
                 );
                 tt->SetNDC();
                 tt->SetTextFont(103); 

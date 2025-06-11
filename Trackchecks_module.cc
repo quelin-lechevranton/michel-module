@@ -428,6 +428,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         // if (vp_hit.size() < nmin) return {};
 
+        // split volume at de cathode
         auto cathodeSide =
             geoDet == kPDVD
         ? [](geo::TPCID::TPCID_t tpc) -> int {
@@ -453,9 +454,12 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             }
         }
 
+        // unsure there is enough hits on at least one side
         unsigned const nmin = 4;
         if (!LOG(per_side_vph.first.size() >= nmin || per_side_vph.second.size() >= nmin)) continue;
 
+
+        // linear regression on each side to have a curvilinear coordinate of each hit inside a track
         // z = m*t + p
         struct LinearRegression {
             unsigned n=0;
@@ -491,6 +495,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         per_side_reg.first.normalize();
         per_side_reg.second.normalize();
 
+        LOG("regression done");
+
+        // compare hits by their curvilinear coordinate
         auto comp = [&](LinearRegression const& reg, HitPtr const& h1, HitPtr const& h2) -> bool {
             double const s1 = reg.projection(
                 GetSpace(h1->WireID()),
@@ -503,6 +510,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             return s1 < s2;
         };
 
+        // get the track ends on each side
         auto minmax = [&](HitPtrVec const& vph, LinearRegression const& reg) -> HitPtrPair {
             if (vph.size() < nmin) return {};
             auto mm = std::minmax_element(
@@ -518,6 +526,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             minmax(per_side_vph.second, per_side_reg.second)
         };
 
+        LOG("side ends done");
+
+        // get a sorted list of hits for each section (ie. pair of TPCs)
         std::vector<HitPtrVec> per_sec_vph(ana::n_sec[geoDet]);
         for (HitPtr const& ph : per_side_vph.first)
             per_sec_vph[ana::tpc2sec[geoDet][ph->WireID().TPC]].push_back(ph);
@@ -534,6 +545,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             );
         }
 
+        LOG("sec sort done");
+
+        // get the track ends for each section
         std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             if (per_sec_vph[s].size() < nmin) continue;
@@ -541,6 +555,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             per_sec_ends[s].second = per_sec_vph[s].back();
         }
 
+        LOG("sec ends done");
+
+        // given the ends of two pieces of track, find the closest ends
         auto closestHits = [&](HitPtrPair const& hp1, HitPtrPair const& hp2, double dmin, HitPtrPair *outermostHits = nullptr) -> HitPtrPair {
             std::vector<HitPtrPair> pairs = {
                 { hp1.first, hp2.first },
@@ -578,7 +595,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             return pairs[closest_idx];
         };
 
-        // tpc crossing
+        // get the hits that are at the boundaries of two sections
         HitPtrVec tpc_crossing;
         bool prev = false;
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
@@ -601,7 +618,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 prev = true;
         }
 
-        // cathode crossing
+        LOG("tpc crossing done");
+
+        // get the hits that are at the cathode, if any
         HitPtrPair trk_ends, cathode_crossing;
         if (per_side_vph.first.size() < nmin)
             trk_ends = per_side_ends.second;
@@ -612,10 +631,15 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         
         if (!LOG(trk_ends.first.isNonnull())) continue;
 
+        // check if the track ends are outside the fiducial volume
         bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
         bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
+
+
+
+        // PLOT
 
         TMarker* m = new TMarker();
         if (cathode_crossing.first.isNull()) {
