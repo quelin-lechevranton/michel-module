@@ -404,9 +404,24 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             }
         }
 
-
-
-
+        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            gs[s] = new TGraph();
+            gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
+            gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
+            gs[s]->SetLineWidth(2);
+            gs[s]->SetLineColor(tooSmall ? kGray : kOrange+6);
+        }
+        for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
+            gs[s]->SetPoint(gs[s]->GetN(), GetSpace(p_hit->WireID()), p_hit->PeakTime());
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            c->cd(s+1);
+            gs[s]->Draw("same l");
+        }
 
 
 
@@ -831,21 +846,21 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
     // tpc crossing
     if (geoDet == kPDVD) {
         bool prev = false; // is there hits in the previous section?
-        for (unsigned sec=0; sec<8; sec++) {
-            if (sec_nhit[sec] < nmin) {
+        for (unsigned s=0; s<8; s++) {
+            if (sec_nhit[s] < nmin) {
                 prev = false;
                 continue;
             }
             if (prev) {
                 HitPair const hp_tpc_crossing = closestHits(
-                    sec_ends[sec-1].hits, sec_ends[sec].hits
+                    sec_ends[s-1].hits, sec_ends[s].hits
                 );
                 if (pvp_tpc_crossing) {
                     pvp_tpc_crossing->push_back(hp_tpc_crossing.first);
                     pvp_tpc_crossing->push_back(hp_tpc_crossing.second);
                 }
             }
-            if (sec == 3)
+            if (s == 3)
                 prev = false; // cathode crossing
             else
                 prev = true;
