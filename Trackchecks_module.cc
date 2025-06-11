@@ -536,6 +536,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            if (per_sec_vph[s].size() < nmin) continue;
             per_sec_ends[s].first = per_sec_vph[s].front();
             per_sec_ends[s].second = per_sec_vph[s].back();
         }
