@@ -260,57 +260,56 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     //     drawMarker(m, p_hit);
     // }
 
+    std::vector<TH2F*> h2s(ana::n_sec[geoDet]);
     if (geoDet == kPDVD) {
-        std::vector<TH2F*> h2(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            h2[s] = new TH2F(
+            h2s[s] = new TH2F(
                 Form("h2_%u", s),
                 "event hits",
                 600, 0, 300,
                 600, 0, 6000
             );
         }
-        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-            if (p_hit->View() != geo::kW) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            // int q = std::min(p_hit->Integral() / 200, 1.F);
-            int q = p_hit->Integral();
-            h2[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), q);
-        }
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            c->cd(s+1);
-            if (s==3)
-                h2[s]->Draw("same colz");
-            else
-                h2[s]->Draw("same col");
-        }
     } else if (geoDet == kPDHD) {
-        std::vector<TH2F*> h2(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            h2[s] = new TH2F(
+            h2s[s] = new TH2F(
                 Form("h2_%u", s),
                 "event hits",
                 600, 0, 6000,
                 600, 0, 464
             );
         }
-        for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-            if (p_hit->View() != geo::kW) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            // int q = std::min(p_hit->Integral() / 1000, 1.F);
-            int q = p_hit->Integral();
-            h2[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), q);
-        }
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            c->cd(s+1);
-            if (s==1)
-                h2[s]->Draw("same colz");
-            else
-                h2[s]->Draw("same col");
-        }
     }
+    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        // int q = std::min(p_hit->Integral() / 1000???200, 1.F);
+        int q = p_hit->Integral();
+        if (geoDet == kPDVD)
+            h2s[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), q);
+        else if (geoDet == kPDHD)
+            h2s[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), q);
+    }
+    double max=0;
+    for (TH2F* h2 : h2s)
+        max = h2->GetMaximum() > max ? h2->GetMaximum() : max;
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        h2s[s]->SetMinimum(0);
+        h2s[s]->SetMaximum(max);
 
+        c->cd(s+1);
+        TH2F* f = (TH2F*) gPad->FindObject(Form("f%u", s));
+        f->SetMinimum(0);
+        f->SetMaximum(max);
+    }
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        c->cd(s+1);
+        if ((geoDet == kPDVD && s==3) || (geoDet == kPDHD && s==1))
+            h2s[s]->Draw("same colz");
+        else
+            h2s[s]->Draw("same col");
+    }
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
@@ -362,8 +361,6 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //     drawMarker(m, trk_ends[2]);
         // }
 
-
-
         auto *ppp_cathode_crossing = new std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>();
         auto *pvp_tpc_crossing = new std::vector<art::Ptr<recob::Hit>>();
 
@@ -401,9 +398,8 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         if (pvp_tpc_crossing->size()) {
             m->SetMarkerStyle(kFullCircle);
             m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
-            for (art::Ptr<recob::Hit> p_tpc_crossing : *pvp_tpc_crossing) {
+            for (art::Ptr<recob::Hit> p_tpc_crossing : *pvp_tpc_crossing)
                 drawMarker(m, p_tpc_crossing);
-            }
         }
 
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
@@ -418,7 +414,10 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             if (p_hit->View() != geo::kW) continue;
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             if (s == -1) continue;
-            gs[s]->SetPoint(gs[s]->GetN(), GetSpace(p_hit->WireID()), p_hit->PeakTime());
+            if (geoDet == kPDVD)
+                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+            else if (geoDet == kPDHD)
+                gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             c->cd(s+1);
@@ -829,8 +828,8 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHi
         // find all distances under d2min threshold
         std::vector<unsigned> candidates_idx;
         std::vector<double>::iterator it = d2s.begin();
-        while ((it = std::find_if(d2s.begin(), d2s.end(), [dmin](double d2) { return d2 < dmin*dmin; })) != d2s.end())
-            candidates_idx.push_back(std::distance(d2s.begin(), it));
+        while ((it = std::find_if(it, d2s.end(), [dmin](double d2) { return d2 < dmin*dmin; })) != d2s.end())
+            candidates_idx.push_back(std::distance(d2s.begin(), it++));
         
         // no candidates found
         if (candidates_idx.empty())
