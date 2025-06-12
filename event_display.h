@@ -3,6 +3,7 @@
 #include <TCanvas.h>
 #include <TH2F.h>
 #include <TGraph.h>
+#include <TF1.h>
 #include <TMarker.h>
 #include <TStyle.h>
 #include <TColor.h>
