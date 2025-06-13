@@ -7,7 +7,6 @@
 // from cetlib version 3.18.02.
 ////////////////////////////////////////////////////////////////////////
 
-#include "utils.h"
 #include "event_display.h"
 
 namespace ana {
@@ -670,7 +669,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             c->cd(s+1);
             if (g->GetN()) g->Draw("same l");
 
-            TF1* f;
+            TF1* f = new TF1();
             if (geoDet == kPDVD) {
                 f = new TF1(
                     Form("f%u_%u", p_trk->ID(), s),
