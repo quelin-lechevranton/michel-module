@@ -675,15 +675,15 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 f = new TF1(
                     Form("f%u_%u", p_trk->ID(), s),
                     "(x - [1]) / [0]",
-                    reg.mz - 30,
-                    reg.mz + 30
+                    reg.mz - 10,
+                    reg.mz + 10
                 );
             } else if (geoDet == kPDHD) {
                 f = new TF1(
                     Form("f%u_%u", p_trk->ID(), s),
                     "[0]*x + [1]",
-                    (reg.mt - 30) / fTick2cm,
-                    (reg.mt + 30) / fTick2cm
+                    (reg.mt - 10) / fTick2cm,
+                    (reg.mt + 10) / fTick2cm
                 );
             }
             f->SetParameter(0, reg.m() / fTick2cm);
@@ -691,6 +691,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             f->SetLineColor(kAzure-4);
             f->SetLineWidth(2);
 
+            c->cd(s+1);
             f->Draw("same");
         }
 

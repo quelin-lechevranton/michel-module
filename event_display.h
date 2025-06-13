@@ -1,3 +1,5 @@
+#include "utils.h"
+
 #include "canvas/Persistency/Common/Ptr.h"
 #include "lardataobj/RecoBase/Hit.h"
 #include <TCanvas.h>
@@ -10,45 +12,6 @@
 #include <TText.h>
 
 namespace ana {
-    enum EnumDet { kPDVD, kPDHD };
-    std::vector<unsigned> n_sec = {
-        8, // PDVD
-        2  // PDHD
-    };
-    std::vector<std::map<unsigned, int>> tpc2sec = {
-        { // PDVD
-            {0, 4}, {2, 4},
-            {1, 5}, {3, 5},
-            {4, 6}, {6, 6},
-            {5, 7}, {7, 7},
-            {8, 0}, {10, 0},
-            {9, 1}, {11, 1},
-            {12, 2}, {14, 2},
-            {13, 3}, {15, 3}
-        },
-        { // PDHD
-            {4, -1}, {0, -1},
-            {5, 0}, {1, 0},
-            {6, 1}, {2, 1},
-            {7, -1}, {3, -1}
-        }
-    };
-    std::vector<std::map<int, std::pair<unsigned, unsigned>>> sec2tpc = {
-        { // PDVD
-            {0, {8, 10}},
-            {1, {9, 11}},
-            {2, {12, 14}},
-            {3, {13, 15}},
-            {4, {0, 2}},
-            {5, {1, 3}},
-            {6, {4, 6}},
-            {7, {5, 7}}
-        },
-        { // PDHD
-            {0, {1, 5}},
-            {1, {2, 6}}
-        }
-    };
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
         Style_t const font = 43;
         unsigned n_sec = 0;
