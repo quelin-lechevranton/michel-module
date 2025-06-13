@@ -437,10 +437,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 MuonTrueEndHit = GetHit(
                     (sz-fz) * dir_z > 0 ? ends.second : ends.first
                 );
-            } else
-                MuonTrueEndHit = ana::Hit{};
-        } else 
-            MuonTrueEndHit = ana::Hit{};
+            } else MuonTrueEndHit = ana::Hit{};
+        } else MuonTrueEndHit = ana::Hit{};
 
         std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ends;
         ends = GetTrackEndsHits(vp_hit_muon);
@@ -450,7 +448,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         int dir_z = increasing_z ? 1 : -1;
         float fz = GetSpace(ends.first->WireID());
         float sz = GetSpace(ends.second->WireID());
-        MuonTrueEndHit = GetHit(
+        MuonEndHit = GetHit(
             (sz-fz) * dir_z > 0 ? ends.second : ends.first
         );
 
