@@ -250,8 +250,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     }
 
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
-        << "  Detector: " << std::vector<std::string>{"PDVD", "PDHD"}[geoDet]
-        << "  (" << asGeo->DetectorName() << ")" << std::endl
+        << "  Detector Geometry: " << asGeo->DetectorName()
+        << "  (" << (!geoDet ? "PDVD" : "PDHD") << ")" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
@@ -385,8 +385,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             default: break;
         }
     }
-
-    // std::unordered_map<int, unsigned> particle_encounter;
 
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
@@ -1081,7 +1079,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
     auto cathodeSide =
         geoDet == kPDVD
         ? [](geo::TPCID::TPCID_t tpc) -> int {
-                return int(tpc >= 8);
+                return tpc >= 8 ? 1 : 0;
             }
             // geoDet == kPDHD
         : [](geo::TPCID::TPCID_t tpc) -> int {
@@ -1090,17 +1088,6 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
                     : ((tpc == 2 || tpc == 6) ? 1 : -1);
             };
 
-
-    std::pair<HitPtrVec, HitPtrVec> per_side_vph;
-    for (HitPtr const& p_hit : vp_hit) {
-        if (p_hit->View() != view) continue;
-        switch (cathodeSide(p_hit->WireID().TPC)) {
-            case 0: per_side_vph.first.push_back(p_hit); break;
-            case 1: per_side_vph.second.push_back(p_hit); break;
-            // dump PDHD TPCs on the other side of the anodes
-            default: break;
-        }
-    }
 
     // linear regression on each side to have a curvilinear coordinate of each hit inside a track
     // z = m*t + p
@@ -1123,62 +1110,57 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
             return (t + m()*(z-p())) / (1 + m()*m());
         }
     };
-    std::pair<LinearRegression, LinearRegression> per_side_reg;
-    for (HitPtr const& p_hit : per_side_vph.first) {
-        double const z = GetSpace(p_hit->WireID());
-        double const t = p_hit->PeakTime() * fTick2cm;
-        per_side_reg.first.add(z, t);
-    }
-    for (HitPtr const& p_hit : per_side_vph.second) {
-        double const z = GetSpace(p_hit->WireID());
-        double const t = p_hit->PeakTime() * fTick2cm;
-        per_side_reg.second.add(z, t);
-    }
-    per_side_reg.first.normalize();
-    per_side_reg.second.normalize();
 
-    // compare hits by their curvilinear coordinate
-    auto curvilinear_order = [&](
-        LinearRegression const& reg, 
-        HitPtr const& h1, 
-        HitPtr const& h2
-    ) -> bool {
-        double const s1 = reg.projection(
-            GetSpace(h1->WireID()),
-            h1->PeakTime() * fTick2cm
-        );
-        double const s2 = reg.projection(
-            GetSpace(h2->WireID()),
-            h2->PeakTime() * fTick2cm
-        );
-        return s1 < s2;
-    };
+    std::vector<LinearRegression> side_reg(2);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int side = cathodeSide(p_hit->WireID().TPC);
+        if (side == -1) continue; // skip hits on the other side of the anodes
+        double z = GetSpace(p_hit->WireID());
+        double t = p_hit->PeakTime() * fTick2cm;
+        side_reg[side].add(z, t);
+    }
+    for (int side : {0, 1}) 
+        side_reg[side].normalize();
 
-    // get the track ends on each side
-    auto minmax = [&](
-        HitPtrVec const& vph,
-        LinearRegression const& reg
-    ) -> HitPtrPair {
-        if (vph.size() < nmin) return {};
-        std::pair<HitPtrVec::const_iterator, HitPtrVec::const_iterator> mm = std::minmax_element(
-            vph.begin(), vph.end(),
-            [&curvilinear_order, &reg](HitPtr const& h1, HitPtr const& h2) {
-                return curvilinear_order(reg, h1, h2);
-            }
+    // if not enough hits on both sides, return empty pair
+    if (side_reg[0].n < nmin && side_reg[1].n < nmin)
+        return {};
+
+    // find the track ends on each side of the cathode
+    std::vector<HitPtrPair> side_ends(2);
+    std::vector<bounds<double>> side_mimmax(2);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int side = cathodeSide(p_hit->WireID().TPC);
+        if (side == -1) continue; // skip hits on the other side of the anodes
+        double s = side_reg[side].projection(
+            GetSpace(p_hit->WireID()),
+            p_hit->PeakTime() * fTick2cm
         );
-        return { *mm.first, *mm.second };
-    };
-    std::pair<HitPtrPair, HitPtrPair> per_side_ends = {
-        minmax(per_side_vph.first, per_side_reg.first),
-        minmax(per_side_vph.second, per_side_reg.second)
-    };   
+        if (s > side_mimmax[side].max) {
+            side_mimmax[side].max = s;
+            side_ends[side].second = p_hit;
+        }
+        if (s < side_mimmax[side].min) {
+            side_mimmax[side].min = s;
+            side_ends[side].first = p_hit;
+        }
+    }
+
+    // if hits are all on one side, and no other info is requested
+    if (!vp_tpc_crossing && !vvp_sec_sorted_hits)
+        if (side_reg[0].n < nmin)
+            return side_ends[1];
+        else if (side_reg[1].n < nmin)
+            return side_ends[0];
     
     // given the ends of two pieces of track, find the closest ends
     auto closestHits = [&](
         HitPtrPair const& pph1,
         HitPtrPair const& pph2,
         double dmin,
-        HitPtrPair *outermostHits = nullptr
+        HitPtrPair *otherHits = nullptr
     ) -> HitPtrPair {
 
         // all combinations of pairs
@@ -1202,7 +1184,11 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
         // find all distances under dmin threshold
         std::vector<unsigned> candidates_idx;
         std::vector<double>::iterator it = d2s.begin();
-        while ((it = std::find_if(it, d2s.end(), [dmin](double d2) { return d2 < dmin*dmin; })) != d2s.end())
+        while ((it = std::find_if(
+                it,
+                d2s.end(),
+                [dmin](double d2) { return d2 < dmin*dmin; }
+            )) != d2s.end())
             candidates_idx.push_back(std::distance(d2s.begin(), it++));
         
         // no candidates found
@@ -1210,42 +1196,42 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
             return {};
 
         // get the closest pair
-        unsigned closest_idx = *std::min_element(candidates_idx.begin(), candidates_idx.end(),
+        unsigned closest_idx = *std::min_element(
+            candidates_idx.begin(),
+            candidates_idx.end(),
             [&d2s](unsigned i, unsigned j) { return d2s[i] < d2s[j]; });
         
         // if outermost hits are requested, get the outermost pair
-        if (outermostHits) {
-            unsigned outermost_idx = (closest_idx+2) % 4; // opposite pair
-            outermostHits->first = pairs[outermost_idx].first;
-            outermostHits->second = pairs[outermost_idx].second;
+        if (otherHits) {
+            unsigned other_idx = (closest_idx+2) % 4; // opposite pair
+            otherHits->first = pairs[other_idx].first;
+            otherHits->second = pairs[other_idx].second;
         }
         return pairs[closest_idx];
     };
 
-    // get ends of the track, and the cathode crossing hits if any
     HitPtrPair trk_ends, cathode_crossing;
-    if (per_side_vph.first.size() < nmin)
-        trk_ends = per_side_ends.second;
-    else if (per_side_vph.second.size() < nmin)
-        trk_ends = per_side_ends.first;
+    if (side_reg[0].n < nmin)
+        trk_ends = side_ends[1];
+    else if (side_reg[1].n < nmin)
+        trk_ends = side_ends[0];
     else
         cathode_crossing = closestHits(
-            per_side_ends.first,
-            per_side_ends.second,
-            2*fCathodeGap, 
+            side_ends[0],
+            side_ends[1],
+            2*fCathodeGap,
             &trk_ends
         );
 
-    // if cathode crossing info is requested, return it
+    // if cathode crossing info is requested
     if (pp_cathode_crossing)
         *pp_cathode_crossing = cathode_crossing;
     
-    // if no tpc crossing info is needed, early return
+    // if no tpc crossing info is needed
     if (geoDet == kPDHD || !vp_tpc_crossing) {
         return trk_ends;
     }
 
-        
     std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
     
     // if a sorted list of hits is requested
@@ -1262,14 +1248,22 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
         }
 
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            LinearRegression const& reg = 
-                s >= ana::n_sec[geoDet]/2
-                ? per_side_reg.second
-                : per_side_reg.first;
+            int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             std::sort(
-                vvp_sec_sorted_hits->at(s).begin(), vvp_sec_sorted_hits->at(s).end(),
-                [&curvilinear_order, &reg](HitPtr const& h1, HitPtr const& h2) -> bool {
-                    return curvilinear_order(reg, h1, h2);
+                vvp_sec_sorted_hits->at(s).begin(), 
+                vvp_sec_sorted_hits->at(s).end(),
+                [&, &reg=side_reg[side]](
+                    HitPtr const& h1, HitPtr const& h2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
                 }
             );
         }
@@ -1293,13 +1287,28 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
 
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             if (per_sec_vph[s].size() < nmin) continue;
-            LinearRegression const& reg = 
-                s >= ana::n_sec[geoDet]/2
-                ? per_side_reg.second
-                : per_side_reg.first;
-            per_sec_ends[s] = minmax(per_sec_vph[s], reg);
+            int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+            auto minmax = std::minmax_element(
+                per_sec_vph[s].begin(), per_sec_vph[s].end(),
+                [&, &reg=side_reg[side]](
+                    HitPtr const& h1, HitPtr const& h2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
+                }
+            );
+            per_sec_ends[s].first = *minmax.first;
+            per_sec_ends[s].second = *minmax.second;
         }
     }
+
 
     // get the hits that are at the boundaries of two sections
     HitPtrVec tpc_crossing;
