@@ -396,6 +396,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
 
         // tracks associated to a MCTruth muon
+        LOG(mcp);
         // if (!mcp) continue;
         // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
@@ -635,7 +636,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         // get all hits nearby muon end point
         Hits TrueSphereHits;
-        std::vector<art::Ptr<recob::Hit>> NearbyPHits;
+        // std::vector<art::Ptr<recob::Hit>> NearbyPHits;
         for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
 
@@ -659,7 +660,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
             NearbyHits.push_back(hit);
-            NearbyPHits.push_back(p_hit);
+            // NearbyPHits.push_back(p_hit);
 
             // art::Ptr<recob::SpacePoint> p_hit_spt = fop_hit2spt.at(p_hit.key());
             // if (p_hit_spt)
@@ -667,14 +668,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             // else 
             //     NearbyHitSpacePoints.push_back(ana::Point{});
 
-            if (!mcp_michel) continue;
             if (from_track) continue;
 
-            float dzt = (hit.space - MuonTrueEndHit.space);
-            float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
-            float dr2t = dzt*dzt + dtt*dtt;
-            if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
-                TrueSphereHits.push_back(hit);
+            if (mcp_michel) {
+                float dzt = (hit.space - MuonTrueEndHit.space);
+                float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
+                float dr2t = dzt*dzt + dtt*dtt;
+                if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
+                    TrueSphereHits.push_back(hit);
+            }
 
             if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
