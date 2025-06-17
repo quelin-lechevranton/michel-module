@@ -12,6 +12,27 @@
 #include <TText.h>
 
 namespace ana {
+    struct LinearRegression {
+        static constexpr unsigned nmin = 4;
+        unsigned n=0;
+        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        void add(double z, double t) {
+            mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
+        }
+        void normalize() {
+            mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
+        }
+        double cov() const { return mzt - mz*mt; }
+        double varz() const { return mz2 - mz*mz; }
+        double vart() const { return mt2 - mt*mt; }
+        double m() const { return n<nmin ? 0 : cov()/vart(); }
+        double p() const { return mz - m()*mt; }
+        double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
+        double projection(double z, double t) const {
+            return (t + m()*(z-p())) / (1 + m()*m());
+        }
+    };
+
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
         Style_t const font = 43;
         unsigned n_sec = 0;

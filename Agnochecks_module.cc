@@ -1120,12 +1120,14 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
         double t = p_hit->PeakTime() * fTick2cm;
         side_reg[side].add(z, t);
     }
-    for (int side : {0, 1}) 
-        side_reg[side].normalize();
+    for (LinearRegression& reg : side_reg) reg.normalize();
 
     // if not enough hits on both sides, return empty pair
-    if (side_reg[0].n < nmin && side_reg[1].n < nmin)
-        return {};
+    if (std::all_of(
+            side_reg.begin(),
+            side_reg.end(),
+            [](const LinearRegression& reg) { return reg.n < nmin; }
+        )) return {};
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
@@ -1149,11 +1151,12 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
     }
 
     // if hits are all on one side, and no other info is requested
-    if (!vp_tpc_crossing && !vvp_sec_sorted_hits)
+    if (!vp_tpc_crossing && !vvp_sec_sorted_hits) {
         if (side_reg[0].n < nmin)
             return side_ends[1];
         else if (side_reg[1].n < nmin)
             return side_ends[0];
+    }
     
     // given the ends of two pieces of track, find the closest ends
     auto closestHits = [&](

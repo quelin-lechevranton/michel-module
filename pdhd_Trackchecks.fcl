@@ -38,6 +38,8 @@ physics: {
 
             Log: true
             TrackLengthCut: 40.
+            Sort: true
+            MichelSpaceRadius: 20.
         }
     }
     ana: [ checks ]
