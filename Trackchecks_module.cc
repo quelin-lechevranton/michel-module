@@ -356,39 +356,42 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //     &tpc_crossing,
         //     &
         // );
-        if (trk_ends.first.isNonnull()) {
-            bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
-                || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
-            bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
-                || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
-            TMarker* m = new TMarker();
-            if (cathode_crossing.first.isNull()) {
-                m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-                m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
-                drawMarker(m, trk_ends.first);
-                m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
-                drawMarker(m, trk_ends.second);
-            } else {
-                m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-                m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
-                drawMarker(m, trk_ends.first);
-                m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
-                drawMarker(m, trk_ends.second);
 
-                m->SetMarkerStyle(kFullTriangleDown);
-                m->SetMarkerColor(tooSmall ? kGray : kPink-2);
-                drawMarker(m, cathode_crossing.first);
-                drawMarker(m, cathode_crossing.second);
-            }
-            if (tpc_crossing.size()) {
-                m->SetMarkerStyle(kFullCircle);
-                m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
-                for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
-                    drawMarker(m, p_hit);
-            }
+        if (!LOG(trk_ends.first && trk_ends.second)) continue;
+
+        bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
+        bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
+            || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
+
+        TMarker* m = new TMarker();
+        if (cathode_crossing.first.isNull()) {
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
+            drawMarker(m, trk_ends.second);
+        } else {
+            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
+            m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
+            drawMarker(m, trk_ends.second);
+
+            m->SetMarkerStyle(kFullTriangleDown);
+            m->SetMarkerColor(tooSmall ? kGray : kPink-2);
+            drawMarker(m, cathode_crossing.first);
+            drawMarker(m, cathode_crossing.second);
+        }
+        if (tpc_crossing.size()) {
+            m->SetMarkerStyle(kFullCircle);
+            m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
+            for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
+                drawMarker(m, p_hit);
         }
 
+        /*
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             gs[s] = new TGraph();
@@ -412,6 +415,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             c->cd(s+1);
             if (gs[s]->GetN()) gs[s]->Draw("same l");
         }
+        */
 
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
@@ -438,7 +442,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             } else {
                 for (art::Ptr<recob::Hit> const& p_hit : vp_hit_muon) {
                     if (p_hit->View() != geo::kW) continue;
-                    if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != s) continue;
+                    if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
                     double const z = GetSpace(p_hit->WireID());
                     double const t = p_hit->PeakTime() * fTick2cm;
                     reg.add(z, t);
