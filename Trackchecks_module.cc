@@ -358,7 +358,17 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         // );
 
 
-        if (!LOG(trk_ends.first && trk_ends.second)) continue;
+        if (!LOG(trk_ends.first && trk_ends.second)) {
+            std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+            for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+                gs[s] = new TGraph();
+                gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
+                gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
+                gs[s]->SetLineWidth(1);
+                gs[s]->SetLineColor(kGreen-8);
+            }
+            continue;
+        }
 
         bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
@@ -432,7 +442,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             if (fSort) {
                 for (art::Ptr<recob::Hit> const& p_hit : vvp_sec_sorted[s]) {
                     double const z = GetSpace(p_hit->WireID());
-                    double const t = p_hit->PeakTime() * fTick2cm;
+                    double const t = p_hit->PeakTime();
                     reg.add(z, t);
                     if (geoDet == kPDVD)
                         g->AddPoint(z, t);
@@ -444,7 +454,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                     if (p_hit->View() != geo::kW) continue;
                     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
                     double const z = GetSpace(p_hit->WireID());
-                    double const t = p_hit->PeakTime() * fTick2cm;
+                    double const t = p_hit->PeakTime();
                     reg.add(z, t);
                     if (geoDet == kPDVD)
                         g->AddPoint(z, t);
@@ -469,11 +479,11 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 f = new TF1(
                     Form("f%u_%u", p_trk->ID(), s),
                     "[0]*x + [1]",
-                    (reg.mt - 10) / fTick2cm,
-                    (reg.mt + 10) / fTick2cm
+                    reg.mt - 50,
+                    reg.mt + 50
                 );
             }
-            f->SetParameter(0, reg.m() / fTick2cm);
+            f->SetParameter(0, reg.m());
             f->SetParameter(1, reg.p());
             f->SetLineColor(reg.r2() > 0.5 ? kAzure-4 : kViolet+6);
             f->SetLineWidth(2);
