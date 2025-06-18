@@ -560,6 +560,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
         if (mcp) {
+
+            LOG("retrieving michel info");
+
             bool has_numu = false, has_nue = false;
             for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
                 simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
@@ -572,16 +575,22 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                     default: break;
                 }
             }
+
+            LOG("retrieved michel info");
+
             if (mcp_michel and has_numu and has_nue) {
                 bool isin = false;
                 for (unsigned t=0; t<asGeo->NTPC(); t++) {
                     isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
                     if (isin) break;
                 }
+                
                 if (isin)
                     MuonHasMichel = kHasMichelInside; 
                 else
                     MuonHasMichel = kHasMichelOutside;
+
+                LOG("michel is inside or outside");
 
                 // recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
                 art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
@@ -590,7 +599,11 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 else
                     MichelTrackLength = 0;
 
+                LOG("retrieved michel track length");
+
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
+
+                LOG("retrieved michel true energy");
 
                 // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
                 std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
@@ -599,10 +612,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
                     MichelHits.push_back(GetHit(p_hit_michel));
                 }
+
+                LOG("retrieved michel hits");
+
                 MichelHitEnergy = MichelHits.energy();
-            }
-            else MuonHasMichel = kNoMichel;
+            } else MuonHasMichel = kNoMichel;
+
         } else {
+            LOG("no michel info");
+
             MuonHasMichel = -1;
             MichelTrackLength = -1;
             MichelHitEnergy = -1;
