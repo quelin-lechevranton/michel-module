@@ -478,6 +478,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         MuonIsAnti = mcp ? mcp->PdgCode() < 0 : false;
         MuonTrackLength = p_trk->Length();
 
+        /*
         if (mcp) {
             std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
             // std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
@@ -507,6 +508,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 }
             } else MuonTrackIsNotBroken = -1;
         } else MuonTrackIsNotBroken = -1;
+        */
 
         if (mcp) {
             MuonEndProcess = mcp->EndProcess();
@@ -522,6 +524,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             // MuonTrueEndEnergy = 0;
         }
 
+        LOG("retrieved end process");
+
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
@@ -531,6 +535,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 default: break;
             }
         }
+
+        LOG("retrieved muon hits");
 
         // and all muon track points
         // for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
@@ -602,6 +608,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             MichelHitEnergy = -1;
         }
 
+        LOG("retrieved muon michel info");
 
         // get induction hits nearby muon end point
         // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -646,12 +653,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
             ana::Hit hit = GetHit(p_hit);
-            if (geoDet == kPDVD) {
-                if (hit.slice() != MuonEndHit.slice()) continue;
-            } else {
-                if (hit.tpc != MuonEndHit.tpc) continue;
-            }
-
+            if (geoDet == kPDVD && hit.slice() != MuonEndHit.slice()) continue;
+            if (geoDet == kPDHD && hit.tpc != MuonEndHit.tpc) continue;
 
             float dz = (hit.space - MuonEndHit.space);
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
