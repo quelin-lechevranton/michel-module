@@ -89,7 +89,7 @@ private:
         Size_t s_mcp_mu = 1;
 
         Color_t c_mcp_me = kAzure-4;
-        Style_t m_mcp_me = kOpenDoubleDIamond;
+        Style_t m_mcp_me = kOpenDoubleDiamond;
         Size_t s_mcp_me = 1;
 
         Color_t c_small = kGray;
@@ -255,107 +255,114 @@ void ana::Trackchecks::beginJob() {
     float line_length = 0.03;
     float ncol = 4;
     Style_t font = 43;
+    Style_t font_bold = 63;
     Float_t title_size = 20;
     Float_t label_size = 16;
 
     TText* title = new TText();
-    title->SetTextFont(font);
+    title->SetTextFont(font_bold);
     title->SetTextSize(title_size);
     TText* label = new TText();
     label->SetTextFont(font);
     label->SetTextSize(label_size);
 
-    title->DrawText(indent, top_margin, "Event Markers");
+    title->DrawText(indent, 1-top_margin, "Event Markers");
 
     TMarker* m_ev = new TMarker();
     m_ev->SetMarkerColor(theme.c_ev);
     m_ev->SetMarkerStyle(theme.m_ev);
-    m_ev->SetMarkerSize(theme.s_ev);
-    m_ev->DrawMarker(indent, top_margin - line_height);
-    label->DrawText(label_indent, top_margin - line_height, "Event Hits");
+    m_ev->SetMarkerSize(2*theme.s_ev);
+    m_ev->DrawMarker(indent, 1-(top_margin - line_height));
+    label->DrawText(label_indent, 1-(top_margin - line_height), "Event Hits");
 
     TMarker* m_mcp_mu = new TMarker();
     m_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
     m_mcp_mu->SetMarkerStyle(theme.m_mcp_mu); 
-    m_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
-    m_mcp_mu->DrawMarker(indent, top_margin - 2 * line_height);
-    label->DrawText(label_indent, top_margin - 2 * line_height, "MCParticle Muon Hits");
+    m_mcp_mu->SetMarkerSize(2*theme.s_mcp_mu);
+    m_mcp_mu->DrawMarker(indent, 1-(top_margin - 2 * line_height));
+    label->DrawText(label_indent, 1-(top_margin - 2 * line_height), "MCParticle Muon Hits");
 
     TMarker* m_mcp_me = new TMarker();
     m_mcp_me->SetMarkerColor(theme.c_mcp_me);
     m_mcp_me->SetMarkerStyle(theme.m_mcp_me);
-    m_mcp_me->SetMarkerSize(theme.s_mcp_me);
-    m_mcp_me->DrawMarker(indent, top_margin - 3 * line_height);
-    label->DrawText(label_indent, top_margin - 3 * line_height, "MCParticle Michel Hits");
+    m_mcp_me->SetMarkerSize(2*theme.s_mcp_me);
+    m_mcp_me->DrawMarker(indent, 1-(top_margin - 3 * line_height));
+    label->DrawText(label_indent, 1-(top_margin - 3 * line_height), "MCParticle Michel Hits");
 
-    title->DrawText(1/ncol + indent, top_margin, "Tracks");
+    title->DrawText(1/ncol + indent, 1-(top_margin), "Tracks");
 
     TLine* l_small = new TLine();
     l_small->SetLineColor(theme.c_small);
-    l_small->SetLineWidth(theme.w_mu);
-    l_small->DrawLine(1/ncol + indent, top_margin - line_height,
-                      1/ncol + indent + line_length, top_margin - line_height);
-    label->DrawText(1/ncol + label_indent, top_margin - line_height, "Small Tracks");
+    l_small->SetLineWidth(2*theme.w_mu);
+    l_small->DrawLine(1/ncol + indent, 1-(top_margin - line_height),
+                      1/ncol + indent + line_length, 1-(top_margin - line_height));
+    label->DrawText(1/ncol + label_indent, 1-(top_margin - line_height), "Small Tracks");
 
     TLine* l_broken = new TLine();
     l_broken->SetLineColor(theme.c_broken);
     l_broken->SetLineStyle(theme.s_broken);
-    l_broken->SetLineWidth(theme.w_mu);
-    l_broken->DrawLine(1/ncol + indent, top_margin - 2 * line_height,
-                       1/ncol + indent + line_length, top_margin - 2 * line_height);
-    label->DrawText(1/ncol + label_indent, top_margin - 2 * line_height, "Broken Tracks");
+    l_broken->SetLineWidth(2*theme.w_mu);
+    l_broken->DrawLine(1/ncol + indent, 1-(top_margin - 2 * line_height),
+                       1/ncol + indent + line_length, 1-(top_margin - 2 * line_height));
+    label->DrawText(1/ncol + label_indent, 1-(top_margin - 2 * line_height), "Broken Tracks");
 
     TLine* l_no_end = new TLine();
     l_no_end->SetLineColor(theme.c_no_end);
-    l_no_end->SetLineWidth(theme.w_mu);
-    l_no_end->DrawLine(1/ncol + indent, top_margin - 3 * line_height,
-                       1/ncol + indent + line_length, top_margin - 3 * line_height);
-    label->DrawText(1/ncol + label_indent, top_margin - 3 * line_height, "End Algorithm failed");
+    l_no_end->SetLineWidth(2*theme.w_mu);
+    l_no_end->DrawLine(1/ncol + indent, 1-(top_margin - 3 * line_height),
+                       1/ncol + indent + line_length, 1-(top_margin - 3 * line_height));
+    label->DrawText(1/ncol + label_indent, 1-(top_margin - 3 * line_height), "End Algorithm failed");
 
     TLine* l_mu = new TLine();
     l_mu->SetLineColor(theme.c_mu);
-    l_mu->SetLineWidth(theme.w_mu);
-    l_mu->DrawLine(1/ncol + indent, top_margin - 4 * line_height,
-                   1/ncol + indent + line_length, top_margin - 4 * line_height);
-    label->DrawText(1/ncol + label_indent, top_margin - 4 * line_height, "Muon Tracks");
+    l_mu->SetLineWidth(2*theme.w_mu);
+    l_mu->DrawLine(1/ncol + indent, 1-(top_margin - 4 * line_height,
+                   1/ncol + indent + line_length, 1-(top_margin - 4 * line_height));
+    label->DrawText(1/ncol + label_indent, 1-(top_margin - 4 * line_height), "Muon Tracks");
 
-    title->DrawText(2/ncol + indent, top_margin, "Track Ends Markers");
+    title->DrawText(2/ncol + indent, 1-(top_margin), "Track Ends Markers");
 
     TMarker* m_mu_in = new TMarker();
     m_mu_in->SetMarkerColor(theme.c_mu);
     m_mu_in->SetMarkerStyle(theme.m_mu_in);
-    m_mu_in->DrawMarker(2/ncol + indent, top_margin - line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - line_height, "Muon Track In");
+    m_mu_in->SetMarkerSize(2);
+    m_mu_in->DrawMarker(2/ncol + indent, 1-(top_margin - line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - line_height), "Muon Track In");
 
     TMarker* m_mu_out = new TMarker();
     m_mu_out->SetMarkerColor(theme.c_mu);
     m_mu_out->SetMarkerStyle(theme.m_mu_out);
-    m_mu_out->DrawMarker(2/ncol + indent, top_margin - 2 * line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - 2 * line_height, "Muon Track Out");
+    m_mu_out->SetMarkerSize(2);
+    m_mu_out->DrawMarker(2/ncol + indent, 1-(top_margin - 2 * line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - 2 * line_height), "Muon Track Out");
 
     TMarker* m_mu_cc_in = new TMarker();
     m_mu_cc_in->SetMarkerColor(theme.c_mu);
     m_mu_cc_in->SetMarkerStyle(theme.m_mu_cc_in);
-    m_mu_cc_in->DrawMarker(2/ncol + indent, top_margin - 3 * line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - 3 * line_height, "Cathode Crossing Muon In");
+    m_mu_cc_in->SetMarkerSize(2);
+    m_mu_cc_in->DrawMarker(2/ncol + indent, 1-(top_margin - 3 * line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - 3 * line_height), "Cathode Crossing Muon In");
 
     TMarker* m_mu_cc_out = new TMarker();
     m_mu_cc_out->SetMarkerColor(theme.c_mu);
     m_mu_cc_out->SetMarkerStyle(theme.m_mu_cc_out);
-    m_mu_cc_out->DrawMarker(2/ncol + indent, top_margin - 4 * line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - 4 * line_height, "Cathode Crossing Muon Out");
+    m_mu_cc_out->SetMarkerSize(2);
+    m_mu_cc_out->DrawMarker(2/ncol + indent, 1-(top_margin - 4 * line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - 4 * line_height), "Cathode Crossing Muon Out");
 
     TMarker* m_cc = new TMarker();
     m_cc->SetMarkerColor(theme.c_cc);
     m_cc->SetMarkerStyle(theme.m_cc);
-    m_cc->DrawMarker(2/ncol + indent, top_margin - 5 * line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - 5 * line_height, "Cathode Crossing");
+    m_cc->SetMarkerSize(2);
+    m_cc->DrawMarker(2/ncol + indent, 1-(top_margin - 5 * line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - 5 * line_height), "Cathode Crossing");
 
     TMarker* m_sc = new TMarker();
     m_sc->SetMarkerColor(theme.c_sc);
     m_sc->SetMarkerStyle(theme.m_sc);
-    m_sc->DrawMarker(2/ncol + indent, top_margin - 6 * line_height);
-    label->DrawText(2/ncol + label_indent, top_margin - 6 * line_height, "Section Crossing");
+    m_sc->SetMarkerSize(2);
+    m_sc->DrawMarker(2/ncol + indent, 1-(top_margin - 6 * line_height));
+    label->DrawText(2/ncol + label_indent, 1-(top_margin - 6 * line_height), "Section Crossing");
 
     c->Write();
 }
@@ -405,6 +412,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             gs[s] = new TGraph();
+            gs[s]->SetEditable(kFALSE);
             gs[s]->SetName(Form("g%u_s%u", gn++, s));
             gs[s]->SetMarkerColor(g->GetMarkerColor());
             gs[s]->SetMarkerStyle(g->GetMarkerStyle());
@@ -511,11 +519,11 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     if (vh_mcp) {
         for (simb::MCParticle const& mcp : *vh_mcp) {
             if (abs(mcp.PdgCode()) != 13) continue; 
-            TGraph* g_mcp_mu = new TGraph();
-            g_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
-            g_mcp_mu->SetMarkerStyle(theme.m_mcp_mu);
-            g_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
-            drawGraph(g_mcp_mu, ana::mcp2hits(&mcp, vp_hit, clockData, false), "p");
+            // TGraph* g_mcp_mu = new TGraph();
+            // g_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
+            // g_mcp_mu->SetMarkerStyle(theme.m_mcp_mu);
+            // g_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
+            // drawGraph(g_mcp_mu, ana::mcp2hits(&mcp, vp_hit, clockData, false), "p");
 
             if (mcp.NumberDaughters() >= 3) {
                 simb::MCParticle const * mcp_michel = nullptr;
@@ -1227,10 +1235,10 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
     }
 
     // if not enough hits on both sides, return empty pair
-    for (ana::LinearRegression& reg : side_reg) {
-        if (reg.n < nmin) return {};
-        reg.normalize();
-    }
+    if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
+
+    // compute average from sum
+    for (ana::LinearRegression& reg : side_reg) reg.normalize();
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
