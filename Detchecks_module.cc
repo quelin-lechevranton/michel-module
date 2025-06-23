@@ -53,13 +53,6 @@ private:
     bool pCollectionZ;
     bool pViewUCoord;
     bool pViewVCoord;
-
-    // Conversion factors
-    float fADCtoE = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    float fChannelPitch = 0.5; // cm/channel
-
-    // geo::WireID GetWireID(geo::Point_t const& P, geo::View_t plane);
-    // raw::ChannelID_t GetChannel(geo::Point_t const& P, geo::View_t plane);
 };
 
 
@@ -81,17 +74,9 @@ ana::Detchecks::Detchecks(fhicl::ParameterSet const& p)
     pCollectionZ(p.get<bool>("CollectionZ", false)),
     pViewUCoord(p.get<bool>("ViewUCoord", false)),
     pViewVCoord(p.get<bool>("ViewVCoord", false))
+{}
 
-    // fMichelTimeRadius(p.get<float>("MichelTimeRadius")), //in µs
-    // fMichelSpaceRadius(p.get<float>("MichelSpaceRadius")), //in cm
-{
-    // Basic Utilities
-}
-
-void ana::Detchecks::analyze(art::Event const& e)
-{
-
-} // end analyze
+void ana::Detchecks::analyze(art::Event const& e) {}
 
 void ana::Detchecks::beginJob()
 {
@@ -361,9 +346,6 @@ void ana::Detchecks::beginJob()
 } // end beginJob
 
 
-void ana::Detchecks::endJob()
-{
-
-} // end endJob
+void ana::Detchecks::endJob() {}
 
 DEFINE_ART_MODULE(ana::Detchecks)

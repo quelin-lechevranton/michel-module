@@ -7,32 +7,12 @@
 #include <TGraph.h>
 #include <TF1.h>
 #include <TMarker.h>
+#include <TLine.h>
 #include <TStyle.h>
 #include <TColor.h>
 #include <TText.h>
 
 namespace ana {
-    struct LinearRegression {
-        static constexpr unsigned nmin = 4;
-        unsigned n=0;
-        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
-        void add(double z, double t) {
-            mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
-        }
-        void normalize() {
-            mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
-        }
-        double cov() const { return mzt - mz*mt; }
-        double varz() const { return mz2 - mz*mz; }
-        double vart() const { return mt2 - mt*mt; }
-        double m() const { return n<nmin ? 0 : cov()/vart(); }
-        double p() const { return mz - m()*mt; }
-        double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
-        double projection(double z, double t) const {
-            return (t + m()*(z-p())) / (1 + m()*m());
-        }
-    };
-
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
         Style_t const font = 43;
         unsigned n_sec = 0;
@@ -43,7 +23,7 @@ namespace ana {
         std::string data;
         switch(real) {
             case 0: data = "Simulation"; break;
-            case 1: data = "Real Data"; break;
+            case 1: data = "Data"; break;
             default: data = "Unknown";
         }
 
@@ -74,15 +54,19 @@ namespace ana {
             if (geoDet == kPDVD) {
                 f = new TH2F(Form("f%u", s), ";Z;T",
                     600, 0, 300,
-                    600, 0, 6000);
+                    // 600, 0, 6000
+                    600, 0, 480
+                );
             } else if (geoDet == kPDHD) {
                 f = new TH2F(Form("f%u", s), ";T;Z",
-                    600, 0, 6000,
-                    600, 0, 464);
+                    // 600, 0, 6000,
+                    600, 0, 480,
+                    600, 0, 464
+                );
             }
             f->SetStats(kFALSE);
-            f->SetTitleFont(43, "xyz");
-            f->SetLabelFont(43, "xyz");
+            f->SetTitleFont(font, "xyz");
+            f->SetLabelFont(font, "xyz");
             f->SetTitleSize(font_size, "xyz");
             f->SetLabelSize(font_size, "xyz");
             f->SetTitleOffset(title_offset_x, "x");
