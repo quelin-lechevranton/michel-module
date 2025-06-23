@@ -25,7 +25,6 @@ public:
     void analyze(art::Event const& e) override;
     void beginJob() override;
     void endJob() override;
-
 private:
 
     // Utilities
@@ -44,7 +43,7 @@ private:
     enum EnumDet { kPDVD, kPDHD };
 
     // Detector Properties
-    // float fADC2MeV;
+    float fADCtoMeV;
     float fTick2cm; // cm/tick
     float fSamplingRate; // µs/tick
     float fDriftVelocity; // cm/µs
@@ -199,7 +198,8 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
             << asGeo->DetectorName() << "\033[0m" << std::endl;
         exit(1);
     }
-
+    // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
+    fADCtoMeV = (geoDet == kPDVD ? 200 : 1000) * 23.6 * 1e-6 / 0.7;
     fChannelPitch = geo::WireGeo::WirePitch(
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0}),
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1})
@@ -524,8 +524,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             // MuonTrueEndEnergy = 0;
         }
 
-        LOG("retrieved end process");
-
         // getting all muon hits
         for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
@@ -535,8 +533,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 default: break;
             }
         }
-
-        LOG("retrieved muon hits");
 
         // and all muon track points
         // for (unsigned i_tpt=0; i_tpt<p_trk->NumberTrajectoryPoints(); i_tpt++) {
@@ -559,10 +555,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
-        if (mcp) {
-
-            LOG("retrieving michel info");
-
+        if (mcp && mcp->NumberDaughters() >= 3) {
             bool has_numu = false, has_nue = false;
             for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
                 simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
@@ -576,8 +569,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 }
             }
 
-            LOG("retrieved michel info");
-
             if (mcp_michel and has_numu and has_nue) {
                 bool isin = false;
                 for (unsigned t=0; t<asGeo->NTPC(); t++) {
@@ -590,8 +581,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 else
                     MuonHasMichel = kHasMichelOutside;
 
-                LOG("michel is inside or outside");
-
                 // recob::Track const * trk_michel = truthUtil.GetRecoTrackFromMCParticle(clockData, *mcp_michel, e, tag_trk.label());
                 art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
                 if (trk_michel) 
@@ -599,11 +588,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 else
                     MichelTrackLength = 0;
 
-                LOG("retrieved michel track length");
-
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
-
-                LOG("retrieved michel true energy");
 
                 // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
                 std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
@@ -613,20 +598,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                     MichelHits.push_back(GetHit(p_hit_michel));
                 }
 
-                LOG("retrieved michel hits");
-
-                MichelHitEnergy = MichelHits.energy();
+                MichelHitEnergy = MichelHits.energy() * fADCtoMeV;
             } else MuonHasMichel = kNoMichel;
 
         } else {
-            LOG("no michel info");
-
             MuonHasMichel = -1;
             MichelTrackLength = -1;
             MichelHitEnergy = -1;
         }
-
-        LOG("retrieved muon michel info");
 
         // get induction hits nearby muon end point
         // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
@@ -714,8 +693,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             //     SphereEnergyFalsePositive += hit.adc;
             // }
         } // end of loop over event hits
-        SphereEnergy = SphereHits.energy();
-        TrueSphereEnergy = TrueSphereHits.energy();
+        SphereEnergy = SphereHits.energy() * fADCtoMeV;
+        TrueSphereEnergy = TrueSphereHits.energy() * fADCtoMeV;
 
         /*
 

@@ -13,6 +13,10 @@ namespace ana {
     class Trackchecks;
 }
 
+using HitPtr = art::Ptr<recob::Hit>;
+using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
+using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+
 class ana::Trackchecks : public art::EDAnalyzer {
 public:
     explicit Trackchecks(fhicl::ParameterSet const& p);
@@ -70,33 +74,59 @@ private:
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
 
-
     unsigned cn=0;
+    unsigned gn=0;
+
+    struct {
+        Int_t i_pal = kCividis;
+
+        Color_t c_ev = kGray;
+        Style_t m_ev = kMultiply;
+        Size_t s_ev = 0.5;
+
+        Color_t c_mcp_mu = kOrange+6;
+        Style_t m_mcp_mu = kOpenDiamond;
+        Size_t s_mcp_mu = 1;
+
+        Color_t c_mcp_me = kAzure-4;
+        Style_t m_mcp_me = kOpenDoubleDIamond;
+        Size_t s_mcp_me = 1;
+
+        Color_t c_small = kGray;
+        Color_t c_broken = kRed-4;
+        Style_t s_broken = kDashed;
+        Color_t c_no_end = kGreen-8;
+
+        Color_t c_mu = kOrange+6;
+        Width_t w_mu = 1;
+
+        Style_t m_mu_in = kFullSquare;
+        Style_t m_mu_out = kOpenSquare;
+
+        Style_t m_mu_cc_in = kFullTriangleUp;
+        Style_t m_mu_cc_out = kOpenTriangleUp;
+
+        Color_t c_cc = kPink-2;
+        Style_t m_cc = kFullTriangleDown;
+
+        Color_t c_sc = kPink-2;
+        Style_t m_sc = kFullCircle;
+
+        Color_t c_reg_good = kAzure-4;
+        Color_t c_reg_bad = kViolet+6;
+        Width_t w_reg = 2;
+    } theme;
+
 
     double GetSpace(geo::WireID);
-    ana::Hit GetHit(art::Ptr<recob::Hit> const p_hit);
-    // art::Ptr<recob::Hit> GetDeepestHit(
-    //     std::vector<art::Ptr<recob::Hit>> const&,
-    //     bool increazing_z,
-    //     geo::View_t = geo::kW
-    // );
-
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> GetTrackEndsHits(
-        std::vector<art::Ptr<recob::Hit>> const&,
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *pp_cathode_crossing = nullptr,
-        std::vector<art::Ptr<recob::Hit>> *vp_tpc_crossing = nullptr,
-        std::vector<std::vector<art::Ptr<recob::Hit>>> *vvp_sec_sorted_hits = nullptr,
-        geo::View_t = geo::kW
+    ana::Hit GetHit(HitPtr const p_hit);
+    HitPtrPair GetTrackEndsHits( // return hits at track ends
+        HitPtrVec const&, // all hits of the track
+        HitPtrPair *pp_cathode_crossing = nullptr, // return hits at cathode crossing
+        HitPtrVec *vp_tpc_crossing = nullptr, // return hits at TPC crossing (PDVD)
+        HitPtrVec *vp_sorted_hit = nullptr, // return hits of the track per section and sorted
+        geo::View_t = geo::kW // view to consider
     );
-
-    /*
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> GetEndHits(
-        std::vector<art::Ptr<recob::Hit>> const&,
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *ppp_cathode_crossing,
-        std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing,
-        geo::View_t = geo::kW
-    );
-    */
 };
 
 
@@ -211,6 +241,125 @@ ana::Trackchecks::Trackchecks(fhicl::ParameterSet const& p)
         // << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
 }
 
+void ana::Trackchecks::beginJob() {
+    TCanvas *c = tfs->make<TCanvas>(
+        "legend", "legend",
+        1300, 800
+    );
+    c->cd();
+
+    float top_margin = 0.1;
+    float indent = 0.05;
+    float label_indent = 0.1;
+    float line_height = 0.05;
+    float line_length = 0.03;
+    float ncol = 4;
+    Style_t font = 43;
+    Float_t title_size = 20;
+    Float_t label_size = 16;
+
+    TText* title = new TText();
+    title->SetTextFont(font);
+    title->SetTextSize(title_size);
+    TText* label = new TText();
+    label->SetTextFont(font);
+    label->SetTextSize(label_size);
+
+    title->DrawText(indent, top_margin, "Event Markers");
+
+    TMarker* m_ev = new TMarker();
+    m_ev->SetMarkerColor(theme.c_ev);
+    m_ev->SetMarkerStyle(theme.m_ev);
+    m_ev->SetMarkerSize(theme.s_ev);
+    m_ev->DrawMarker(indent, top_margin - line_height);
+    label->DrawText(label_indent, top_margin - line_height, "Event Hits");
+
+    TMarker* m_mcp_mu = new TMarker();
+    m_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
+    m_mcp_mu->SetMarkerStyle(theme.m_mcp_mu); 
+    m_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
+    m_mcp_mu->DrawMarker(indent, top_margin - 2 * line_height);
+    label->DrawText(label_indent, top_margin - 2 * line_height, "MCParticle Muon Hits");
+
+    TMarker* m_mcp_me = new TMarker();
+    m_mcp_me->SetMarkerColor(theme.c_mcp_me);
+    m_mcp_me->SetMarkerStyle(theme.m_mcp_me);
+    m_mcp_me->SetMarkerSize(theme.s_mcp_me);
+    m_mcp_me->DrawMarker(indent, top_margin - 3 * line_height);
+    label->DrawText(label_indent, top_margin - 3 * line_height, "MCParticle Michel Hits");
+
+    title->DrawText(1/ncol + indent, top_margin, "Tracks");
+
+    TLine* l_small = new TLine();
+    l_small->SetLineColor(theme.c_small);
+    l_small->SetLineWidth(theme.w_mu);
+    l_small->DrawLine(1/ncol + indent, top_margin - line_height,
+                      1/ncol + indent + line_length, top_margin - line_height);
+    label->DrawText(1/ncol + label_indent, top_margin - line_height, "Small Tracks");
+
+    TLine* l_broken = new TLine();
+    l_broken->SetLineColor(theme.c_broken);
+    l_broken->SetLineStyle(theme.s_broken);
+    l_broken->SetLineWidth(theme.w_mu);
+    l_broken->DrawLine(1/ncol + indent, top_margin - 2 * line_height,
+                       1/ncol + indent + line_length, top_margin - 2 * line_height);
+    label->DrawText(1/ncol + label_indent, top_margin - 2 * line_height, "Broken Tracks");
+
+    TLine* l_no_end = new TLine();
+    l_no_end->SetLineColor(theme.c_no_end);
+    l_no_end->SetLineWidth(theme.w_mu);
+    l_no_end->DrawLine(1/ncol + indent, top_margin - 3 * line_height,
+                       1/ncol + indent + line_length, top_margin - 3 * line_height);
+    label->DrawText(1/ncol + label_indent, top_margin - 3 * line_height, "End Algorithm failed");
+
+    TLine* l_mu = new TLine();
+    l_mu->SetLineColor(theme.c_mu);
+    l_mu->SetLineWidth(theme.w_mu);
+    l_mu->DrawLine(1/ncol + indent, top_margin - 4 * line_height,
+                   1/ncol + indent + line_length, top_margin - 4 * line_height);
+    label->DrawText(1/ncol + label_indent, top_margin - 4 * line_height, "Muon Tracks");
+
+    title->DrawText(2/ncol + indent, top_margin, "Track Ends Markers");
+
+    TMarker* m_mu_in = new TMarker();
+    m_mu_in->SetMarkerColor(theme.c_mu);
+    m_mu_in->SetMarkerStyle(theme.m_mu_in);
+    m_mu_in->DrawMarker(2/ncol + indent, top_margin - line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - line_height, "Muon Track In");
+
+    TMarker* m_mu_out = new TMarker();
+    m_mu_out->SetMarkerColor(theme.c_mu);
+    m_mu_out->SetMarkerStyle(theme.m_mu_out);
+    m_mu_out->DrawMarker(2/ncol + indent, top_margin - 2 * line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - 2 * line_height, "Muon Track Out");
+
+    TMarker* m_mu_cc_in = new TMarker();
+    m_mu_cc_in->SetMarkerColor(theme.c_mu);
+    m_mu_cc_in->SetMarkerStyle(theme.m_mu_cc_in);
+    m_mu_cc_in->DrawMarker(2/ncol + indent, top_margin - 3 * line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - 3 * line_height, "Cathode Crossing Muon In");
+
+    TMarker* m_mu_cc_out = new TMarker();
+    m_mu_cc_out->SetMarkerColor(theme.c_mu);
+    m_mu_cc_out->SetMarkerStyle(theme.m_mu_cc_out);
+    m_mu_cc_out->DrawMarker(2/ncol + indent, top_margin - 4 * line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - 4 * line_height, "Cathode Crossing Muon Out");
+
+    TMarker* m_cc = new TMarker();
+    m_cc->SetMarkerColor(theme.c_cc);
+    m_cc->SetMarkerStyle(theme.m_cc);
+    m_cc->DrawMarker(2/ncol + indent, top_margin - 5 * line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - 5 * line_height, "Cathode Crossing");
+
+    TMarker* m_sc = new TMarker();
+    m_sc->SetMarkerColor(theme.c_sc);
+    m_sc->SetMarkerStyle(theme.m_sc);
+    m_sc->DrawMarker(2/ncol + indent, top_margin - 6 * line_height);
+    label->DrawText(2/ncol + label_indent, top_margin - 6 * line_height, "Section Crossing");
+
+    c->Write();
+}
+
 void ana::Trackchecks::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
@@ -220,7 +369,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    std::vector<art::Ptr<recob::Hit>> vp_hit;
+    HitPtrVec vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
@@ -239,24 +388,61 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     );
     ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
 
-    auto drawMarker = [&](TMarker* m, art::Ptr<recob::Hit> const& p_hit) -> void {
+    auto drawMarker = [&](TMarker* m, HitPtr const& p_hit) -> void {
         if (geoDet == kPDVD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             c->cd(s+1);
-            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
+            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
         } else if (geoDet == kPDHD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             if (s == -1) return;
             c->cd(s+1);
-            m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
+            m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
         }
     };
 
-    gStyle->SetPalette(kCividis);
+    auto drawGraph = [&](TGraph* g, HitPtrVec const& vp_hit, char const* draw) -> void {
+        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            gs[s] = new TGraph();
+            gs[s]->SetName(Form("g%u_s%u", gn++, s));
+            gs[s]->SetMarkerColor(g->GetMarkerColor());
+            gs[s]->SetMarkerStyle(g->GetMarkerStyle());
+            gs[s]->SetMarkerSize(g->GetMarkerSize());
+            gs[s]->SetLineColor(g->GetLineColor());
+            gs[s]->SetLineStyle(g->GetLineStyle());
+            gs[s]->SetLineWidth(g->GetLineWidth());
+        }
+        for (HitPtr p_hit : vp_hit) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
+            if (geoDet == kPDVD)
+                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+            else if (geoDet == kPDHD)
+                gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            if (!gs[s]->GetN()) continue;
+            c->cd(s+1);
+            gs[s]->Draw(draw);
+        }
+    };
+
+    gStyle->SetPalette(theme.i_pal);
+
+    // all event hits TGraph
+    TGraph* g = new TGraph();
+    g->SetMarkerColor(theme.c_ev);
+    g->SetMarkerStyle(theme.m_ev);
+    g->SetMarkerSize(theme.s_ev);
+    drawGraph(g, vp_hit, "p");
+
+    // all event hits simulate TScatter
     // TArrayI const& colors = TColor::GetPalette();
     // TMarker* m = new TMarker();
     // m->SetMarkerStyle(kFullCircle);
-    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+    // for (HitPtr p_hit : vp_hit) {
     //     if (p_hit->View() != geo::kW) continue;
     //     float const x = std::min(p_hit->Integral() / (geoDet == kPDVD ? 200.F : 1000.F), 1.F);
     //     m->SetMarkerSize(2*x+0.1);
@@ -265,99 +451,118 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     //     drawMarker(m, p_hit);
     // }
 
-    std::vector<TH2F*> h2s(ana::n_sec[geoDet]);
-    if (geoDet == kPDVD) {
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            h2s[s] = new TH2F(
-                Form("h2_%u", s),
-                "event hits",
-                600, 0, 300,
-                600, 0, 6000
-            );
-        }
-    } else if (geoDet == kPDHD) {
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            h2s[s] = new TH2F(
-                Form("h2_%u", s),
-                "event hits",
-                600, 0, 6000,
-                600, 0, 464
-            );
-        }
-    }
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        if (p_hit->View() != geo::kW) continue;
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        if (s == -1) continue;
-        // int q = std::min(p_hit->Integral() / 1000???200, 1.F);
-        int q = p_hit->Integral();
-        if (geoDet == kPDVD)
-            h2s[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime(), q);
-        else if (geoDet == kPDHD)
-            h2s[s]->Fill(p_hit->PeakTime(), GetSpace(p_hit->WireID()), q);
-    }
-    double max=0;
-    for (TH2F* h2 : h2s)
-        max = h2->GetMaximum() > max ? h2->GetMaximum() : max;
-    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        h2s[s]->SetMinimum(0);
-        h2s[s]->SetMaximum(max);
 
-        c->cd(s+1);
-        TH2F* f = (TH2F*) gPad->FindObject(Form("f%u", s));
-        f->SetMinimum(0);
-        f->SetMaximum(max);
-    }
-    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        c->cd(s+1);
-        if ((geoDet == kPDVD && s==3) || (geoDet == kPDHD && s==1))
-            h2s[s]->Draw("same colz");
-        else
-            h2s[s]->Draw("same col");
-    }
+    // all event hits TH2F
+    // std::vector<TH2F*> h2s(ana::n_sec[geoDet]);
+    // if (geoDet == kPDVD) {
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         h2s[s] = new TH2F(
+    //             Form("h2_%u", s),
+    //             "event hits",
+    //             600, 0, 300,
+    //             600, 0, 6000
+    //         );
+    //     }
+    // } else if (geoDet == kPDHD) {
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         h2s[s] = new TH2F(
+    //             Form("h2_%u", s),
+    //             "event hits",
+    //             600, 0, 6000,
+    //             600, 0, 464
+    //         );
+    //     }
+    // }
+    // for (HitPtr p_hit : vp_hit) {
+    //     if (p_hit->View() != geo::kW) continue;
+    //     int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //     if (s == -1) continue;
+    //     // int q = std::min(p_hit->Integral() / 1000???200, 1.F);
+    //     int q = p_hit->Integral();
+    //     if (geoDet == kPDVD)
+    //         h2s[s]->Fill(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm, q);
+    //     else if (geoDet == kPDHD)
+    //         h2s[s]->Fill(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()), q);
+    // }
+    // double max=0;
+    // for (TH2F* h2 : h2s)
+    //     max = h2->GetMaximum() > max ? h2->GetMaximum() : max;
+    // for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //     h2s[s]->SetMinimum(0);
+    //     h2s[s]->SetMaximum(max);
 
+    //     c->cd(s+1);
+    //     TH2F* f = (TH2F*) gPad->FindObject(Form("f%u", s));
+    //     f->SetMinimum(0);
+    //     f->SetMaximum(max);
+    // }
+    // for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //     c->cd(s+1);
+    //     if ((geoDet == kPDVD && s==3) || (geoDet == kPDHD && s==1))
+    //         h2s[s]->Draw("same colz");
+    //     else
+    //         h2s[s]->Draw("same col");
+    // }
+
+
+
+
+    auto const& vh_mcp = e.getHandle<std::vector<simb::MCParticle>>(tag_mcp);
+    if (vh_mcp) {
+        for (simb::MCParticle const& mcp : *vh_mcp) {
+            if (abs(mcp.PdgCode()) != 13) continue; 
+            TGraph* g_mcp_mu = new TGraph();
+            g_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
+            g_mcp_mu->SetMarkerStyle(theme.m_mcp_mu);
+            g_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
+            drawGraph(g_mcp_mu, ana::mcp2hits(&mcp, vp_hit, clockData, false), "p");
+
+            if (mcp.NumberDaughters() >= 3) {
+                simb::MCParticle const * mcp_michel = nullptr;
+                bool has_numu = false, has_nue = false;
+                for (int i_dau=mcp.NumberDaughters()-3; i_dau<mcp.NumberDaughters(); i_dau++) {
+                    simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp.Daughter(i_dau));    
+                    if (!mcp_dau) continue;
+                    switch (abs(mcp_dau->PdgCode())) {
+                        case 14: has_numu = true; break;
+                        case 12: has_nue = true; break;
+                        case 11: mcp_michel = mcp_dau; break;
+                        default: break;
+                    }
+                }
+                if (mcp_michel and has_numu and has_nue) {
+                    TGraph* g_mcp_me = new TGraph();
+                    g_mcp_me->SetMarkerColor(theme.c_mcp_me);
+                    g_mcp_me->SetMarkerStyle(theme.m_mcp_me);
+                    g_mcp_me->SetMarkerSize(theme.s_mcp_me);
+                    drawGraph(g_mcp_me, ana::mcp2hits(mcp_michel, vp_hit, clockData, true), "p");
+                }
+            }
+        }
+    }
+            
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
 
         bool tooSmall = p_trk->Length() < fTrackLengthCut;
 
-        // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
-        // tracks associated to a MCTruth muon
-        // if (!mcp) continue;
-        // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
-
-        std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
+        HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         if (!LOG(vp_hit_muon.size())) continue;
 
-        // if (mcp) {
-        //     art::Ptr<recob::Hit> deephit = GetDeepestHit(
-        //         ana::mcp2hits(mcp, vp_hit, clockData, false),
-        //         mcp->EndZ() > mcp->Vz()
-        //     );
-        //     if (deephit) MuonTrueEndHit = GetHit(deephit);
-        // } else MuonTrueEndHit = ana::Hit{};
+        HitPtrPair cathode_crossing;
+        HitPtrVec tpc_crossing;
+        HitPtrVec vp_sorted_hit;
 
-
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> cathode_crossing;
-        std::vector<art::Ptr<recob::Hit>> tpc_crossing;
-        std::vector<std::vector<art::Ptr<recob::Hit>>> vvp_sec_sorted;
-
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> trk_ends =
+        HitPtrPair trk_ends =
             GetTrackEndsHits(
                 vp_hit_muon,
                 &cathode_crossing,
                 &tpc_crossing,
-                fSort ? &vvp_sec_sorted : nullptr
+                fSort ? &vp_sorted_hit : nullptr
             );
 
-        // auto trk_ends = GetEndHits(
-        //     vp_hit_muon,
-        //     &cathode_crossing,
-        //     &tpc_crossing,
-        //     &
-        // );
 
-
+        // no reconstructed track ends
         if (!LOG(trk_ends.first && trk_ends.second)) {
             std::vector<TGraph*> gs(ana::n_sec[geoDet]);
             for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
@@ -365,132 +570,199 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
                 gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
                 gs[s]->SetLineWidth(1);
-                gs[s]->SetLineColor(kGreen-8);
+                gs[s]->SetLineColor(theme.c_no_end);
             }
             continue;
         }
 
-        bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
+        // fiducial tests
+        bool outsideFront = !wireWindow.isInside(trk_ends.first->PeakTime() * fTick2cm, fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
-        bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
+        bool outsideBack = !wireWindow.isInside(trk_ends.second->PeakTime() * fTick2cm, fMichelTickRadius)
             || !geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
-        TMarker* m = new TMarker();
-        if (cathode_crossing.first.isNull()) {
-            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-            m->SetMarkerStyle(outsideFront ? kOpenSquare : kFullSquare);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? kOpenSquare : kFullSquare);
-            drawMarker(m, trk_ends.second);
-        } else {
-            m->SetMarkerColor(tooSmall ? kGray : kOrange+6);
-            m->SetMarkerStyle(outsideFront ? kOpenTriangleUp : kFullTriangleUp);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? kOpenTriangleUp : kFullTriangleUp);
-            drawMarker(m, trk_ends.second);
+        // broken tests
+        bool isBroken = false;
+        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
+        if (mcp) {
+            std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
+            isBroken = vp_trk_from_mcp.size() > 1;
+            // if (vp_trk_from_mcp.size()) {
+            //     if (vp_trk_from_mcp.size() == 1)
+                //     MuonTrackIsNotBroken = kNotBroken;
+                // else {
+                //     bool IsDeepestTrack = true;
+                //     for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
+                //         if (geoDet == kPDVD)
+                //             IsDeepestTrack = IsDeepestTrack
+                //                 && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X()
+                //                 && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
+                //         else if (geoDet == kPDHD)
+                //             IsDeepestTrack = IsDeepestTrack
+                //                 && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y()
+                //                 && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
+                //     if (IsDeepestTrack)
+                //         MuonTrackIsNotBroken = kLastOfBroken;
+                //     else
+                //         MuonTrackIsNotBroken = kBroken;
+                // }
+            // }
+        }
 
-            m->SetMarkerStyle(kFullTriangleDown);
-            m->SetMarkerColor(tooSmall ? kGray : kPink-2);
-            drawMarker(m, cathode_crossing.first);
-            drawMarker(m, cathode_crossing.second);
-        }
-        if (tpc_crossing.size()) {
-            m->SetMarkerStyle(kFullCircle);
-            m->SetMarkerColor(tooSmall ? kGray : kViolet+6);
-            for (art::Ptr<recob::Hit> p_hit : tpc_crossing)
-                drawMarker(m, p_hit);
-        }
+        Color_t c_mu = tooSmall ?   theme.c_small
+                    : (isBroken ?   theme.c_broken
+                    :               theme.c_mu);
 
-        /*
-        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            gs[s] = new TGraph();
-            gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
-            gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-            gs[s]->SetLineWidth(1);
-            gs[s]->SetLineColor(trk_ends.first.isNull() ?
-                kGreen-8 : (tooSmall ? kGray : kOrange+6)
-            );
-        }
-        for (art::Ptr<recob::Hit> p_hit : vp_hit_muon) {
-            if (p_hit->View() != geo::kW) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            if (geoDet == kPDVD)
-                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime());
-            else if (geoDet == kPDHD)
-                gs[s]->AddPoint(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-        }
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            c->cd(s+1);
-            if (gs[s]->GetN()) gs[s]->Draw("same l");
-        }
-        */
+        // track hits and regression
+        TGraph* g_mu = new TGraph();
+        g_mu->SetLineColor(c_mu);
+        g_mu->SetLineWidth(theme.w_mu);
+        g_mu->SetLineStyle(isBroken ? theme.s_broken : kSolid);
+        if (fSort)
+            drawGraph(g_mu, vp_sorted_hit, "l");
+        else
+            drawGraph(g_mu, vp_hit_muon, "l");
 
-        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+        // std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             ana::LinearRegression reg;
             // LinearRegression const& reg = s >= ana::n_sec[geoDet]/2 ?
             //     per_side_reg.second : per_side_reg.first;
             // bool lin = reg.r2() > 0.5;
 
-            TGraph* g = gs[s] = new TGraph();
-            g->SetName(Form("g%u_%u", p_trk->ID(), s));
-            g->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-            g->SetLineWidth(1);
-            g->SetLineColor(tooSmall ? kGray : kOrange+6);
-            if (fSort) {
-                for (art::Ptr<recob::Hit> const& p_hit : vvp_sec_sorted[s]) {
-                    double const z = GetSpace(p_hit->WireID());
-                    double const t = p_hit->PeakTime();
-                    reg.add(z, t);
-                    if (geoDet == kPDVD)
-                        g->AddPoint(z, t);
-                    else if (geoDet == kPDHD)
-                        g->AddPoint(t, z);
-                }
-            } else {
-                for (art::Ptr<recob::Hit> const& p_hit : vp_hit_muon) {
-                    if (p_hit->View() != geo::kW) continue;
-                    if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
-                    double const z = GetSpace(p_hit->WireID());
-                    double const t = p_hit->PeakTime();
-                    reg.add(z, t);
-                    if (geoDet == kPDVD)
-                        g->AddPoint(z, t);
-                    else if (geoDet == kPDHD)
-                        g->AddPoint(t, z);
-                }
+            // TGraph* g = gs[s] = new TGraph();
+            // g->SetName(Form("g%u_%u", p_trk->ID(), s));
+            // g->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
+            // g->SetLineWidth(1);
+            // g->SetLineColor(tooSmall ? theme.c_small : theme.c_mu);
+            // if (fSort) {
+            //     for (HitPtr const& p_hit : vvp_sec_sorted[s]) {
+            //         double const z = GetSpace(p_hit->WireID());
+            //         double const t = p_hit->PeakTime() * fTick2cm;
+            //         reg.add(z, t);
+            //         if (geoDet == kPDVD)
+            //             g->AddPoint(z, t);
+            //         else if (geoDet == kPDHD)
+            //             g->AddPoint(t, z);
+            //     }
+            // } else {
+            //     for (HitPtr const& p_hit : vp_hit_muon) {
+            //         if (p_hit->View() != geo::kW) continue;
+            //         if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
+            //         double const z = GetSpace(p_hit->WireID());
+            //         double const t = p_hit->PeakTime() * fTick2cm;
+            //         reg.add(z, t);
+            //         if (geoDet == kPDVD)
+            //             g->AddPoint(z, t);
+            //         else if (geoDet == kPDHD)
+            //             g->AddPoint(t, z);
+            //     }
+            // }
+            // reg.normalize();
+
+            // c->cd(s+1);
+            // if (g->GetN()) g->Draw("l");
+
+            for (HitPtr const& p_hit : vp_hit_muon) {
+                if (p_hit->View() != geo::kW) continue;
+                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
+                reg.add(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
             }
             reg.normalize();
-
-            c->cd(s+1);
-            if (g->GetN()) g->Draw("same l");
 
             TF1* f = new TF1();
             if (geoDet == kPDVD) {
                 f = new TF1(
-                    Form("f%u_%u", p_trk->ID(), s),
+                    Form("reg%u_s%u", p_trk->ID(), s),
                     "(x - [1]) / [0]",
                     reg.mz - 10,
                     reg.mz + 10
                 );
             } else if (geoDet == kPDHD) {
                 f = new TF1(
-                    Form("f%u_%u", p_trk->ID(), s),
+                    Form("reg%u_s%u", p_trk->ID(), s),
                     "[0]*x + [1]",
-                    reg.mt - 50,
-                    reg.mt + 50
+                    reg.mt - 10,
+                    reg.mt + 10
                 );
             }
             f->SetParameter(0, reg.m());
             f->SetParameter(1, reg.p());
-            f->SetLineColor(reg.r2() > 0.5 ? kAzure-4 : kViolet+6);
-            f->SetLineWidth(2);
+            f->SetLineColor(reg.r2() > 0.5 ? theme.c_reg_good : theme.c_reg_bad);
+            f->SetLineWidth(theme.w_reg);
 
             c->cd(s+1);
             f->Draw("same");
         }
+
+        // track ends and cathode/section crossing
+        TMarker* m = new TMarker();
+        if (cathode_crossing.first.isNonnull()) {
+            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_mu);
+            m->SetMarkerStyle(outsideFront ? theme.m_mu_cc_out : theme.m_mu_cc_in);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? theme.m_mu_cc_out : theme.m_mu_cc_in);
+            drawMarker(m, trk_ends.second);
+
+            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_cc);
+            m->SetMarkerStyle(theme.m_cc);
+            drawMarker(m, cathode_crossing.first);
+            drawMarker(m, cathode_crossing.second);
+        } else {
+            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_mu);
+            m->SetMarkerStyle(outsideFront ? theme.m_mu_out : theme.m_mu_in);
+            drawMarker(m, trk_ends.first);
+            m->SetMarkerStyle(outsideBack ? theme.m_mu_out : theme.m_mu_in);
+            drawMarker(m, trk_ends.second);
+        }
+        if (tpc_crossing.size()) {
+            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_sc);
+            m->SetMarkerStyle(theme.m_sc);
+            for (HitPtr const& p_hit : tpc_crossing)
+                drawMarker(m, p_hit);
+        }
+
+        // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
+        // if (mcp && abs(mcp->PdgCode()) == 13) {
+            // HitPtrVec vp_mcp_hit = ana::mcp2hits(
+            //     mcp, vp_hit, clockData, false
+            // );
+            // HitPtrPair mcp_ends = GetTrackEndsHits(vp_mcp_hit)
+            
+
+        //     TGraph* g_mcp_mu = new TGraph();
+        //     g_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
+        //     g_mcp_mu->SetMarkerStyle(theme.m_mcp_mu);
+        //     g_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
+        //     drawGraph(g_mcp_mu, vp_mcp_hit, "p");
+
+        //     if (mcp->NumberDaughters() >= 3) {
+        //         simb::MCParticle const * mcp_michel = nullptr;
+        //         bool has_numu = false, has_nue = false;
+        //         for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
+        //             simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
+        //             if (!mcp_dau) continue;
+
+        //             switch (abs(mcp_dau->PdgCode())) {
+        //                 case 14: has_numu = true; break;
+        //                 case 12: has_nue = true; break;
+        //                 case 11: mcp_michel = mcp_dau; break;
+        //                 default: break;
+        //             }
+        //         }
+        //         if (mcp_michel and has_numu and has_nue) {
+        //             HitPtrVec vp_mcp_me = ana::mcp2hits(
+        //                 mcp_michel, vp_hit, clockData, false
+        //             );
+
+        //             TGraph* g_mcp_me = new TGraph();
+        //             g_mcp_me->SetMarkerColor(theme.c_mcp_me);
+        //             g_mcp_me->SetMarkerStyle(theme.m_mcp_me);
+        //             g_mcp_me->SetMarkerSize(theme.s_mcp_me);
+        //             drawGraph(g_mcp_me, vp_mcp_me, "p");
+        //         }
+        //     }
+        // }
 
 
 
@@ -512,9 +784,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                     : ((tpc == 2 || tpc == 6) ? 1 : -1);
             };
 
-        using HitPtr = art::Ptr<recob::Hit>;
-        using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-        using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+        using HitPtr = HitPtr;
+        using HitPtrVec = HitPtrVec;
+        using HitPtrPair = HitPtrPair;
 
         std::pair<HitPtrVec, HitPtrVec> per_side_vph;
         for (HitPtr const& p_hit : vp_hit_muon) {
@@ -814,56 +1086,6 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-        // fiducial cuts
-        // MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
-        // MuonEndIsInVolumeYZ = geoHighX.InFiducialY(MuonEndTrackPoint.y, fMichelSpaceRadius)
-        //     && geoHighX.InFiducialZ(MuonEndTrackPoint.z, fMichelSpaceRadius);
-
-        // if (!LOG(fKeepOutside or (MuonEndIsInWindowT and MuonEndIsInVolumeYZ))) continue;
-
-        // true test is broken
-        // if (mcp) {
-        //     std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-        //     // std::cout << "trk#" << p_trk->ID() << " mu#" << mcp->TrackId() << " encounter#" << ++particle_encounter[mcp->TrackId()] << " #mcp2trk:" << vp_trk_from_mcp.size();
-        //     if (vp_trk_from_mcp.size()) {
-        //         // bool isin = std::find(vp_trk_from_mcp.begin(), vp_trk_from_mcp.end(), p_trk) != vp_trk_from_mcp.end();
-        //         // std::cout << " \033[1;9" << (isin ? 2 : 1) << "m" << (isin ? "in" : "not in") << "\033[0m";
-        //         // std::cout << " [ ";
-        //         // for (art::Ptr<recob::Track> p : vp_trk_from_mcp) std::cout << p->ID() << ", ";
-        //         // std::cout << "]" << std::endl;
-        //         if (vp_trk_from_mcp.size() == 1)
-        //             MuonTrackIsNotBroken = kNotBroken;
-        //         else {
-        //             bool IsDeepestTrack = true;
-        //             for (art::Ptr<recob::Track> p_trk_from_mcp : vp_trk_from_mcp)
-        //                 if (geoDet == kPDVD)
-        //                     IsDeepestTrack = IsDeepestTrack
-        //                         && (MuonEndTrackPoint.x <= p_trk_from_mcp->Start().X()
-        //                         && MuonEndTrackPoint.x <= p_trk_from_mcp->End().X());
-        //                 else if (geoDet == kPDHD)
-        //                     IsDeepestTrack = IsDeepestTrack
-        //                         && (MuonEndTrackPoint.y <= p_trk_from_mcp->Start().Y()
-        //                         && MuonEndTrackPoint.y <= p_trk_from_mcp->End().Y());
-        //             if (IsDeepestTrack)
-        //                 MuonTrackIsNotBroken = kLastOfBroken;
-        //             else
-        //                 MuonTrackIsNotBroken = kBroken;
-        //         }
-        //     } else MuonTrackIsNotBroken = -1;
-        // } else MuonTrackIsNotBroken = -1;
-
         // if (mcp) {
         //     MuonEndProcess = mcp->EndProcess();
         // } else {
@@ -907,8 +1129,8 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //         MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
         //         // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-        //         std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-        //         for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
+        //         HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+        //         for (HitPtr p_hit_michel : vp_hit_michel) {
         //             if (p_hit_michel->View() != geo::kW) continue;
 
         //             MichelHits.push_back(GetHit(p_hit_michel));
@@ -926,14 +1148,13 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     c->Write();
 }
 
-void ana::Trackchecks::beginJob() {}
 void ana::Trackchecks::endJob() {}
 
 double ana::Trackchecks::GetSpace(geo::WireID wid) {
     return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
 }
 
-ana::Hit ana::Trackchecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
+ana::Hit ana::Trackchecks::GetHit(HitPtr const p_hit) {
     geo::WireID wid = p_hit->WireID();
     // if (geoDet == kPDHD)
     //     for (int t : (int[]){0, 4, 3, 7})
@@ -949,485 +1170,13 @@ ana::Hit ana::Trackchecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
     };
 }
 
-// art::Ptr<recob::Hit> ana::Trackchecks::GetDeepestHit(
-//     std::vector<art::Ptr<recob::Hit>> const& vp_hit,
-//     bool increasing_z,
-//     geo::View_t view
-// ) {
-//     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
-
-//     art::Ptr<recob::Hit> DeepestHit;
-//     if (geoDet == kPDVD) {
-
-//         // test if the muon goes into the bottom volume
-//         bool in_bot = false;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             unsigned tpc = p_hit->WireID().TPC;
-//             if (tpc < 8) {
-//                 in_bot = true;
-//                 break;
-//             }
-//         }
-
-//         // basic linear regression on the hits that are in the last volume
-//         unsigned n=0;
-//         double mz=0, mt=0, mt2=0, mzt=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             if (in_bot && p_hit->WireID().TPC >= 8) continue;
-//             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-//             double z = GetSpace(p_hit->WireID());
-//             double t = p_hit->PeakTime() * fTick2cm;
-//             mz += z; mt += t; mt2 += t*t, mzt += z*t;
-//             n++;
-//         }
-//         mz /= n; mt /= n; mt2 /= n; mzt /= n;
-//         double cov = mzt - mz*mt;
-//         double vart = mt2 - mt*mt;
-
-//         // z ~ m*t + p
-//         double m = cov / vart;
-//         double p = mz - m*mt;
-
-//         double extrem_s = in_bot ?
-//             std::numeric_limits<double>::max() // search min_s
-//             : std::numeric_limits<double>::lowest(); // search max_s
-
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             if (in_bot && p_hit->WireID().TPC >= 8) continue;
-//             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-//             double z = GetSpace(p_hit->WireID());
-//             double t = p_hit->PeakTime() * fTick2cm;
-
-//             // projection on the axis of the track
-//             double s = (t + m*(z-p)) / (1 + m*m);
-//             if (in_bot) {
-//                 if (extrem_s > s) {
-//                     extrem_s = s;
-//                     DeepestHit = p_hit;
-//                 }
-//             } else {
-//                 if (extrem_s < s) {
-//                     extrem_s = s;
-//                     DeepestHit = p_hit;
-//                 }
-//             }
-//         }
-//     } else if (geoDet == kPDHD) {
-
-//         // test if the muon crosses the cathod
-//         unsigned n_left=0, n_right=0;
-//         double mz_left=0, mz_right=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             unsigned tpc = p_hit->WireID().TPC;
-//             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-//             double z = GetSpace(p_hit->WireID());
-//             if (tpc == 1 || tpc == 5) {
-//                 mz_left += z;
-//                 n_left++;
-//             } else if (tpc == 2 || tpc == 6) {
-//                 mz_right += z;
-//                 n_right++;
-//             }
-//         }
-//         mz_left /= n_left; mz_right /= n_right;
-//         std::pair<unsigned, unsigned> tpcs;
-//         if (
-//             (increasing_z && mz_left > mz_right)
-//             || (!increasing_z && mz_left < mz_right)
-//         ) {
-//             tpcs.first = 1;
-//             tpcs.second = 5;
-//         } else {
-//             tpcs.first = 2;
-//             tpcs.second = 6;
-//         }
-
-//         // basic linear regression on the hits that are in the last volume
-//         unsigned n=0;
-//         double mz=0, mt=0, mz2=0, mzt=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             unsigned tpc = p_hit->WireID().TPC;
-//             if (tpc != tpcs.first && tpc != tpcs.second) continue;
-//             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-//             double z = GetSpace(p_hit->WireID());
-//             double t = p_hit->PeakTime() * fTick2cm;
-//             mz += z; mt += t; mz2 += z*z; mzt += z*t;
-//             n++;
-//         }
-//         mz /= n; mt /= n; mz2 /= n; mzt /= n;
-//         double cov = mzt - mz*mt;
-//         double varz = mz2 - mz*mz;
-
-//         // t ~ m*z + p
-//         double m = cov / varz;
-//         double p = mt - m*mz;
-
-//         double extrem_s = increasing_z ?
-//             std::numeric_limits<double>::lowest() // search max_s
-//             : std::numeric_limits<double>::max(); // search min_s
-
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-//             if (p_hit->View() != view) continue;
-//             unsigned tpc = p_hit->WireID().TPC;
-//             if (tpc != tpcs.first && tpc != tpcs.second) continue;
-//             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
-//             double z = GetSpace(p_hit->WireID());
-//             double t = p_hit->PeakTime() * fTick2cm;
-
-//             // projection on the axis of the track
-//             double s = (z + m*(t-p)) / (1 + m*m);
-//             if (increasing_z) {
-//                 if (extrem_s < s) {
-//                     extrem_s = s;
-//                     DeepestHit = p_hit;
-//                 }
-//             } else {
-//                 if (extrem_s > s) {
-//                     extrem_s = s;
-//                     DeepestHit = p_hit;
-//                 }
-//             }
-//         }
-//     }
-//     return DeepestHit;
-// }
-
-/*
-std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetEndHits(
-    std::vector<art::Ptr<recob::Hit>> const& vp_hit,
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *ppp_cathode_crossing,
-    std::vector<art::Ptr<recob::Hit>> *pvp_tpc_crossing,
+HitPtrPair ana::Trackchecks::GetTrackEndsHits(
+    HitPtrVec const& vp_hit,
+    HitPtrPair *pp_cathode_crossing,
+    HitPtrVec *vp_tpc_crossing,
+    HitPtrVec *vp_sorted_hit,
     geo::View_t view
 ) {
-    unsigned const nmin = 4;
-    if (vp_hit.size() < nmin) return {};
-
-    std::function<int(geo::TPCID::TPCID_t)> cathodeSide =
-        geoDet == kPDVD
-      ? [](geo::TPCID::TPCID_t tpc) -> int { return int(tpc >= 8); }
-      : [](geo::TPCID::TPCID_t tpc) -> int {
-            return (tpc == 1 || tpc == 5) ? 1
-                : ((tpc == 2 || tpc == 6) ? 0 : -1);
-        };
-
-    // z = m*t + p
-    struct LinearRegression {
-        unsigned n=0;
-        double mz=0, mt=0, mt2=0, mzt=0;
-        void add(double z, double t) {
-            mz+=z; mt+=t; mt2+=t*t; mzt+=z*t; n++;
-        }
-        void normalize() {
-            mz/=n; mt/=n; mt2/=n; mzt/=n;
-        }
-        double cov() const { return mzt - mz*mt; }
-        double vart() const { return mt2 - mt*mt; }
-        double m() const { return n<nmin ? 0 : cov()/vart(); }
-        double p() const { return mz - m()*mt; }
-        double projection(double z, double t) const {
-            return (t + m()*(z-p())) / (1 + m()*m());
-        }
-    } side0_reg, side1_reg;
-
-    // std::vector<std::vector<art::Ptr<recob::Hit>>> vvp_sec_hit(ana::n_sec[geoDet]);
-    // for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-    //     if (p_hit->View() != view) continue;
-    //     geo::WireID wireid = p_hit->WireID();
-    //     int side = cathodeSide(wireid.TPC);
-    //     if (side == -1) continue;
-    //     vvp_sec_hit[ana::tpc2sec[geoDet][wireid.TPC]].push_back(p_hit);
-    // }
-
-    // std::vector<std::vector<unsigned>> vvi_sec_sort_idx(ana::n_sec[geoDet]);
-    // for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-    //     std::vector<unsigned> &vi = vvi_sec_sort_idx[s];
-    //     vi.resize(vvp_sec_hit[s].size());
-    //     std::iota(vi.begin(), vi.end(), 0);
-
-    //     LinearRegression const& reg = s >= ana::n_sec[geoDet]/2 ? side1_reg : side0_reg;
-    //     std::sort(vi.begin(), vi.end(),
-    //         [this, s, &reg, &vvp_sec_hit](unsigned i, unsigned j) {
-    //             double si = reg.projection(
-    //                 GetSpace(vvp_sec_hit[s][i]->WireID()),
-    //                 vvp_sec_hit[s][i]->PeakTime() * fTick2cm
-    //             );
-    //             double sj = reg.projection(
-    //                 GetSpace(vvp_sec_hit[s][j]->WireID()),
-    //                 vvp_sec_hit[s][j]->PeakTime() * fTick2cm
-    //             );
-    //             return si < sj;
-    //         }
-    //     );
-    // }
-
-    std::vector<unsigned> sec_nhit(ana::n_sec[geoDet], 0);
-
-    // unsigned nhit=0;
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        if (p_hit->View() != view) continue;
-        geo::WireID wireid = p_hit->WireID();
-        int side = cathodeSide(wireid.TPC);
-        if (side == -1) continue;
-        double z = GetSpace(p_hit->WireID());
-        double t = p_hit->PeakTime() * fTick2cm;
-        if (side == 0)
-            side0_reg.add(z, t);
-        else if (side == 1)
-            side1_reg.add(z, t);
-
-        if (geoDet == kPDVD) // for tpc crossing
-            sec_nhit[ana::tpc2sec[geoDet][wireid.TPC]]++;
-    }
-    side0_reg.normalize();
-    side1_reg.normalize();
-
-    if (side0_reg.n < nmin && side1_reg.n < nmin) return {};
-
-    using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-    struct ProjectionEnds {
-        HitPtrPair hits;
-        double min = std::numeric_limits<double>::max();
-        double max = std::numeric_limits<double>::lowest();
-        void test(double s, art::Ptr<recob::Hit> const& h) {
-            if (s < min) {
-                min=s;
-                hits.first = h;
-            }
-            if (s > max) {
-                max=s;
-                hits.second = h;
-            }
-        }
-    };
-    ProjectionEnds side0_ends, side1_ends;
-    std::vector<ProjectionEnds> sec_ends(ana::n_sec[geoDet]);
-
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-        if (p_hit->View() != view) continue;
-        geo::WireID wireid = p_hit->WireID();
-        int side = cathodeSide(wireid.TPC);
-        if (side == -1) continue;
-        double z = GetSpace(p_hit->WireID());
-        double t = p_hit->PeakTime() * fTick2cm;
-        if (side == 0) {
-            double s = side0_reg.projection(z, t);
-            side0_ends.test(s, p_hit);
-            
-            if (geoDet == kPDVD) // for tpc crossing
-                sec_ends[ana::tpc2sec[geoDet][wireid.TPC]].test(s, p_hit);
-
-        } else if (side == 1) {
-            double s = side1_reg.projection(z, t);
-            side1_ends.test(s, p_hit);
-
-            if (geoDet == kPDVD) // for tpc crossing
-                sec_ends[ana::tpc2sec[geoDet][wireid.TPC]].test(s, p_hit);
-        }
-    }
-
-    // auto d2 = [&](art::Ptr<recob::Hit> h1, art::Ptr<recob::Hit> h2) -> double {
-    //     double z1 = GetSpace(h1->WireID());
-    //     double t1 = h1->PeakTime() * fTick2cm;
-    //     double z2 = GetSpace(h2->WireID());
-    //     double t2 = h2->PeakTime() * fTick2cm;
-    //     return pow(z1-z2,2) + pow(t1-t2,2);
-    // };
-
-    auto closestHits = [&](HitPtrPair const& hp0, HitPtrPair const& hp1, double dmin, HitPtrPair *outermostHits = nullptr) -> HitPtrPair {
-        std::vector<HitPtrPair> pairs = {
-            { hp0.first, hp1.first },
-            { hp0.first, hp1.second },
-            { hp0.second, hp1.second },
-            { hp0.second, hp1.first }
-        };
-        std::vector<double> d2s(4, 0);
-        for (unsigned i=0; i<4; i++) {
-            double zf = GetSpace(pairs[i].first->WireID());
-            double tf = pairs[i].first->PeakTime() * fTick2cm;
-            double zs = GetSpace(pairs[i].second->WireID());
-            double ts = pairs[i].second->PeakTime() * fTick2cm;
-            d2s[i] = pow(zf-zs,2) + pow(tf-ts,2);
-        }
-
-        // find all distances under d2min threshold
-        std::vector<unsigned> candidates_idx;
-        std::vector<double>::iterator it = d2s.begin();
-        while ((it = std::find_if(it, d2s.end(), [dmin](double d2) { return d2 < dmin*dmin; })) != d2s.end())
-            candidates_idx.push_back(std::distance(d2s.begin(), it++));
-        
-        // no candidates found
-        if (candidates_idx.empty())
-            return {};
-
-        // get the closest pair
-        unsigned closest_idx = *std::min_element(candidates_idx.begin(), candidates_idx.end(),
-            [&d2s](unsigned i, unsigned j) { return d2s[i] < d2s[j]; });
-        if (outermostHits) {
-            unsigned outermost_idx = (closest_idx+2) % 4;
-            outermostHits->first = pairs[outermost_idx].first;
-            outermostHits->second = pairs[outermost_idx].second;
-        }
-        return pairs[closest_idx];
-
-        // if (candidates_idx.size() == 1) {
-        //     closest_idx = candidates_idx.front();
-            // if (outermostHits) {
-            //     unsigned outer_idx = (idx+2) % 4;
-            //     outermostHits->first = pairs[outer_idx].first;
-            //     outermostHits->second = pairs[outer_idx].second;
-            // }
-            // return pairs[idx];
-        // }
-        // if (candidates_idx.size() > 1) {
-            // find the pair with the smallest distance
-            // unsigned min_idx = *std::min_element(candidates_idx.begin(), candidates_idx.end(),
-            //     [&d2s](unsigned i1, unsigned i2) { return d2s[i1] < d2s[i2]; });
-            // if (outermostHits) {
-            //     unsigned outer_idx = (min_idx+2) % 4;
-            //     outermostHits->first = pairs[outer_idx].first;
-            //     outermostHits->second = pairs[outer_idx].second;
-            // }
-            // return pairs[min_idx];
-        // }
-            
-        // switch(std::distance(d2s.begin(), std::min_element(d2s.begin(), d2s.end()))) {
-        //     case 0: 
-        //         if (outermostHits) {
-        //             outermostHits->first = hp0.second;
-        //             outermostHits->second = hp1.second;
-        //         }
-        //         return { hp0.first, hp1.first };
-        //     case 1:
-        //         if (outermostHits) {
-        //             outermostHits->first = hp0.second;
-        //             outermostHits->second = hp1.first;
-        //         }
-        //         return { hp0.first, hp1.second };
-        //     case 2:
-        //         if (outermostHits) {
-        //             outermostHits->first = hp0.first;
-        //             outermostHits->second = hp1.second;
-        //         }
-        //         return { hp0.second, hp1.first };
-        //     case 3:
-        //         if (outermostHits) {
-        //             outermostHits->first = hp0.first;
-        //             outermostHits->second = hp1.first;
-        //         }
-        //         return { hp0.second, hp1.second };
-        //     default: break;
-        // }
-        // return {};
-    };
-
-    // tpc crossing
-    if (geoDet == kPDVD) {
-        bool prev = false; // is there hits in the previous section?
-        for (unsigned s=0; s<8; s++) {
-            if (sec_nhit[s] < nmin) {
-                prev = false;
-                continue;
-            }
-            if (prev) {
-                HitPtrPair const pp_tpc_crossing = closestHits(
-                    sec_ends[s-1].hits, sec_ends[s].hits, 2
-                );
-                if (pp_tpc_crossing.first.isNonnull() && pvp_tpc_crossing) {
-                    pvp_tpc_crossing->push_back(pp_tpc_crossing.first);
-                    pvp_tpc_crossing->push_back(pp_tpc_crossing.second);
-                }
-            }
-            if (s == 3)
-                prev = false; // cathode crossing
-            else
-                prev = true;
-        }
-    }
-
-    // no cathode crossing
-    if (side0_reg.n < nmin)
-        return side1_ends.hits;
-    else if (side1_reg.n < nmin)
-        return side0_ends.hits;
-
-    // cathode crossing
-    HitPtrPair ends;
-    HitPtrPair const pp_cathode_crossing = closestHits(
-        side0_ends.hits, side1_ends.hits, 2*fCathodeGap, &ends
-    );
-
-    if (pp_cathode_crossing.first.isNonnull() && ppp_cathode_crossing) {
-        ppp_cathode_crossing->first = pp_cathode_crossing.first;
-        ppp_cathode_crossing->second = pp_cathode_crossing.second;
-    }
-    return ends;
-
-    // std::vector<double> d2s(4, 0);
-    // d2s[0] = d2(side0_ends.hits.first, side1_ends.hits.first);
-    // d2s[1] = d2(side0_ends.hits.first, side1_ends.hits.second);
-    // d2s[2] = d2(side0_ends.hits.second, side1_ends.hits.first);
-    // d2s[3] = d2(side0_ends.hits.second, side1_ends.hits.second);
-
-    // switch(std::distance(d2s.begin(), std::min_element(d2s.begin(), d2s.end()))) {
-    //     case 0: 
-    //         ppp_cathode_crossing->first = side0_ends.hits.first;
-    //         ppp_cathode_crossing->second = side1_ends.hits.first;
-    //         return {
-    //             side0_ends.hits.second,
-    //             // side0_ends.hits.first,
-    //             // side1_ends.hits.first,
-    //             side1_ends.hits.second
-    //         };
-    //     case 1: 
-    //         ppp_cathode_crossing->first = side0_ends.hits.first;
-    //         ppp_cathode_crossing->second = side1_ends.hits.second;
-    //         return {
-    //             side0_ends.hits.second,
-    //             // side0_ends.hits.first,
-    //             // side1_ends.hits.second,
-    //             side1_ends.hits.first
-    //         };
-    //     case 2: 
-    //         ppp_cathode_crossing->first = side0_ends.hits.second;
-    //         ppp_cathode_crossing->second = side1_ends.hits.first;
-    //         return {
-    //             side0_ends.hits.first,
-    //             // side0_ends.hits.second,
-    //             // side1_ends.hits.first,
-    //             side1_ends.hits.second
-    //         };
-    //     case 3:
-    //         ppp_cathode_crossing->first = side0_ends.hits.second;
-    //         ppp_cathode_crossing->second = side1_ends.hits.second;
-    //         return {
-    //             side0_ends.hits.first,
-    //             // side0_ends.hits.second,
-    //             // side1_ends.hits.second,
-    //             side1_ends.hits.first
-    //         };
-    //     default: break;
-    // }
-    // return {};
-}
-    
-*/
-
-std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetTrackEndsHits(
-    std::vector<art::Ptr<recob::Hit>> const& vp_hit,
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *pp_cathode_crossing,
-    std::vector<art::Ptr<recob::Hit>> *vp_tpc_crossing,
-    std::vector<std::vector<art::Ptr<recob::Hit>>> *vvp_sec_sorted_hits,
-    geo::View_t view
-) {
-    using HitPtr = art::Ptr<recob::Hit>;
-    using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-    using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-
     // minimum number of hits to perform a linear regression
     unsigned const nmin = ana::LinearRegression::nmin;
 
@@ -1476,14 +1225,12 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetTrack
         double t = p_hit->PeakTime() * fTick2cm;
         side_reg[side].add(z, t);
     }
-    for (ana::LinearRegression& reg : side_reg) reg.normalize();
 
     // if not enough hits on both sides, return empty pair
-    if (std::all_of(
-            side_reg.begin(),
-            side_reg.end(),
-            [](const ana::LinearRegression& reg) { return reg.n < nmin; }
-        )) return {};
+    for (ana::LinearRegression& reg : side_reg) {
+        if (reg.n < nmin) return {};
+        reg.normalize();
+    }
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
@@ -1507,7 +1254,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetTrack
     }
 
     // if hits are all on one side, and no other info is requested
-    if (!vp_tpc_crossing && !vvp_sec_sorted_hits) {
+    if (!vp_tpc_crossing && !vp_sorted_hit) {
         if (side_reg[0].n < nmin)
             return side_ends[1];
         else if (side_reg[1].n < nmin)
@@ -1594,74 +1341,100 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Trackchecks::GetTrack
     std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
     
     // if a sorted list of hits is requested
-    if (vvp_sec_sorted_hits) {
+    // if (vvp_sec_sorted_hits) {
+    //     // get a sorted list of hits for each section (ie. pair of TPCs)
+    //     vvp_sec_sorted_hits->clear();
+    //     vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
+    //     for (HitPtr const& p_hit : vp_hit) {
+    //         if (p_hit->View() != view) continue;
+    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         if (s == -1) continue;
+    //         vvp_sec_sorted_hits->at(s).push_back(p_hit);
+    //     }
 
-        // get a sorted list of hits for each section (ie. pair of TPCs)
-        vvp_sec_sorted_hits->clear();
-        vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : vp_hit) {
-            if (p_hit->View() != view) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            vvp_sec_sorted_hits->at(s).push_back(p_hit);
-        }
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+    //         std::sort(
+    //             vvp_sec_sorted_hits->at(s).begin(), 
+    //             vvp_sec_sorted_hits->at(s).end(),
+    //             [&, &reg=side_reg[side]](
+    //                 HitPtr const& h1, HitPtr const& h2
+    //             ) -> bool {
+    //                 double const s1 = reg.projection(
+    //                     GetSpace(h1->WireID()),
+    //                     h1->PeakTime() * fTick2cm
+    //                 );
+    //                 double const s2 = reg.projection(
+    //                     GetSpace(h2->WireID()),
+    //                     h2->PeakTime() * fTick2cm
+    //                 );
+    //                 return s1 < s2;
+    //             }
+    //         );
+    //     }
+
+    //     // get the track ends for each section
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         if (vvp_sec_sorted_hits->at(s).size() < nmin) continue;
+    //         per_sec_ends[s].first = vvp_sec_sorted_hits->at(s).front();
+    //         per_sec_ends[s].second = vvp_sec_sorted_hits->at(s).back();
+    //     }
+
+    std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        vp_sec_hit[s].push_back(p_hit);
+    }
+    auto side_sort = [&](int side) {
+        return [&](HitPtr const& h1, HitPtr const& h2) -> bool {
+            double const s1 = side_reg[side].projection(
+                GetSpace(h1->WireID()),
+                h1->PeakTime() * fTick2cm
+            );
+            double const s2 = side_reg[side].projection(
+                GetSpace(h2->WireID()),
+                h2->PeakTime() * fTick2cm
+            );
+            return s1 < s2;
+        };
+    };
+
+    if (vp_sorted_hit) {
+        vp_sorted_hit->clear();
 
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            HitPtrVec& vp_sec_sorted = vp_sec_hit[s];
+            if (vp_sec_sorted.size() < nmin) continue;
+
             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             std::sort(
-                vvp_sec_sorted_hits->at(s).begin(), 
-                vvp_sec_sorted_hits->at(s).end(),
-                [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
-                ) -> bool {
-                    double const s1 = reg.projection(
-                        GetSpace(h1->WireID()),
-                        h1->PeakTime() * fTick2cm
-                    );
-                    double const s2 = reg.projection(
-                        GetSpace(h2->WireID()),
-                        h2->PeakTime() * fTick2cm
-                    );
-                    return s1 < s2;
-                }
+                vp_sec_sorted.begin(), 
+                vp_sec_sorted.end(),
+                side_sort(side)
             );
-        }
 
-        // get the track ends for each section
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (vvp_sec_sorted_hits->at(s).size() < nmin) continue;
-            per_sec_ends[s].first = vvp_sec_sorted_hits->at(s).front();
-            per_sec_ends[s].second = vvp_sec_sorted_hits->at(s).back();
+            // get the track ends for each section
+
+            per_sec_ends[s].first = vp_sec_sorted.front();
+            per_sec_ends[s].second = vp_sec_sorted.back();
+
+            vp_sorted_hit->insert(
+                vp_sorted_hit->end(),
+                vp_sec_sorted.begin(), vp_sec_sorted.end()
+            );
         }
 
     } else { // only get the minmax ends of each section
 
-        std::vector<HitPtrVec> per_sec_vph(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : vp_hit) {
-            if (p_hit->View() != view) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            per_sec_vph[s].push_back(p_hit);
-        }
-
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (per_sec_vph[s].size() < nmin) continue;
+            if (vp_sec_hit[s].size() < nmin) continue;
             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             auto minmax = std::minmax_element(
-                per_sec_vph[s].begin(), per_sec_vph[s].end(),
-                [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
-                ) -> bool {
-                    double const s1 = reg.projection(
-                        GetSpace(h1->WireID()),
-                        h1->PeakTime() * fTick2cm
-                    );
-                    double const s2 = reg.projection(
-                        GetSpace(h2->WireID()),
-                        h2->PeakTime() * fTick2cm
-                    );
-                    return s1 < s2;
-                }
+                vp_sec_hit[s].begin(),
+                vp_sec_hit[s].end(),
+                side_sort(side)
             );
             per_sec_ends[s].first = *minmax.first;
             per_sec_ends[s].second = *minmax.second;

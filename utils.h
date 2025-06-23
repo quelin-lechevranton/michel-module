@@ -30,6 +30,7 @@
 #include <TBranch.h>
 
 #include <cstdio>
+#include <ranges>
 
 #define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
 
@@ -74,6 +75,27 @@ namespace ana {
         }
     };
 
+    // z = m*t + p
+    struct LinearRegression {
+        static constexpr unsigned nmin = 4;
+        unsigned n=0;
+        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+        void add(double z, double t) {
+            mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
+        }
+        void normalize() {
+            mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
+        }
+        double cov() const { return mzt - mz*mt; }
+        double varz() const { return mz2 - mz*mz; }
+        double vart() const { return mt2 - mt*mt; }
+        double m() const { return n<nmin ? 0 : cov()/vart(); }
+        double p() const { return mz - m()*mt; }
+        double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
+        double projection(double z, double t) const {
+            return (t + m()*(z-p())) / (1 + m()*m());
+        }
+    };
 
     template<typename T>
     struct bounds {
@@ -95,8 +117,6 @@ namespace ana {
             return ay * wiregeo.GetCenter().Y() + az * wiregeo.GetCenter().Z();
         }
     };
-
-    float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
 
     struct Hit {
         unsigned tpc;
@@ -149,7 +169,7 @@ namespace ana {
         float energy() const {
             float e = 0;
             for (unsigned i=0; i<N; i++) e += adc[i];
-            return e * fADCtoMeV;
+            return e;
         }
 
         void SetBranches(TTree *t, const char* pre="") {
