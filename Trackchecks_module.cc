@@ -84,7 +84,7 @@ private:
         Style_t m_ev = kMultiply;
         Size_t s_ev = 0.5;
 
-        Color_t c_mcp_mu = kOrange+6;
+        Color_t c_mcp_mu = kSpring+2;
         Style_t m_mcp_mu = kOpenDiamond;
         Size_t s_mcp_mu = 1;
 
@@ -266,103 +266,103 @@ void ana::Trackchecks::beginJob() {
     label->SetTextFont(font);
     label->SetTextSize(label_size);
 
-    title->DrawText(indent, 1-top_margin, "Event Markers");
+    title->DrawText(indent, 1 - top_margin, "Event Markers");
 
     TMarker* m_ev = new TMarker();
     m_ev->SetMarkerColor(theme.c_ev);
     m_ev->SetMarkerStyle(theme.m_ev);
     m_ev->SetMarkerSize(2*theme.s_ev);
-    m_ev->DrawMarker(indent, 1-(top_margin - line_height));
-    label->DrawText(label_indent, 1-(top_margin - line_height), "Event Hits");
+    m_ev->DrawMarker(indent, 1 - top_margin - line_height);
+    label->DrawText(label_indent, 1 - top_margin - line_height, "Event Hits");
 
     TMarker* m_mcp_mu = new TMarker();
     m_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
     m_mcp_mu->SetMarkerStyle(theme.m_mcp_mu); 
     m_mcp_mu->SetMarkerSize(2*theme.s_mcp_mu);
-    m_mcp_mu->DrawMarker(indent, 1-(top_margin - 2 * line_height));
-    label->DrawText(label_indent, 1-(top_margin - 2 * line_height), "MCParticle Muon Hits");
+    m_mcp_mu->DrawMarker(indent, 1 - top_margin - 2 * line_height);
+    label->DrawText(label_indent, 1 - top_margin - 2 * line_height, "MCParticle Muon Hits");
 
     TMarker* m_mcp_me = new TMarker();
     m_mcp_me->SetMarkerColor(theme.c_mcp_me);
     m_mcp_me->SetMarkerStyle(theme.m_mcp_me);
     m_mcp_me->SetMarkerSize(2*theme.s_mcp_me);
-    m_mcp_me->DrawMarker(indent, 1-(top_margin - 3 * line_height));
-    label->DrawText(label_indent, 1-(top_margin - 3 * line_height), "MCParticle Michel Hits");
+    m_mcp_me->DrawMarker(indent, 1 - top_margin - 3 * line_height);
+    label->DrawText(label_indent, 1 - top_margin - 3 * line_height, "MCParticle Michel Hits");
 
-    title->DrawText(1/ncol + indent, 1-(top_margin), "Tracks");
+    title->DrawText(1/ncol + indent, 1 - top_margin, "Tracks");
 
     TLine* l_small = new TLine();
     l_small->SetLineColor(theme.c_small);
     l_small->SetLineWidth(2*theme.w_mu);
-    l_small->DrawLine(1/ncol + indent, 1-(top_margin - line_height),
-                      1/ncol + indent + line_length, 1-(top_margin - line_height));
-    label->DrawText(1/ncol + label_indent, 1-(top_margin - line_height), "Small Tracks");
+    l_small->DrawLine(1/ncol + indent, 1 - top_margin - line_height,
+                      1/ncol + indent + line_length, 1 - top_margin - line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - line_height, "Small Tracks");
 
     TLine* l_broken = new TLine();
     l_broken->SetLineColor(theme.c_broken);
     l_broken->SetLineStyle(theme.s_broken);
     l_broken->SetLineWidth(2*theme.w_mu);
-    l_broken->DrawLine(1/ncol + indent, 1-(top_margin - 2 * line_height),
-                       1/ncol + indent + line_length, 1-(top_margin - 2 * line_height));
-    label->DrawText(1/ncol + label_indent, 1-(top_margin - 2 * line_height), "Broken Tracks");
+    l_broken->DrawLine(1/ncol + indent, 1 - top_margin - 2 * line_height,
+                       1/ncol + indent + line_length, 1 - top_margin - 2 * line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 2 * line_height, "Broken Tracks");
 
     TLine* l_no_end = new TLine();
     l_no_end->SetLineColor(theme.c_no_end);
     l_no_end->SetLineWidth(2*theme.w_mu);
-    l_no_end->DrawLine(1/ncol + indent, 1-(top_margin - 3 * line_height),
-                       1/ncol + indent + line_length, 1-(top_margin - 3 * line_height));
-    label->DrawText(1/ncol + label_indent, 1-(top_margin - 3 * line_height), "End Algorithm failed");
+    l_no_end->DrawLine(1/ncol + indent, 1 - top_margin - 3 * line_height,
+                       1/ncol + indent + line_length, 1 - top_margin - 3 * line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 3 * line_height, "End Algorithm failed");
 
     TLine* l_mu = new TLine();
     l_mu->SetLineColor(theme.c_mu);
     l_mu->SetLineWidth(2*theme.w_mu);
-    l_mu->DrawLine(1/ncol + indent, 1-(top_margin - 4 * line_height,
-                   1/ncol + indent + line_length, 1-(top_margin - 4 * line_height));
-    label->DrawText(1/ncol + label_indent, 1-(top_margin - 4 * line_height), "Muon Tracks");
+    l_mu->DrawLine(1/ncol + indent, 1 - top_margin - 4 * line_height,
+                   1/ncol + indent + line_length, 1 - top_margin - 4 * line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 4 * line_height, "Muon Tracks");
 
-    title->DrawText(2/ncol + indent, 1-(top_margin), "Track Ends Markers");
+    title->DrawText(2/ncol + indent, 1 - top_margin, "Track Ends Markers");
 
     TMarker* m_mu_in = new TMarker();
     m_mu_in->SetMarkerColor(theme.c_mu);
     m_mu_in->SetMarkerStyle(theme.m_mu_in);
     m_mu_in->SetMarkerSize(2);
-    m_mu_in->DrawMarker(2/ncol + indent, 1-(top_margin - line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - line_height), "Muon Track In");
+    m_mu_in->DrawMarker(2/ncol + indent, 1 - top_margin - line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - line_height, "Muon Track In");
 
     TMarker* m_mu_out = new TMarker();
     m_mu_out->SetMarkerColor(theme.c_mu);
     m_mu_out->SetMarkerStyle(theme.m_mu_out);
     m_mu_out->SetMarkerSize(2);
-    m_mu_out->DrawMarker(2/ncol + indent, 1-(top_margin - 2 * line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - 2 * line_height), "Muon Track Out");
+    m_mu_out->DrawMarker(2/ncol + indent, 1 - top_margin - 2 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 2 * line_height, "Muon Track Out");
 
     TMarker* m_mu_cc_in = new TMarker();
     m_mu_cc_in->SetMarkerColor(theme.c_mu);
     m_mu_cc_in->SetMarkerStyle(theme.m_mu_cc_in);
     m_mu_cc_in->SetMarkerSize(2);
-    m_mu_cc_in->DrawMarker(2/ncol + indent, 1-(top_margin - 3 * line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - 3 * line_height), "Cathode Crossing Muon In");
+    m_mu_cc_in->DrawMarker(2/ncol + indent, 1 - top_margin - 3 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 3 * line_height, "Cathode Crossing Muon In");
 
     TMarker* m_mu_cc_out = new TMarker();
     m_mu_cc_out->SetMarkerColor(theme.c_mu);
     m_mu_cc_out->SetMarkerStyle(theme.m_mu_cc_out);
     m_mu_cc_out->SetMarkerSize(2);
-    m_mu_cc_out->DrawMarker(2/ncol + indent, 1-(top_margin - 4 * line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - 4 * line_height), "Cathode Crossing Muon Out");
+    m_mu_cc_out->DrawMarker(2/ncol + indent, 1 - top_margin - 4 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 4 * line_height, "Cathode Crossing Muon Out");
 
     TMarker* m_cc = new TMarker();
     m_cc->SetMarkerColor(theme.c_cc);
     m_cc->SetMarkerStyle(theme.m_cc);
     m_cc->SetMarkerSize(2);
-    m_cc->DrawMarker(2/ncol + indent, 1-(top_margin - 5 * line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - 5 * line_height), "Cathode Crossing");
+    m_cc->DrawMarker(2/ncol + indent, 1 - top_margin - 5 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 5 * line_height, "Cathode Crossing");
 
     TMarker* m_sc = new TMarker();
     m_sc->SetMarkerColor(theme.c_sc);
     m_sc->SetMarkerStyle(theme.m_sc);
     m_sc->SetMarkerSize(2);
-    m_sc->DrawMarker(2/ncol + indent, 1-(top_margin - 6 * line_height));
-    label->DrawText(2/ncol + label_indent, 1-(top_margin - 6 * line_height), "Section Crossing");
+    m_sc->DrawMarker(2/ncol + indent, 1 - top_margin - 6 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 6 * line_height, "Section Crossing");
 
     c->Write();
 }
@@ -525,6 +525,21 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             // g_mcp_mu->SetMarkerSize(theme.s_mcp_mu);
             // drawGraph(g_mcp_mu, ana::mcp2hits(&mcp, vp_hit, clockData, false), "p");
 
+            HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
+            HitPtrPair mcp_ends = GetTrackEndsHits(vp_mcp_hit);
+            if (mcp_ends.first && mcp_ends.second) {
+                int dir_z = mcp.EndZ() > mcp.Vz() ? 1 : -1;
+                float fz = GetSpace(mcp_ends.first->WireID());
+                float sz = GetSpace(mcp_ends.second->WireID());
+                HitPtr mcp_end = (sz-fz) * dir_z > 0 ? mcp_ends.second : mcp_ends.first;
+
+                TMarker* m = new TMarker();
+                m->SetMarkerColor(theme.c_mcp_mu);
+                m->SetMarkerStyle(theme.m_mcp_mu);
+                m->SetMarkerSize(theme.s_mcp_mu);
+                drawMarker(m, mcp_end);
+            } 
+
             if (mcp.NumberDaughters() >= 3) {
                 simb::MCParticle const * mcp_michel = nullptr;
                 bool has_numu = false, has_nue = false;
@@ -680,18 +695,20 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
             TF1* f = new TF1();
             if (geoDet == kPDVD) {
+                double xmin = reg.m() > 1 ? reg.mz - 10 : reg.m() * (reg.mt - 10) + reg.p();
+                double xmax = reg.m() > 1 ? reg.mz + 10 : reg.m() * (reg.mt + 10) + reg.p();
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "(x - [1]) / [0]",
-                    reg.mz - 10,
-                    reg.mz + 10
+                    xmin, xmax
                 );
             } else if (geoDet == kPDHD) {
+                double xmin = reg.m() > 1 ? (reg.mz - 10 - reg.p()) / reg.m() : reg.mt - 10;
+                double xmax = reg.m() > 1 ? (reg.mz + 10 - reg.p()) / reg.m() : reg.mt + 10;
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "[0]*x + [1]",
-                    reg.mt - 10,
-                    reg.mt + 10
+                    xmin, xmax
                 );
             }
             f->SetParameter(0, reg.m());
@@ -732,11 +749,21 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
         // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         // if (mcp && abs(mcp->PdgCode()) == 13) {
-            // HitPtrVec vp_mcp_hit = ana::mcp2hits(
-            //     mcp, vp_hit, clockData, false
-            // );
-            // HitPtrPair mcp_ends = GetTrackEndsHits(vp_mcp_hit)
-            
+        //     HitPtrVec vp_mcp_hit = ana::mcp2hits(
+        //         mcp, vp_hit, clockData, false
+        //     );
+        //     HitPtrPair mcp_ends = GetTrackEndsHits(vp_mcp_hit);
+        //     if (mcp_ends.first && mcp_ends.second) {
+        //         int dir_z = mcp->EndZ() > mcp->Vz() ? 1 : -1;
+        //         float fz = GetSpace(mcp_ends.first->WireID());
+        //         float sz = GetSpace(mcp_ends.second->WireID());
+        //         HitPtr mcp_end = (sz-fz) * dir_z > 0 ? mcp_ends.second : mcp_ends.first;
+
+        //         m->SetMarkerColor(theme.c_mcp_mu);
+        //         m->SetMarkerStyle(theme.m_mcp_mu);
+        //         m->SetMarkerSize(theme.s_mcp_mu);
+        //         drawMarker(m, mcp_end);
+        //     } 
 
         //     TGraph* g_mcp_mu = new TGraph();
         //     g_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
@@ -1159,7 +1186,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 void ana::Trackchecks::endJob() {}
 
 double ana::Trackchecks::GetSpace(geo::WireID wid) {
-    return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
+    return plane2axis[wid].space(asWire->Wire(wid));
 }
 
 ana::Hit ana::Trackchecks::GetHit(HitPtr const p_hit) {
@@ -1395,19 +1422,20 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
         if (s == -1) continue;
         vp_sec_hit[s].push_back(p_hit);
     }
-    auto side_sort = [&](int side) {
-        return [&](HitPtr const& h1, HitPtr const& h2) -> bool {
-            double const s1 = side_reg[side].projection(
-                GetSpace(h1->WireID()),
-                h1->PeakTime() * fTick2cm
-            );
-            double const s2 = side_reg[side].projection(
-                GetSpace(h2->WireID()),
-                h2->PeakTime() * fTick2cm
-            );
-            return s1 < s2;
-        };
-    };
+    // THIS CAUSES A SEGFAULT FOR SOME REASON???
+    // auto side_sort = [&](int side) {
+    //     return [&](HitPtr const& h1, HitPtr const& h2) -> bool {
+    //         double const s1 = side_reg[side].projection(
+    //             GetSpace(h1->WireID()),
+    //             h1->PeakTime() * fTick2cm
+    //         );
+    //         double const s2 = side_reg[side].projection(
+    //             GetSpace(h2->WireID()),
+    //             h2->PeakTime() * fTick2cm
+    //         );
+    //         return s1 < s2;
+    //     };
+    // };
 
     if (vp_sorted_hit) {
         vp_sorted_hit->clear();
@@ -1420,11 +1448,22 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
             std::sort(
                 vp_sec_sorted.begin(), 
                 vp_sec_sorted.end(),
-                side_sort(side)
+                [&, &reg=side_reg[side]](
+                    HitPtr const& h1, HitPtr const& h2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
+                }
             );
 
             // get the track ends for each section
-
             per_sec_ends[s].first = vp_sec_sorted.front();
             per_sec_ends[s].second = vp_sec_sorted.back();
 
@@ -1433,16 +1472,24 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
                 vp_sec_sorted.begin(), vp_sec_sorted.end()
             );
         }
-
     } else { // only get the minmax ends of each section
-
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             if (vp_sec_hit[s].size() < nmin) continue;
             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             auto minmax = std::minmax_element(
                 vp_sec_hit[s].begin(),
                 vp_sec_hit[s].end(),
-                side_sort(side)
+                [&, &reg=side_reg[side]](HitPtr const& h1, HitPtr const& h2) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
+                }
             );
             per_sec_ends[s].first = *minmax.first;
             per_sec_ends[s].second = *minmax.second;

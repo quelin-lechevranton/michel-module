@@ -13,6 +13,9 @@ namespace ana {
     class Agnochecks;
 }
 
+using HitPtr = art::Ptr<recob::Hit>;
+using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
+using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 class ana::Agnochecks : public art::EDAnalyzer {
 public:
@@ -135,18 +138,18 @@ private:
 
     bool IsUpright(recob::Track const& T);
     double GetSpace(geo::WireID);
-    ana::Hit GetHit(art::Ptr<recob::Hit> const p_hit);
-    // art::Ptr<recob::Hit> GetDeepestHit(
-    //     std::vector<art::Ptr<recob::Hit>> const&,
+    ana::Hit GetHit(HitPtr const p_hit);
+    // HitPtr GetDeepestHit(
+    //     HitPtrVec const&,
     //     bool increazing_z,
     //     geo::View_t = geo::kW
     // );
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> GetTrackEndsHits(
-        std::vector<art::Ptr<recob::Hit>> const&,
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *pp_cathode_crossing = nullptr,
-        std::vector<art::Ptr<recob::Hit>> *vp_tpc_crossing = nullptr,
-        std::vector<std::vector<art::Ptr<recob::Hit>>> *vvp_sec_sorted_hits = nullptr,
-        geo::View_t = geo::kW
+    HitPtrPair GetTrackEndsHits(
+        HitPtrVec const& vp_hit,
+        HitPtrPair *pp_cathode_crossing = nullptr,
+        HitPtrVec *vp_tpc_crossing = nullptr,
+        HitPtrVec *vp_sorted_hit = nullptr,
+        geo::View_t view = geo::kW
     );
 };
 
@@ -342,7 +345,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    std::vector<art::Ptr<recob::Hit>> vp_hit;
+    HitPtrVec vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
@@ -377,7 +380,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     EventIsReal = e.isRealData();
 
     // for (recob::Hit const& hit : *vh_hit) {
-    for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+    for (HitPtr p_hit : vp_hit) {
         switch (p_hit->View()) {
             // case geo::kU: EventUHits.push_back(GetHit(p_hit)); break;
             // case geo::kV: EventVHits.push_back(GetHit(p_hit)); break;
@@ -400,7 +403,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // if (!mcp) continue;
         // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        std::vector<art::Ptr<recob::Hit>> vp_hit_muon = fmp_trk2hit.at(p_trk.key());
+        HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         if (!LOG(vp_hit_muon.size())) continue;
 
@@ -417,14 +420,14 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         }
 
         if (mcp) {
-            // art::Ptr<recob::Hit> deephit = getdeepesthit(
+            // HitPtr deephit = getdeepesthit(
             //     ana::mcp2hits(mcp, vp_hit, clockData, false),
             //     mcp->EndZ() > mcp->Vz()
             // );
             
             // if (deephit) MuonTrueEndHit = GetHit(deephit);
 
-            std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ends;
+            HitPtrPair ends;
             ends = GetTrackEndsHits(ana::mcp2hits(
                 mcp, vp_hit, clockData, false
             ));
@@ -439,7 +442,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             } else MuonTrueEndHit = ana::Hit{};
         } else MuonTrueEndHit = ana::Hit{};
 
-        std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ends;
+        HitPtrPair ends;
         ends = GetTrackEndsHits(vp_hit_muon);
 
         if (!LOG(ends.first && ends.second)) continue;
@@ -451,7 +454,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             (sz-fz) * dir_z > 0 ? ends.second : ends.first
         );
 
-        // art::Ptr<recob::Hit> deephit = GetDeepestHit(vp_hit_muon, increasing_z);
+        // HitPtr deephit = GetDeepestHit(vp_hit_muon, increasing_z);
         // if (!LOG(deephit)) continue;
         // MuonEndHit = GetHit(deephit);
 
@@ -525,7 +528,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         }
 
         // getting all muon hits
-        for (art::Ptr<recob::Hit> const& p_hit_muon : vp_hit_muon) {
+        for (HitPtr const& p_hit_muon : vp_hit_muon) {
             switch (p_hit_muon->View()) {
                 // case geo::kU: MuonUHits.push_back(GetHit(p_hit_muon)); break;
                 // case geo::kV: MuonVHits.push_back(GetHit(p_hit_muon)); break;
@@ -591,8 +594,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
                 // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-                std::vector<art::Ptr<recob::Hit>> vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-                for (art::Ptr<recob::Hit> p_hit_michel : vp_hit_michel) {
+                HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+                for (HitPtr p_hit_michel : vp_hit_michel) {
                     if (p_hit_michel->View() != geo::kW) continue;
 
                     MichelHits.push_back(GetHit(p_hit_michel));
@@ -608,7 +611,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         }
 
         // get induction hits nearby muon end point
-        // for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        // for (HitPtr const& p_hit : vp_hit) {
         //     if (p_hit->View() != geo::kU && p_hit->View() != geo::kV) continue;
 
         //     art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
@@ -640,8 +643,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         // get all hits nearby muon end point
         Hits TrueSphereHits;
-        // std::vector<art::Ptr<recob::Hit>> NearbyPHits;
-        for (art::Ptr<recob::Hit> const& p_hit : vp_hit) {
+        // HitPtrVec NearbyPHits;
+        for (HitPtr const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
 
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
@@ -701,7 +704,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // get space points nearby muon end point
         for (art::Ptr<recob::SpacePoint> const& p_spt : vp_spt) {
 
-            art::Ptr<recob::Hit> p_spt_hit = fop_spt2hit.at(p_spt.key());
+            HitPtr p_spt_hit = fop_spt2hit.at(p_spt.key());
             art::Ptr<recob::Track> p_spt_trk = fop_hit2trk.at(p_spt_hit.key());
 
             if (p_spt_trk and p_spt_trk.key() != p_trk.key() and p_spt_trk->Length() > fTrackLengthCut) continue;
@@ -728,7 +731,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         // ana::Points NearbySpaceHits;
         std::cout << "mu#" << iMuon << " w/ " << NearbyPHits.size() << " nearby hits, w/ " << NearbySpacePoints.size() << " nearby space points" << std::endl;
-        for (art::Ptr<recob::Hit> const& p_hit_col : NearbyPHits) {
+        for (HitPtr const& p_hit_col : NearbyPHits) {
 
             art::Ptr<recob::SpacePoint> p_spt = fop_hit2spt.at(p_hit_col.key());
             std::cout << "\033[1m" "hit w/ " << (p_spt ? "1" : "0") << " spt: " "\033[0m";
@@ -885,10 +888,10 @@ void ana::Agnochecks::resetMuon() {
 
 
 double ana::Agnochecks::GetSpace(geo::WireID wid) {
-    return plane2axis[(geo::PlaneID) wid].space(asWire->Wire(wid));
+    return plane2axis[wid].space(asWire->Wire(wid));
 }
 
-ana::Hit ana::Agnochecks::GetHit(art::Ptr<recob::Hit> const p_hit) {
+ana::Hit ana::Agnochecks::GetHit(HitPtr const p_hit) {
     geo::WireID wid = p_hit->WireID();
     // if (geoDet == kPDHD)
     //     for (int t : (int[]){0, 4, 3, 7})
@@ -912,19 +915,19 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
     return false;
 }
 
-// art::Ptr<recob::Hit> ana::Agnochecks::GetDeepestHit(
-//     std::vector<art::Ptr<recob::Hit>> const& vp_hit,
+// HitPtr ana::Agnochecks::GetDeepestHit(
+//     HitPtrVec const& vp_hit,
 //     bool increasing_z,
 //     geo::View_t view
 // ) {
-//     if (vp_hit.empty()) return art::Ptr<recob::Hit>{};
+//     if (vp_hit.empty()) return HitPtr{};
 
-//     art::Ptr<recob::Hit> DeepestHit;
+//     HitPtr DeepestHit;
 //     if (geoDet == kPDVD) {
 
 //         // test if the muon goes into the bottom volume
 //         bool in_bot = false;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             unsigned tpc = p_hit->WireID().TPC;
 //             if (tpc < 8) {
@@ -936,7 +939,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //         // basic linear regression on the hits that are in the last volume
 //         unsigned n=0;
 //         double mz=0, mt=0, mt2=0, mzt=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             if (in_bot && p_hit->WireID().TPC >= 8) continue;
 //             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
@@ -958,7 +961,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //             ?  std::numeric_limits<double>::max() // search min_s
 //             : std::numeric_limits<double>::lowest(); // search max_s
 
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             if (in_bot && p_hit->WireID().TPC >= 8) continue;
 //             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
@@ -984,7 +987,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //         // test if the muon crosses the cathod
 //         unsigned n_left=0, n_right=0;
 //         double mz_left=0, mz_right=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             unsigned tpc = p_hit->WireID().TPC;
 //             // double z = asWire->Wire(p_hit->WireID()).GetCenter().Z();
@@ -1013,7 +1016,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //         // basic linear regression on the hits that are in the last volume
 //         unsigned n=0;
 //         double mz=0, mt=0, mz2=0, mzt=0;
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             unsigned tpc = p_hit->WireID().TPC;
 //             if (tpc != tpcs.first && tpc != tpcs.second) continue;
@@ -1036,7 +1039,7 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //             ? std::numeric_limits<double>::lowest() // search max_s
 //             : std::numeric_limits<double>::max(); // search min_s
 
-//         for (art::Ptr<recob::Hit> p_hit : vp_hit) {
+//         for (HitPtr p_hit : vp_hit) {
 //             if (p_hit->View() != view) continue;
 //             unsigned tpc = p_hit->WireID().TPC;
 //             if (tpc != tpcs.first && tpc != tpcs.second) continue;
@@ -1062,20 +1065,15 @@ bool ana::Agnochecks::IsUpright(recob::Track const& T) {
 //     return DeepestHit;
 // }
 
-
-std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackEndsHits(
-    std::vector<art::Ptr<recob::Hit>> const& vp_hit,
-    std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> *pp_cathode_crossing,
-    std::vector<art::Ptr<recob::Hit>> *vp_tpc_crossing,
-    std::vector<std::vector<art::Ptr<recob::Hit>>> *vvp_sec_sorted_hits,
+HitPtrPair ana::Agnochecks::GetTrackEndsHits(
+    HitPtrVec const& vp_hit,
+    HitPtrPair *pp_cathode_crossing,
+    HitPtrVec *vp_tpc_crossing,
+    HitPtrVec *vp_sorted_hit,
     geo::View_t view
 ) {
-    using HitPtr = art::Ptr<recob::Hit>;
-    using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-    using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-
     // minimum number of hits to perform a linear regression
-    unsigned const nmin = 4;
+    unsigned const nmin = ana::LinearRegression::nmin;
 
     // split volume at de cathode
     auto cathodeSide =
@@ -1093,27 +1091,27 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
 
     // linear regression on each side to have a curvilinear coordinate of each hit inside a track
     // z = m*t + p
-    struct LinearRegression {
-        unsigned n=0;
-        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
-        void add(double z, double t) {
-            mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
-        }
-        void normalize() {
-            mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
-        }
-        double cov() const { return mzt - mz*mt; }
-        double varz() const { return mz2 - mz*mz; }
-        double vart() const { return mt2 - mt*mt; }
-        double m() const { return n<nmin ? 0 : cov()/vart(); }
-        double p() const { return mz - m()*mt; }
-        double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
-        double projection(double z, double t) const {
-            return (t + m()*(z-p())) / (1 + m()*m());
-        }
-    };
+    // struct LinearRegression {
+    //     unsigned n=0;
+    //     double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+    //     void add(double z, double t) {
+    //         mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
+    //     }
+    //     void normalize() {
+    //         mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
+    //     }
+    //     double cov() const { return mzt - mz*mt; }
+    //     double varz() const { return mz2 - mz*mz; }
+    //     double vart() const { return mt2 - mt*mt; }
+    //     double m() const { return n<nmin ? 0 : cov()/vart(); }
+    //     double p() const { return mz - m()*mt; }
+    //     double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
+    //     double projection(double z, double t) const {
+    //         return (t + m()*(z-p())) / (1 + m()*m());
+    //     }
+    // };
 
-    std::vector<LinearRegression> side_reg(2);
+    std::vector<ana::LinearRegression> side_reg(2);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
         int side = cathodeSide(p_hit->WireID().TPC);
@@ -1122,14 +1120,12 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
         double t = p_hit->PeakTime() * fTick2cm;
         side_reg[side].add(z, t);
     }
-    for (LinearRegression& reg : side_reg) reg.normalize();
 
     // if not enough hits on both sides, return empty pair
-    if (std::all_of(
-            side_reg.begin(),
-            side_reg.end(),
-            [](const LinearRegression& reg) { return reg.n < nmin; }
-        )) return {};
+    if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
+
+    // compute average from sum
+    for (ana::LinearRegression& reg : side_reg) reg.normalize();
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
@@ -1153,7 +1149,7 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
     }
 
     // if hits are all on one side, and no other info is requested
-    if (!vp_tpc_crossing && !vvp_sec_sorted_hits) {
+    if (!vp_tpc_crossing && !vp_sorted_hit) {
         if (side_reg[0].n < nmin)
             return side_ends[1];
         else if (side_reg[1].n < nmin)
@@ -1240,23 +1236,78 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
     std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
     
     // if a sorted list of hits is requested
-    if (vvp_sec_sorted_hits) {
+    // if (vvp_sec_sorted_hits) {
+    //     // get a sorted list of hits for each section (ie. pair of TPCs)
+    //     vvp_sec_sorted_hits->clear();
+    //     vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
+    //     for (HitPtr const& p_hit : vp_hit) {
+    //         if (p_hit->View() != view) continue;
+    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         if (s == -1) continue;
+    //         vvp_sec_sorted_hits->at(s).push_back(p_hit);
+    //     }
 
-        // get a sorted list of hits for each section (ie. pair of TPCs)
-        vvp_sec_sorted_hits->clear();
-        vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : vp_hit) {
-            if (p_hit->View() != view) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            vvp_sec_sorted_hits->at(s).push_back(p_hit);
-        }
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+    //         std::sort(
+    //             vvp_sec_sorted_hits->at(s).begin(), 
+    //             vvp_sec_sorted_hits->at(s).end(),
+    //             [&, &reg=side_reg[side]](
+    //                 HitPtr const& h1, HitPtr const& h2
+    //             ) -> bool {
+    //                 double const s1 = reg.projection(
+    //                     GetSpace(h1->WireID()),
+    //                     h1->PeakTime() * fTick2cm
+    //                 );
+    //                 double const s2 = reg.projection(
+    //                     GetSpace(h2->WireID()),
+    //                     h2->PeakTime() * fTick2cm
+    //                 );
+    //                 return s1 < s2;
+    //             }
+    //         );
+    //     }
+
+    //     // get the track ends for each section
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         if (vvp_sec_sorted_hits->at(s).size() < nmin) continue;
+    //         per_sec_ends[s].first = vvp_sec_sorted_hits->at(s).front();
+    //         per_sec_ends[s].second = vvp_sec_sorted_hits->at(s).back();
+    //     }
+
+    std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        vp_sec_hit[s].push_back(p_hit);
+    }
+    // THIS CAUSES A SEGFAULT FOR SOME REASON???
+    // auto side_sort = [&](int side) {
+    //     return [&](HitPtr const& h1, HitPtr const& h2) -> bool {
+    //         double const s1 = side_reg[side].projection(
+    //             GetSpace(h1->WireID()),
+    //             h1->PeakTime() * fTick2cm
+    //         );
+    //         double const s2 = side_reg[side].projection(
+    //             GetSpace(h2->WireID()),
+    //             h2->PeakTime() * fTick2cm
+    //         );
+    //         return s1 < s2;
+    //     };
+    // };
+
+    if (vp_sorted_hit) {
+        vp_sorted_hit->clear();
 
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            HitPtrVec& vp_sec_sorted = vp_sec_hit[s];
+            if (vp_sec_sorted.size() < nmin) continue;
+
             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             std::sort(
-                vvp_sec_sorted_hits->at(s).begin(), 
-                vvp_sec_sorted_hits->at(s).end(),
+                vp_sec_sorted.begin(), 
+                vp_sec_sorted.end(),
                 [&, &reg=side_reg[side]](
                     HitPtr const& h1, HitPtr const& h2
                 ) -> bool {
@@ -1271,33 +1322,24 @@ std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>> ana::Agnochecks::GetTrackE
                     return s1 < s2;
                 }
             );
-        }
 
-        // get the track ends for each section
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (vvp_sec_sorted_hits->at(s).size() < nmin) continue;
-            per_sec_ends[s].first = vvp_sec_sorted_hits->at(s).front();
-            per_sec_ends[s].second = vvp_sec_sorted_hits->at(s).back();
-        }
+            // get the track ends for each section
+            per_sec_ends[s].first = vp_sec_sorted.front();
+            per_sec_ends[s].second = vp_sec_sorted.back();
 
+            vp_sorted_hit->insert(
+                vp_sorted_hit->end(),
+                vp_sec_sorted.begin(), vp_sec_sorted.end()
+            );
+        }
     } else { // only get the minmax ends of each section
-
-        std::vector<HitPtrVec> per_sec_vph(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : vp_hit) {
-            if (p_hit->View() != view) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            per_sec_vph[s].push_back(p_hit);
-        }
-
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (per_sec_vph[s].size() < nmin) continue;
+            if (vp_sec_hit[s].size() < nmin) continue;
             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
             auto minmax = std::minmax_element(
-                per_sec_vph[s].begin(), per_sec_vph[s].end(),
-                [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
-                ) -> bool {
+                vp_sec_hit[s].begin(),
+                vp_sec_hit[s].end(),
+                [&, &reg=side_reg[side]](HitPtr const& h1, HitPtr const& h2) -> bool {
                     double const s1 = reg.projection(
                         GetSpace(h1->WireID()),
                         h1->PeakTime() * fTick2cm
