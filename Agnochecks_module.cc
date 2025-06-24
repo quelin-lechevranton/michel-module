@@ -78,6 +78,8 @@ private:
     float fCoincidenceRadius; // in cm
 
     // Output Variables
+    unsigned evRun, evSubRun, evEvent;
+
     TTree* tEvent;
     bool EventIsReal;
     unsigned iEvent=0;
@@ -270,7 +272,11 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
 
     tEvent = tfs->make<TTree>("event","");
 
+    tEvent->Branch("eventRun", &evRun);
+    tEvent->Branch("eventSubRun", &evSubRun);
+    tEvent->Branch("eventEvent", &evEvent);
     tEvent->Branch("isReal", &EventIsReal);
+
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
@@ -279,6 +285,10 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     // EventVHits.SetBranches(tEvent, "V");
 
     tMuon = tfs->make<TTree>("muon","");
+
+    tMuon->Branch("eventRun", &evRun);
+    tMuon->Branch("eventSubRun", &evSubRun);
+    tMuon->Branch("eventEvent", &evEvent);
 
     tMuon->Branch("iEvent", &iEvent);
     tMuon->Branch("iMuon", &iMuon);
@@ -377,6 +387,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
     resetEvent();
 
+    evRun = e.run();
+    evSubRun = e.subRun();
+    evEvent = e.event();
     EventIsReal = e.isRealData();
 
     // for (recob::Hit const& hit : *vh_hit) {
