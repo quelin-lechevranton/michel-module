@@ -32,11 +32,12 @@ physics: {
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
+                ["Reco",       "pandoraShower", "",       "recob::Shower"],
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"],
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
-            Log: true
+            Log: false
             TrackLengthCut: 40.
             Sort: true
             MichelSpaceRadius: 20.

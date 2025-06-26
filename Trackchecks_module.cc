@@ -64,7 +64,7 @@ private:
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
     art::InputTag tag_mcp, tag_sed, tag_wir,
-        tag_hit, tag_clu, tag_trk,
+        tag_hit, tag_clu, tag_trk, tag_shw,
         tag_spt, tag_pfp;
 
     // Input Parameters
@@ -115,6 +115,9 @@ private:
         Color_t c_reg_good = kAzure-4;
         Color_t c_reg_bad = kViolet+6;
         Width_t w_reg = 2;
+
+        Color_t c_shw = kGreen;
+        Style_t m_shw = kOpenCircle;
     } theme;
 
 
@@ -160,6 +163,7 @@ ana::Trackchecks::Trackchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Wire")             tag_wir = tag;
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
@@ -250,6 +254,7 @@ void ana::Trackchecks::beginJob() {
 
     float top_margin = 0.1;
     float indent = 0.05;
+    float title_indent = 0.04;
     float label_indent = 0.1;
     float line_height = 0.05;
     float line_length = 0.03;
@@ -266,7 +271,7 @@ void ana::Trackchecks::beginJob() {
     label->SetTextFont(font);
     label->SetTextSize(label_size);
 
-    title->DrawText(indent, 1 - top_margin, "Event Markers");
+    title->DrawText(title_indent, 1 - top_margin, "Event Markers");
 
     TMarker* m_ev = new TMarker();
     m_ev->SetMarkerColor(theme.c_ev);
@@ -280,7 +285,7 @@ void ana::Trackchecks::beginJob() {
     m_mcp_mu->SetMarkerStyle(theme.m_mcp_mu); 
     m_mcp_mu->SetMarkerSize(2*theme.s_mcp_mu);
     m_mcp_mu->DrawMarker(indent, 1 - top_margin - 2 * line_height);
-    label->DrawText(label_indent, 1 - top_margin - 2 * line_height, "MCParticle Muon Hits");
+    label->DrawText(label_indent, 1 - top_margin - 2 * line_height, "MCParticle Muon End Hit");
 
     TMarker* m_mcp_me = new TMarker();
     m_mcp_me->SetMarkerColor(theme.c_mcp_me);
@@ -289,7 +294,7 @@ void ana::Trackchecks::beginJob() {
     m_mcp_me->DrawMarker(indent, 1 - top_margin - 3 * line_height);
     label->DrawText(label_indent, 1 - top_margin - 3 * line_height, "MCParticle Michel Hits");
 
-    title->DrawText(1/ncol + indent, 1 - top_margin, "Tracks");
+    title->DrawText(1/ncol + title_indent, 1 - top_margin, "Tracks");
 
     TLine* l_small = new TLine();
     l_small->SetLineColor(theme.c_small);
@@ -318,9 +323,23 @@ void ana::Trackchecks::beginJob() {
     l_mu->SetLineWidth(2*theme.w_mu);
     l_mu->DrawLine(1/ncol + indent, 1 - top_margin - 4 * line_height,
                    1/ncol + indent + line_length, 1 - top_margin - 4 * line_height);
-    label->DrawText(1/ncol + label_indent, 1 - top_margin - 4 * line_height, "Muon Tracks");
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 4 * line_height, "Tracks");
 
-    title->DrawText(2/ncol + indent, 1 - top_margin, "Track Ends Markers");
+    TLine* l_reg_good = new TLine();
+    l_reg_good->SetLineColor(theme.c_reg_good);
+    l_reg_good->SetLineWidth(2*theme.w_reg);
+    l_reg_good->DrawLine(1/ncol + indent, 1 - top_margin - 5 * line_height,
+                         1/ncol + indent + line_length, 1 - top_margin - 5 * line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 5 * line_height, "Regression Good");
+
+    TLine* l_reg_bad = new TLine();
+    l_reg_bad->SetLineColor(theme.c_reg_bad);
+    l_reg_bad->SetLineWidth(2*theme.w_reg);
+    l_reg_bad->DrawLine(1/ncol + indent, 1 - top_margin - 6 * line_height,
+                         1/ncol + indent + line_length, 1 - top_margin - 6 * line_height);
+    label->DrawText(1/ncol + label_indent, 1 - top_margin - 6 * line_height, "Regression Bad");
+
+    title->DrawText(2/ncol + title_indent, 1 - top_margin, "Track Ends Markers");
 
     TMarker* m_mu_in = new TMarker();
     m_mu_in->SetMarkerColor(theme.c_mu);
@@ -364,6 +383,13 @@ void ana::Trackchecks::beginJob() {
     m_sc->DrawMarker(2/ncol + indent, 1 - top_margin - 6 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 6 * line_height, "Section Crossing");
 
+    TMarker* m_shw = new TMarker();
+    m_shw->SetMarkerColor(theme.c_shw);
+    m_shw->SetMarkerStyle(theme.m_shw);
+    m_shw->SetMarkerSize(2);
+    m_shw->DrawMarker(2/ncol + indent, 1 - top_margin - 7 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 7 * line_height, "Shower Hits");
+
     c->Write();
 }
 
@@ -387,6 +413,13 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
+    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    if (!vh_shw.isValid()) return;
+    std::vector<art::Ptr<recob::Shower>> vp_shw;
+    art::fill_ptr_vector(vp_shw, vh_shw);
+
+    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
+    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     TCanvas *c = tfs->make<TCanvas>(
         Form("c%u", cn++),
@@ -609,7 +642,12 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         if (mcp) {
             std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp = mcp2trks(mcp, vp_trk, clockData, fmp_trk2hit);
-            isBroken = vp_trk_from_mcp.size() > 1;
+            unsigned long_trk_count = 0;
+            for (art::Ptr<recob::Track> const& p_trk_from_mcp : vp_trk_from_mcp)
+                if (p_trk_from_mcp->Length() > fTrackLengthCut)
+                    long_trk_count++;
+            isBroken = long_trk_count > 1;
+
             // if (vp_trk_from_mcp.size()) {
             //     if (vp_trk_from_mcp.size() == 1)
                 //     MuonTrackIsNotBroken = kNotBroken;
@@ -1179,6 +1217,17 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         //     MichelHitEnergy = -1;
         // }
     } // end of loop over tracks
+
+    for (art::Ptr<recob::Shower> const& p_shw : vp_shw) {
+        HitPtrVec vp_hit_shw = fmp_shw2hit.at(p_shw.key());
+        if (vp_hit_shw.empty()) continue;
+
+        TGraph* g_shw = new TGraph();
+        g_shw->SetMarkerColor(theme.c_shw);
+        g_shw->SetMarkerStyle(theme.m_shw);
+
+        drawGraph(g_shw, vp_hit_shw, "p");
+    }
 
     c->Write();
 }
