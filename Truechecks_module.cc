@@ -269,19 +269,19 @@ void ana::Truechecks::analyze(art::Event const& e)
                 // same section of the detector
                 if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
 
-                // not from the mother muon
-                if (std::find_if(
-                    vp_mcp_hit.begin(),
-                    vp_mcp_hit.end(),
-                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-                ) != vp_mcp_hit.end()) continue;
-
                 float z = GetSpace(p_hit->WireID());
                 float t = p_hit->PeakTime() * fTick2cm;
                 float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
 
                 // at less then r cm from muon's end
                 if (dr2 > r2) continue;
+
+                // not from the mother muon
+                if (std::find_if(
+                    vp_mcp_hit.begin(),
+                    vp_mcp_hit.end(),
+                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                ) != vp_mcp_hit.end()) continue;
 
                 // sphere_true_hits.push_back(p_hit);
                 sphere_true_e += p_hit->Integral() * fADC2MeV;
@@ -297,13 +297,6 @@ void ana::Truechecks::analyze(art::Event const& e)
                 // same section of the detector
                 if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
 
-                // not from the mother muon
-                if (std::find_if(
-                    vp_mcp_hit.begin(),
-                    vp_mcp_hit.end(),
-                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-                ) != vp_mcp_hit.end()) continue;
-
                 float z = GetSpace(p_hit->WireID());
                 float t = p_hit->PeakTime() * fTick2cm;
                 float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
@@ -311,6 +304,21 @@ void ana::Truechecks::analyze(art::Event const& e)
                 // at less then r cm from muon's end
                 if (dr2 > r2) continue;
 
+                // not from the mother muon
+                if (std::find_if(
+                    vp_mcp_hit.begin(),
+                    vp_mcp_hit.end(),
+                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                ) != vp_mcp_hit.end()) continue;
+
+                // not from other muons?
+
+
+
+
+
+
+                
                 // sphere_hits.push_back(p_hit);
                 sphere_e += p_hit->Integral() * fADC2MeV;
                 // sphere_e[i] += p_hit->Integral() * fADC2MeV;
@@ -323,6 +331,9 @@ void ana::Truechecks::analyze(art::Event const& e)
         tMuon->Fill();
     }
 } // end analyze
+
+void ana::Truechecks::beginJob() {}  
+void ana::Truechecks::endJob() {}
 
 std::string ana::Truechecks::GetParticleName(int pdg) {
 
