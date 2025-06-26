@@ -1,11 +1,11 @@
 #include "services_dune.fcl"
-#include "services_vdcoldbox.fcl" 
+#include "services_protodunevd.fcl" 
 #include "tools_dune.fcl"	
 
 process_name: RunTruechecks
 
 services: {
-    TFileService: { fileName: "pdvd_Truechecks_out.root" }
+    TFileService: { fileName: "pdvd_Truechecks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -32,10 +32,13 @@ physics: {
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
-                ["Reco",       "pandora",       "",       "recob::SpacePoint"]
+                ["Reco",       "pandoraShower", "",       "recob::Shower"],
+                ["Reco",       "pandora",       "",       "recob::SpacePoint"],
+                ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
-            LogLevel: 10
+            ADC2el: 200
+            MichelRadius: 20.
         }
     }
     ana: [ checks ]

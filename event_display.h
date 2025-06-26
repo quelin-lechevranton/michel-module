@@ -27,15 +27,16 @@ namespace ana {
             default: data = "Unknown";
         }
 
+        c->SetMargin(0, 0, 0, 0);
         if (geoDet == kPDVD) {
-            c->Divide(4, 2);
+            c->Divide(4, 2, 0, 0);
             n_sec = 8;
             font_size = 12;
             pad_margin = {0.14, 0.04, 0.09, 0.06};
             title_offset_x = 1.3;
             title_offset_y = 1.7;
         } else if (geoDet == kPDHD) {
-            c->Divide(2, 1);
+            c->Divide(2, 1, 0, 0);
             n_sec = 2;
             font_size = 20;
             pad_margin = {0.1, 0.04, 0.09, 0.06};

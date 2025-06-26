@@ -1,17 +1,17 @@
 #include "services_dune.fcl"
-#include "services_vdcoldbox.fcl" 
+#include "services_protodunehd.fcl" 
 #include "tools_dune.fcl"	
 
-process_name: RunMuchecks
+process_name: RunTruechecks
 
 services: {
-    TFileService: { fileName: "pdvd_Muchecks_out.root" }
+    TFileService: { fileName: "pdhd_Truechecks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
-    DetectorPropertiesService:  @local::protodunevd_detproperties
+    DetectorPropertiesService:  @local::protodunehd_detproperties
     FileCatalogMetadata:        @local::art_file_catalog_mc
-                                @table::protodunevd_reco_services
+                                @table::protodunehd_reco_services
     LArPropertiesService:       @local::dunefd_properties
 }
 
@@ -23,25 +23,22 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "Muchecks"
+            module_type:    "Truechecks"
             Products:       [
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
                 ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
-                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
+                ["Reco",       "wclsdatahd",    "gauss",  "recob::Wire"],
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
-                ["Reco",       "pandora",       "",       "recob::SpacePoint"]
+                ["Reco",       "pandoraShower", "",       "recob::Shower"],
+                ["Reco",       "pandora",       "",       "recob::SpacePoint"],
+                ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
-            LogLevel: 2
-            
-            TrackLengthCut: 40.
-            MichelSpaceRadius: 20.
-
-            KeepOutside: false
-            KeepNonDecaying: true
+            ADC2el: 1000
+            MichelRadius: 20.
         }
     }
     ana: [ checks ]

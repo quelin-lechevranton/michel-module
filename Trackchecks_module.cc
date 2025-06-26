@@ -9,13 +9,13 @@
 
 #include "event_display.h"
 
-namespace ana {
-    class Trackchecks;
-}
-
 using HitPtr = art::Ptr<recob::Hit>;
 using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
 using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+
+namespace ana {
+    class Trackchecks;
+}
 
 class ana::Trackchecks : public art::EDAnalyzer {
 public:

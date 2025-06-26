@@ -6,100 +6,27 @@
 // Generated at Tue Feb 4 15:23:48 2025 by Jeremy Quelin Lechevranton
 ////////////////////////////////////////////////////////////////////////
 
-// Art includes
-#include "art/Framework/Core/EDAnalyzer.h"
-#include "art/Framework/Core/ModuleMacros.h"
-#include "art/Framework/Principal/Event.h"
-#include "art/Framework/Principal/Handle.h"
-#include "art/Framework/Principal/Run.h"
-#include "art/Framework/Principal/SubRun.h"
-#include "canvas/Utilities/InputTag.h"
-#include "fhiclcpp/ParameterSet.h"
-#include "messagefacility/MessageLogger/MessageLogger.h"
-#include "canvas/Persistency/Common/FindManyP.h"
-#include "art_root_io/TFileService.h"
+#include "utils.h"
 
-// LArSoft includes
-#include "larsim/MCCheater/ParticleInventoryService.h"
-#include "larsim/MCCheater/BackTrackerService.h"
-
-#include "nusimdata/SimulationBase/MCTruth.h"
-#include "nusimdata/SimulationBase/MCParticle.h"
-#include "lardataobj/Simulation/SimEnergyDeposit.h"
-
-#include "lardataobj/RecoBase/Hit.h"
-#include "lardataobj/RecoBase/Wire.h"
-#include "lardataobj/RecoBase/Track.h"
-#include "lardataobj/RecoBase/SpacePoint.h"
-
-#include "larcore/Geometry/Geometry.h"
-#include "larcore/Geometry/WireReadout.h"
-
-#include "larcorealg/Geometry/Exceptions.h"
-
-#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
-// #include "lardata/ArtDataHelper/TrackUtils.h"
-
-// ProtoDUNE includes
-#include "protoduneana/Utilities/ProtoDUNETrackUtils.h"
-#include "protoduneana/Utilities/ProtoDUNETruthUtils.h"
-#include "protoduneana/Utilities/ProtoDUNEPFParticleUtils.h"
-
-// ROOT includes
-#include "TLorentzVector.h"
-#include "TTree.h"
-#include "TCanvas.h"
-#include "TH1F.h"
-#include "TH2F.h"
-#include "TH3F.h"
-#include "TLine.h"
-#include "TGraph.h"
-#include "TGraph2D.h"
-#include "TEllipse.h"
-
-
-// #include "ROOT/RVec.hxx"
-// #include "RVec.hxx"
-
-// std includes
-#include <iostream>
-#include <sstream>
-#include <vector>
-#include <string>
-#include <iterator>
-#include <map>
-#include <unordered_map>
-#include <numeric>
-#include <algorithm>
-#include <utility>
+using HitPtr = art::Ptr<recob::Hit>;
+using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
+using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 namespace ana {
     class Truechecks;
-    struct Binning {
-        int n;
-        float min, max;
-    };
 }
 
 class ana::Truechecks : public art::EDAnalyzer {
 public:
     explicit Truechecks(fhicl::ParameterSet const& p);
-    // The compiler-generated destructor is fine for non-base
-    // classes without bare pointers or other resource use.
-
-    // Plugins should not be copied or assigned.
     Truechecks(Truechecks const&) = delete;
     Truechecks(Truechecks&&) = delete;
     Truechecks& operator=(Truechecks const&) = delete;
     Truechecks& operator=(Truechecks&&) = delete;
 
-    // Required functions.
     void analyze(art::Event const& e) override;
-
-    // Selected optional functions.
     void beginJob() override;
     void endJob() override;
-
 private:
 
     // Utilities
@@ -110,77 +37,76 @@ private:
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
 
-    protoana::ProtoDUNETruthUtils truthUtil;
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
-    // Conversion factors
-    float feltoMeV = 23.6 * 1e-6 / 0.7; // 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    float fADCtoMeV = 200 * 23.6 * 1e-6 / 0.7; // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    float fChannelPitch;
-    float fDriftVelocity; // cm/µs
-    float fSamplingRate; // µs/tick
-
-
-
-
-    // Verbosity
-    int iLogLevel;
-    enum EnumFlag { kImportant, kBasics, kInfos, kDetails };
-
-
-    // Diagnostic Variables
-    std::map<std::string, unsigned> map_mup_endproc;
-    std::map<std::string, unsigned> map_mum_endproc;
-    unsigned n_mup=0, n_mum=0, n_mep=0, n_mem=0;
-    unsigned n_cme_wh=0, n_cme_nh=0;
-    float mean_cme_h=0;
-
-
     // Products
     std::vector<std::vector<std::string>> vvsProducts;
-    art::InputTag   tag_mcp,
-                    tag_sed,
-                    tag_wir,
-                    tag_hit,
-                    tag_clu,
-                    tag_trk,
-                    tag_spt;
+    art::InputTag tag_mcp, tag_sed, tag_wir,
+        tag_hit, tag_clu, tag_trk, tag_shw,
+        tag_spt, tag_pfp;
 
-    bool Log(bool cond, int flag, int tab, std::string msg, std::string succ, std::string fail);
+    int geoDet;
+    enum EnumDet { kPDVD, kPDHD };
+
+    // Detector Properties
+    float fADC2el; // e-/ADC.tick
+    float fADC2MeV; // MeV/ADC.tick
+    float fTick2cm; // cm/tick
+    float fSamplingRate; // µs/tick
+    float fDriftVelocity; // cm/µs
+    float fCathodeGap; // cm
+
+    std::map<geo::PlaneID, ana::axis> plane2axis;
+    std::map<geo::PlaneID, double> plane2pitch;
+
+    // Input
+    float fMichelRadius;
+
+    // Output
+    TTree* tMuon;
+    std::string EndProcess;
+    int HasMichel;
+    float TrueE;
+    float HitE;
+    float SharedE;
+    std::vector<float> SphereTrueE;
+    std::vector<float> SphereE; 
+
     std::string GetParticleName(int pdg);
+    double GetSpace(geo::WireID);
+    HitPtrPair GetTrackEndsHits( // return hits at track ends
+        HitPtrVec const&, // all hits of the track
+        HitPtrPair *pp_cathode_crossing = nullptr, // return hits at cathode crossing
+        HitPtrVec *vp_tpc_crossing = nullptr, // return hits at TPC crossing (PDVD)
+        HitPtrVec *vp_sorted_hit = nullptr, // return hits of the track per section and sorted
+        geo::View_t = geo::kW // view to consider
+    );
 };
 
 
 
 ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
-    iLogLevel(p.get<int>("LogLevel")),
-    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products"))
+    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    fADC2el(p.get<float>("ADC2el", 0.F)), // e-/ADC.tick
+    fMichelRadius(p.get<float>("MichelRadius", 20.F))
 {
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Truechecks::Truechecks: ============================================================" << "\033[0m" << std::endl;
-    // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>();    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>();
 
-    geo::WireGeo const wiregeo1 = asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0});
-    geo::WireGeo const wiregeo2 = asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1});
-    fChannelPitch = geo::WireGeo::WirePitch(wiregeo1, wiregeo2);
-
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
 
-    // Retrieving product tags
     for (std::vector<std::string> prod : vvsProducts) {
-
         const std::string   process     = prod[0],
                             label       = prod[1],
                             instance    = prod[2],
                             type        = prod[3];
 
-        const art::InputTag tag = art::InputTag(label,instance);
+        const art::InputTag tag = art::InputTag{label,instance};
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
@@ -188,231 +114,215 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Wire")             tag_wir = tag;
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
+        else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
 
-    // fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    // fDriftVelocity = detProp.DriftVelocity();
+    if (asGeo->DetectorName().find("vd") != std::string::npos)
+        geoDet = kPDVD;
+    else if (asGeo->DetectorName().find("hd") != std::string::npos)
+        geoDet = kPDHD;
+    else {
+        std::cout << "\033[1;91m" "unknown geometry: "
+            << asGeo->DetectorName() << "\033[0m" << std::endl;
+        exit(1);
+    }
+    // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
 
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Truechecks::Truechecks ======================================================" << "\033[0m" << std::endl;
+    fADC2MeV = fADC2el * 23.6 * 1e-6 / 0.7;
+
+    for (unsigned t=0; t<asGeo->NTPC(); t++) {
+        for (unsigned p=0; p<asWire->Nplanes(); p++) {
+            geo::PlaneID pid{0, t, p};
+            geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
+            geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
+
+            int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
+            int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
+
+            plane2axis[pid] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
+            plane2pitch[pid] = geo::WireGeo::WirePitch(w0, w1);
+        }
+    }
+
+    tMuon = tfs->make<TTree>("muon", "Muon Tree"); 
+    tMuon->Branch("EndProcess", &EndProcess);
+    tMuon->Branch("HasMichel", &HasMichel, "HasMichel/I");
+    tMuon->Branch("TrueE", &TrueE, "TrueE/F");
+    tMuon->Branch("HitE", &HitE, "HitE/F");
+    tMuon->Branch("SharedE", &SharedE, "SharedE/F");
+    tMuon->Branch("SphereTrueE", &SphereTrueE, "SphereTrueE/F");
+    tMuon->Branch("SphereE", &SphereE, "SphereE/F");
 }
 
 void ana::Truechecks::analyze(art::Event const& e)
 {
-
-    if (iLogLevel >= kBasics) {
-        std::cout << "\033[93m" << "Truechecks::analyze: Initialization evt#" << std::setw(5) << e.id().event() << " ====================================" << "\033[0m" << std::endl;
-    }
-
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
+    fTick2cm = fDriftVelocity * fSamplingRate;
 
-    // auto const & vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
-    // std::vector<art::Ptr<recob::Hit>> vp_hit;
-    // art::fill_ptr_vector(vp_hit, vh_hit);
+    auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
 
-    auto const & vh_trk = e.getValidHandle<std::vector<recob::Track>>(tag_trk);
-    std::vector<art::Ptr<recob::Track>> vp_trk;
-    art::fill_ptr_vector(vp_trk, vh_trk);
+    auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
+    std::vector<art::Ptr<recob::Hit>> vp_hit;
+    art::fill_ptr_vector(vp_hit, vh_hit);
 
-    // art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    // art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
-    // art::FindManyP<recob::SpacePoint> fmp_hit2spt(vh_hit, e, tag_spt);
+    for (simb::MCParticle const& mcp : *vh_mcp) {
+        if (abs(mcp.PdgCode()) != 13) continue;
 
-    std::map<std::string, unsigned> map_decay_count;
-    std::map<std::string, unsigned> map_el_proc_count;
+        EndProcess = mcp.EndProcess();
 
-    std::vector<unsigned> n_dau;
-    std::vector<unsigned> n_muioni;
-    std::vector<std::vector<int>> dau_pdg;
-    std::vector<std::vector<std::string>> dau_process;
+        HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
+        HitPtrPair mcp_ends = GetTrackEndsHits(vp_mcp_hit);
 
-    if (iLogLevel >= kInfos) std::cout << "looping over " << vp_trk.size() << " tracks..." << std::endl;
-    for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        if (iLogLevel >= kInfos) std::cout << "trk#" << p_trk->ID() << "\r" << std::flush;
+        if (!mcp_ends.first || !mcp_ends.second) continue;
 
-        if (p_trk->Length() < 40) continue;
-        simb::MCParticle const * mcp = truthUtil.GetMCParticleFromRecoTrack(clockData, *p_trk, e, tag_trk.label());
-        if (!mcp) continue;
-        if (abs(mcp->PdgCode()) != 13) continue;
+        int dir_z = mcp.EndZ() > mcp.Vz() ? 1 : -1;
+        float fz = GetSpace(mcp_ends.first->WireID());
+        float sz = GetSpace(mcp_ends.second->WireID());
+        HitPtr mcp_end = (sz-fz) * dir_z > 0 ? mcp_ends.second : mcp_ends.first;
 
-        map_decay_count[mcp->EndProcess()]++;
-
-        if (mcp->EndProcess() == "Transportation") continue;
-
-        if (mcp->PdgCode() > 0) {
-            n_mum++;
-            map_mum_endproc[mcp->EndProcess()]++;
-        } else {
-            n_mup++;
-            map_mup_endproc[mcp->EndProcess()]++;
-        }
-
-        unsigned tp_n_dau=0;
-        unsigned tp_n_muioni=0;
-        std::vector<int> tp_dau_pdg;
-        std::vector<std::string> tp_dau_process;
-        for (int i_dau=0; i_dau<mcp->NumberDaughters(); i_dau++) {
-            simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));
-            if (!mcp_dau) continue;
-
-            tp_n_dau++;
-
-            if (mcp_dau->Process() == "muIoni" && mcp_dau->PdgCode() == 11) {
-                tp_n_muioni++;
-                continue;
-            }
-
-            tp_dau_pdg.push_back(mcp_dau->PdgCode());
-            tp_dau_process.push_back(mcp_dau->Process());
-        }
-        n_dau.push_back(tp_n_dau);
-        n_muioni.push_back(tp_n_muioni);
-        dau_pdg.push_back(tp_dau_pdg);
-        dau_process.push_back(tp_dau_process);
-    
-        if (mcp->NumberDaughters() < 3) continue;
-
-        bool has_numu=false, has_nue=false;
-        simb::MCParticle const * mcp_mich = nullptr;
-        for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
-            simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));
-            if (!mcp_dau) continue;
-            switch (abs(mcp_dau->PdgCode())) {
-                case 14: has_numu = true; break;
-                case 12: has_nue = true; break;
-                case 11: mcp_mich = mcp_dau; break;
-                default: break;
-            }
-        }
-
-        if (!(has_nue and has_numu and mcp_mich)) continue;
-
-        if (mcp->PdgCode() > 0) n_mem++;
-        else n_mep++;
-
-        map_el_proc_count[mcp_mich->Process()]++;
-
-        std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_mich, e, tag_hit.label());
-        if (mcp->EndProcess() == "muMinusCaptureAtRest") {
-            if (v_hit_michel.size()) {
-                n_cme_wh++;
-                mean_cme_h += v_hit_michel.size();
-            } else {
-                n_cme_nh++;
-            }
-        }
-
-        std::cout << "\tlooking at michel (" << GetParticleName(mcp_mich->PdgCode()) << ") / mcp::TrackID: " <<  mcp_mich->TrackId() << " / " << v_hit_michel.size() << " hits" << std::endl;
-        float mich_ide_energy = 0;
-        float mich_hit_energy = 0;
-
-        unsigned i_hit=0;
-        for (const recob::Hit* hit_michel : v_hit_michel) {
-            if (hit_michel->View() != geo::kW) continue;
-
-            mich_hit_energy += hit_michel->Integral() * fADCtoMeV;
-
-            std::vector<sim::TrackIDE> v_tid = bt_serv->HitToTrackIDEs(clockData, *hit_michel); 
-            std::cout << "\thit#" << i_hit++
-                << " Integral: " << hit_michel->Integral() * fADCtoMeV
-                << " MeV  / ROIADC: " << hit_michel->ROISummedADC() * fADCtoMeV
-                << " MeV / "  << v_tid.size() << " trackIDEs"
-                << std::endl;
-
-            unsigned i_tid=0;
-            for (const sim::TrackIDE& tid : v_tid) {
-                simb::MCParticle const * mcp_tid = pi_serv->TrackIdToParticle_P(tid.trackID);
-                std::cout << "\t\t\ttIDE#" << i_tid++
-                    << " trackID: " << (tid.trackID == mcp_mich->TrackId() ? "\033[92m" : "\033[91m") << tid.trackID << "\033[0m"
-                    << " (" << GetParticleName(mcp_tid->PdgCode()) << ")"
-                    << " energy: " << tid.energy
-                    << " energyFrac: " << tid.energyFrac
-                    << " numElectrons: " << tid.numElectrons
-                    << " (" << tid.numElectrons * feltoMeV << " MeV)"
-                    << std::endl;
-                if (tid.trackID == mcp_mich->TrackId()) {
-                   mich_ide_energy += tid.energy; 
+        simb::MCParticle const* mcp_michel = nullptr;
+        if (mcp.NumberDaughters() >= 3) {
+            bool has_numu = false, has_nue = false;
+            for (int i_dau=mcp.NumberDaughters()-3; i_dau<mcp.NumberDaughters(); i_dau++) {
+                simb::MCParticle const* mcp_dau = pi_serv->TrackIdToParticle_P(mcp.Daughter(i_dau));    
+                if (!mcp_dau) continue;
+                switch (abs(mcp_dau->PdgCode())) {
+                    case 14: has_numu = true; break;
+                    case 12: has_nue = true; break;
+                    case 11: mcp_michel = mcp_dau; break;
+                    default: break;
                 }
             }
+            if (has_numu && has_nue && mcp_michel) {
+                bool isin = false;
+                for (unsigned t=0; t<asGeo->NTPC(); t++) {
+                    isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
+                    if (isin) break;
+                }
+                if (isin)
+                    HasMichel = 2;
+                else
+                    HasMichel = 1;
+            } else {
+                mcp_michel = nullptr;
+                HasMichel = 0;
+            }
         }
 
-        std::cout << "\tMichel IDE energy: " << mich_ide_energy << " MeV"
-            << " / Michel Hit energy: " << mich_hit_energy << " MeV"
-            << " / Michel True K-energy: " << (mcp_mich->E() - mcp_mich->Mass()) * 1e3 << " MeV"
-            << std::endl;
+        TrueE = 0.F;
+        HitE = 0.F;
+        SharedE = 0.F;
+        SphereTrueE.clear();
+        SphereE.clear();
+
+        if (!mcp_michel) {
+            tMuon->Fill();
+            continue;
+        }
+
+        TrueE = (mcp_michel->E() - mcp_michel->Mass()) * 1e-3; // MeV
+
+        HitPtrVec vp_michel_hit = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+
+        // HitPtrVec shared_hits;
+        // float shared_e = 0.F;
+        for (HitPtr const& p_hit : vp_michel_hit) {
+            // collection hits
+            if (p_hit->View() != geo::kW) continue;
+
+            // also from the mother muon
+            if (std::find_if(
+                vp_mcp_hit.begin(),
+                vp_mcp_hit.end(),
+                [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+            ) != vp_mcp_hit.end()) {
+                // shared_hits.push_back(p_hit);
+                // shared_e += p_hit->Integral() * fADC2MeV;
+                SharedE += p_hit->Integral() * fADC2MeV;
+            }
+
+            HitE += p_hit->Integral() * fADC2MeV;
+        }
+
+        float Oz = GetSpace(mcp_end->WireID());
+        float Ot = mcp_end->PeakTime() * fTick2cm;
+
+        std::vector<float> radii = { 10, 20, 30, 40, 50 };
+        // std::vector<float> sphere_true_e(radii.size(), 0.F);
+        // std::vector<float> sphere_e(radii.size(), 0.F);
+        for (unsigned i=0; i<radii.size(); i++) {
+            float r2 = pow(radii[i], 2);
+            
+            // float r2 = fMichelRadius * fMichelRadius;
+
+            // HitPtrVec sphere_true_hits;
+            float sphere_true_e = 0.F;
+            for (HitPtr const& p_hit : vp_michel_hit) {
+                // collection hits
+                if (p_hit->View() != geo::kW) continue;
+
+                // same section of the detector
+                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
+
+                // not from the mother muon
+                if (std::find_if(
+                    vp_mcp_hit.begin(),
+                    vp_mcp_hit.end(),
+                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                ) != vp_mcp_hit.end()) continue;
+
+                float z = GetSpace(p_hit->WireID());
+                float t = p_hit->PeakTime() * fTick2cm;
+                float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
+
+                // at less then r cm from muon's end
+                if (dr2 > r2) continue;
+
+                // sphere_true_hits.push_back(p_hit);
+                sphere_true_e += p_hit->Integral() * fADC2MeV;
+                // sphere_true_e[i] += p_hit->Integral() * fADC2MeV;
+            }
+
+            // HitPtrVec sphere_hits;
+            float sphere_e = 0.F;
+            for (HitPtr const& p_hit : vp_hit) {
+                // collection hits
+                if (p_hit->View() != geo::kW) continue;
+
+                // same section of the detector
+                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
+
+                // not from the mother muon
+                if (std::find_if(
+                    vp_mcp_hit.begin(),
+                    vp_mcp_hit.end(),
+                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                ) != vp_mcp_hit.end()) continue;
+
+                float z = GetSpace(p_hit->WireID());
+                float t = p_hit->PeakTime() * fTick2cm;
+                float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
+
+                // at less then r cm from muon's end
+                if (dr2 > r2) continue;
+
+                // sphere_hits.push_back(p_hit);
+                sphere_e += p_hit->Integral() * fADC2MeV;
+                // sphere_e[i] += p_hit->Integral() * fADC2MeV;
+            }
+
+            SphereE.push_back(sphere_e);
+            SphereTrueE.push_back(sphere_true_e);
+        }
+
+        tMuon->Fill();
     }
-
-    // std::cout << "======= MU END PROC =======" << std::endl;
-
-    // for (auto const& [key, val] : map_decay_count) {
-    //     std::cout << key << ": " << val << std::endl;
-    // }
-
-    // std::cout << "======= MICHEL PROC =======" << std::endl;
-
-    // for (auto const& [key, val] : map_el_proc_count) {
-    //     std::cout << key << ": " << val << std::endl;
-    // }
-
-    // std::cout << "======= DAU DETAILS =======" << std::endl;
-
-    // for (unsigned i=0; i<n_dau.size(); i++) {
-    //     char ith[4];
-    //     switch (i) {
-    //         case 0: strcpy(ith, "st"); break;
-    //         case 1: strcpy(ith, "nd"); break;
-    //         case 2: strcpy(ith, "rd"); break;
-    //         default: strcpy(ith, "th"); break;
-    //     } 
-    //     std::cout << i+1 << ith << " µ has " << n_dau[i] << " daughters" << std::endl;
-    //     std::cout << "  e- muIoni (x" << n_muioni[i] << ")" << std::endl;
-    //     for (unsigned j=0; j<dau_pdg[i].size(); j++) {
-    //         std::cout << "  " << std::setw(6) << GetParticleName(dau_pdg[i][j]) << " " << dau_process[i][j] << std::endl;
-    //     }
-    // }
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Truechecks::analyze =======================================================" << "\033[0m" << std::endl;
 } // end analyze
-
-void ana::Truechecks::beginJob()
-{
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Truechecks::beginJob: ============================================================" << "\033[0m" << std::endl;
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Truechecks::beginJob ======================================================" << "\033[0m" << std::endl;
-} // end beginJob
-
-
-void ana::Truechecks::endJob()
-{
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Truechecks::endJob: ==============================================================" << "\033[0m" << std::endl;
-
-    std::cout << "µ+ decay rate: " << 100.*n_mep / n_mup << "% (" << n_mup << ")" << std::endl;
-    for (auto const& [key, val] : map_mup_endproc) {
-        std::cout << "  " << key << ": " << val << std::endl;
-    }
-    std::cout << "µ- decay rate: " << 100.*n_mem / n_mum << "% (" << n_mum << ")" << std::endl;
-    for (auto const& [key, val] : map_mum_endproc) {
-        std::cout << "  " << key << ": " << val << std::endl;
-    }
-    std::cout << "µ- decaying after capture: " << n_cme_wh + n_cme_nh << "% (" << (n_cme_wh + n_cme_nh) / map_mum_endproc["muMinusCaptureAtRest"] << ")" << std::endl;
-    std::cout << "  w/ hits: " << n_cme_wh << " (~" << mean_cme_h/n_cme_wh << " hits/michel)" << std::endl;
-    std::cout << "  w/o hit: " << n_cme_nh << std::endl;
-
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Truechecks::endJob ========================================================" << "\033[0m" << std::endl;
-} // end endJob
-
-
-bool ana::Truechecks::Log(bool cond, int flag, int tab, std::string msg, std::string succ, std::string fail) {
-    if (iLogLevel >= flag) {
-        std::cout << std::string(tab,'\t') << msg << " ";
-        if (cond) std::cout << "\033[92m" << succ << "\033[0m" << std::endl;
-        else std::cout << "\033[91m" << fail << "\033[0m" << std::endl;
-    }
-    return cond;
-}
 
 std::string ana::Truechecks::GetParticleName(int pdg) {
 
@@ -447,6 +357,329 @@ std::string ana::Truechecks::GetParticleName(int pdg) {
     }
 
     return Form("%d", pdg);
+}
+
+double ana::Truechecks::GetSpace(geo::WireID wid) {
+    return plane2axis[wid].space(asWire->Wire(wid));
+}
+
+HitPtrPair ana::Truechecks::GetTrackEndsHits(
+    HitPtrVec const& vp_hit,
+    HitPtrPair *pp_cathode_crossing,
+    HitPtrVec *vp_tpc_crossing,
+    HitPtrVec *vp_sorted_hit,
+    geo::View_t view
+) {
+    // minimum number of hits to perform a linear regression
+    unsigned const nmin = ana::LinearRegression::nmin;
+
+    // split volume at de cathode
+    auto cathodeSide =
+        geoDet == kPDVD
+        ? [](geo::TPCID::TPCID_t tpc) -> int {
+                return tpc >= 8 ? 1 : 0;
+            }
+            // geoDet == kPDHD
+        : [](geo::TPCID::TPCID_t tpc) -> int {
+                return (tpc == 1 || tpc == 5)
+                    ? 0
+                    : ((tpc == 2 || tpc == 6) ? 1 : -1);
+            };
+
+
+    // linear regression on each side to have a curvilinear coordinate of each hit inside a track
+    // z = m*t + p
+    // struct LinearRegression {
+    //     unsigned n=0;
+    //     double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
+    //     void add(double z, double t) {
+    //         mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
+    //     }
+    //     void normalize() {
+    //         mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
+    //     }
+    //     double cov() const { return mzt - mz*mt; }
+    //     double varz() const { return mz2 - mz*mz; }
+    //     double vart() const { return mt2 - mt*mt; }
+    //     double m() const { return n<nmin ? 0 : cov()/vart(); }
+    //     double p() const { return mz - m()*mt; }
+    //     double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
+    //     double projection(double z, double t) const {
+    //         return (t + m()*(z-p())) / (1 + m()*m());
+    //     }
+    // };
+
+    std::vector<ana::LinearRegression> side_reg(2);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int side = cathodeSide(p_hit->WireID().TPC);
+        if (side == -1) continue; // skip hits on the other side of the anodes
+        double z = GetSpace(p_hit->WireID());
+        double t = p_hit->PeakTime() * fTick2cm;
+        side_reg[side].add(z, t);
+    }
+
+    // if not enough hits on both sides, return empty pair
+    if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
+
+    // compute average from sum
+    for (ana::LinearRegression& reg : side_reg) reg.normalize();
+
+    // find the track ends on each side of the cathode
+    std::vector<HitPtrPair> side_ends(2);
+    std::vector<bounds<double>> side_mimmax(2);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int side = cathodeSide(p_hit->WireID().TPC);
+        if (side == -1) continue; // skip hits on the other side of the anodes
+        double s = side_reg[side].projection(
+            GetSpace(p_hit->WireID()),
+            p_hit->PeakTime() * fTick2cm
+        );
+        if (s > side_mimmax[side].max) {
+            side_mimmax[side].max = s;
+            side_ends[side].second = p_hit;
+        }
+        if (s < side_mimmax[side].min) {
+            side_mimmax[side].min = s;
+            side_ends[side].first = p_hit;
+        }
+    }
+
+    // if hits are all on one side, and no other info is requested
+    if (!vp_tpc_crossing && !vp_sorted_hit) {
+        if (side_reg[0].n < nmin)
+            return side_ends[1];
+        else if (side_reg[1].n < nmin)
+            return side_ends[0];
+    }
+    
+    // given the ends of two pieces of track, find the closest ends
+    auto closestHits = [&](
+        HitPtrPair const& pph1,
+        HitPtrPair const& pph2,
+        double dmin,
+        HitPtrPair *otherHits = nullptr
+    ) -> HitPtrPair {
+
+        // all combinations of pairs
+        std::vector<HitPtrPair> pairs = {
+            { pph1.first, pph2.first },
+            { pph1.first, pph2.second },
+            { pph1.second, pph2.second },
+            { pph1.second, pph2.first }
+        };
+
+        // distance squared between all pairs
+        std::vector<double> d2s(4, 0);
+        for (unsigned i=0; i<4; i++) {
+            double zf = GetSpace(pairs[i].first->WireID());
+            double tf = pairs[i].first->PeakTime() * fTick2cm;
+            double zs = GetSpace(pairs[i].second->WireID());
+            double ts = pairs[i].second->PeakTime() * fTick2cm;
+            d2s[i] = pow(zf-zs,2) + pow(tf-ts,2);
+        }
+
+        // find all distances under dmin threshold
+        std::vector<unsigned> candidates_idx;
+        std::vector<double>::iterator it = d2s.begin();
+        while ((it = std::find_if(
+                it,
+                d2s.end(),
+                [dmin](double d2) { return d2 < dmin*dmin; }
+            )) != d2s.end())
+            candidates_idx.push_back(std::distance(d2s.begin(), it++));
+        
+        // no candidates found
+        if (candidates_idx.empty())
+            return {};
+
+        // get the closest pair
+        unsigned closest_idx = *std::min_element(
+            candidates_idx.begin(),
+            candidates_idx.end(),
+            [&d2s](unsigned i, unsigned j) { return d2s[i] < d2s[j]; });
+        
+        // if outermost hits are requested, get the outermost pair
+        if (otherHits) {
+            unsigned other_idx = (closest_idx+2) % 4; // opposite pair
+            otherHits->first = pairs[other_idx].first;
+            otherHits->second = pairs[other_idx].second;
+        }
+        return pairs[closest_idx];
+    };
+
+    HitPtrPair trk_ends, cathode_crossing;
+    if (side_reg[0].n < nmin)
+        trk_ends = side_ends[1];
+    else if (side_reg[1].n < nmin)
+        trk_ends = side_ends[0];
+    else
+        cathode_crossing = closestHits(
+            side_ends[0],
+            side_ends[1],
+            2*fCathodeGap,
+            &trk_ends
+        );
+
+    // if cathode crossing info is requested
+    if (pp_cathode_crossing)
+        *pp_cathode_crossing = cathode_crossing;
+    
+    // if no tpc crossing info is needed
+    if (geoDet == kPDHD || !vp_tpc_crossing) {
+        return trk_ends;
+    }
+
+    std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
+    
+    // if a sorted list of hits is requested
+    // if (vvp_sec_sorted_hits) {
+    //     // get a sorted list of hits for each section (ie. pair of TPCs)
+    //     vvp_sec_sorted_hits->clear();
+    //     vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
+    //     for (HitPtr const& p_hit : vp_hit) {
+    //         if (p_hit->View() != view) continue;
+    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         if (s == -1) continue;
+    //         vvp_sec_sorted_hits->at(s).push_back(p_hit);
+    //     }
+
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+    //         std::sort(
+    //             vvp_sec_sorted_hits->at(s).begin(), 
+    //             vvp_sec_sorted_hits->at(s).end(),
+    //             [&, &reg=side_reg[side]](
+    //                 HitPtr const& h1, HitPtr const& h2
+    //             ) -> bool {
+    //                 double const s1 = reg.projection(
+    //                     GetSpace(h1->WireID()),
+    //                     h1->PeakTime() * fTick2cm
+    //                 );
+    //                 double const s2 = reg.projection(
+    //                     GetSpace(h2->WireID()),
+    //                     h2->PeakTime() * fTick2cm
+    //                 );
+    //                 return s1 < s2;
+    //             }
+    //         );
+    //     }
+
+    //     // get the track ends for each section
+    //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+    //         if (vvp_sec_sorted_hits->at(s).size() < nmin) continue;
+    //         per_sec_ends[s].first = vvp_sec_sorted_hits->at(s).front();
+    //         per_sec_ends[s].second = vvp_sec_sorted_hits->at(s).back();
+    //     }
+
+    std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
+    for (HitPtr const& p_hit : vp_hit) {
+        if (p_hit->View() != view) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        vp_sec_hit[s].push_back(p_hit);
+    }
+    // THIS CAUSES A SEGFAULT FOR SOME REASON???
+    // auto side_sort = [&](int side) {
+    //     return [&](HitPtr const& h1, HitPtr const& h2) -> bool {
+    //         double const s1 = side_reg[side].projection(
+    //             GetSpace(h1->WireID()),
+    //             h1->PeakTime() * fTick2cm
+    //         );
+    //         double const s2 = side_reg[side].projection(
+    //             GetSpace(h2->WireID()),
+    //             h2->PeakTime() * fTick2cm
+    //         );
+    //         return s1 < s2;
+    //     };
+    // };
+
+    if (vp_sorted_hit) {
+        vp_sorted_hit->clear();
+
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            HitPtrVec& vp_sec_sorted = vp_sec_hit[s];
+            if (vp_sec_sorted.size() < nmin) continue;
+
+            int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+            std::sort(
+                vp_sec_sorted.begin(), 
+                vp_sec_sorted.end(),
+                [&, &reg=side_reg[side]](
+                    HitPtr const& h1, HitPtr const& h2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
+                }
+            );
+
+            // get the track ends for each section
+            per_sec_ends[s].first = vp_sec_sorted.front();
+            per_sec_ends[s].second = vp_sec_sorted.back();
+
+            vp_sorted_hit->insert(
+                vp_sorted_hit->end(),
+                vp_sec_sorted.begin(), vp_sec_sorted.end()
+            );
+        }
+    } else { // only get the minmax ends of each section
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            if (vp_sec_hit[s].size() < nmin) continue;
+            int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
+            auto minmax = std::minmax_element(
+                vp_sec_hit[s].begin(),
+                vp_sec_hit[s].end(),
+                [&, &reg=side_reg[side]](HitPtr const& h1, HitPtr const& h2) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return s1 < s2;
+                }
+            );
+            per_sec_ends[s].first = *minmax.first;
+            per_sec_ends[s].second = *minmax.second;
+        }
+    }
+
+
+    // get the hits that are at the boundaries of two sections
+    HitPtrVec tpc_crossing;
+    bool prev = false;
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        if (per_sec_ends[s].first.isNull()) {
+            prev = false;
+            continue;
+        }
+        if (prev) {
+            HitPtrPair const pp_tpc_crossing = closestHits(
+                per_sec_ends[s-1], per_sec_ends[s], 2
+            );
+            if (pp_tpc_crossing.first.isNonnull()) {
+                tpc_crossing.push_back(pp_tpc_crossing.first);
+                tpc_crossing.push_back(pp_tpc_crossing.second);
+            }
+        }
+        if ((geoDet == kPDVD && s == 3) || (geoDet == kPDHD && s == 1))
+            prev = false; // cathode crossing
+        else
+            prev = true;
+    }
+
+    *vp_tpc_crossing = tpc_crossing;
+    return trk_ends;
 }
 
 DEFINE_ART_MODULE(ana::Truechecks)
