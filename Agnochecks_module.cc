@@ -372,7 +372,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         std::string gen = vh_mct.provenance()->moduleLabel();
         simb::MCTruth const& mct = vh_mct->at(0);
 
-        for (unsigned i_mcp=0; i_mcp<mct.NParticles(); i_mcp++) {
+        for (int i_mcp=0; i_mcp<mct.NParticles(); i_mcp++) {
             simb::MCParticle const& mcp = mct.GetParticle(i_mcp);
             tid2gen[mcp.TrackId()] = gen; 
         }
@@ -705,7 +705,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
             NearbyHitFromTrack.push_back(p_hit_trk and p_hit_trk->Length() > fTrackLengthCut);
 
-            if (!EventIsReal) {}
+            if (!EventIsReal) {
                 std::vector<sim::TrackIDE> const& v_ide = bt_serv->HitToTrackIDEs(clockData, p_hit);
                 if (v_ide.empty()) {
                     NearbyHitGenerator.push_back("");
@@ -740,15 +740,11 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 ) != vp_hit_mcp_muon.end();
 
                 if (from_michel) {
-                    if (from_mother_muon)
-                        NearbyHitMiMoMu.push_back(kBoth);
-                    else
-                        NearbyHitMiMoMu.push_back(kMichel);
+                    if (from_mother_muon) NearbyHitMiMoMu.push_back(kBoth);
+                    else NearbyHitMiMoMu.push_back(kMichel);
                 } else {
-                    if (from_mother_muon)
-                        NearbyHitMiMoMu.push_back(kMotherMuon);
-                    else
-                        NearbyHitMiMoMu.push_back(kNone);
+                    if (from_mother_muon) NearbyHitMiMoMu.push_back(kMotherMuon);
+                    else NearbyHitMiMoMu.push_back(kNone);
                 }
             }
 
