@@ -46,7 +46,7 @@ private:
     enum EnumDet { kPDVD, kPDHD };
 
     // Detector Properties
-    float fADCtoMeV;
+    float fADC2MeV;
     float fTick2cm; // cm/tick
     float fSamplingRate; // µs/tick
     float fDriftVelocity; // cm/µs
@@ -204,7 +204,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
         exit(1);
     }
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    fADCtoMeV = (geoDet == kPDVD ? 200 : 1000) * 23.6 * 1e-6 / 0.7;
+    fADC2MeV = (geoDet == kPDVD ? 200 : 1000) * 23.6 * 1e-6 / 0.7;
     fChannelPitch = geo::WireGeo::WirePitch(
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0}),
         asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1})
@@ -614,7 +614,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                     MichelHits.push_back(GetHit(p_hit_michel));
                 }
 
-                MichelHitEnergy = MichelHits.energy() * fADCtoMeV;
+                MichelHitEnergy = MichelHits.energy() * fADC2MeV;
             } else MuonHasMichel = kNoMichel;
 
         } else {
@@ -709,8 +709,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             //     SphereEnergyFalsePositive += hit.adc;
             // }
         } // end of loop over event hits
-        SphereEnergy = SphereHits.energy() * fADCtoMeV;
-        TrueSphereEnergy = TrueSphereHits.energy() * fADCtoMeV;
+        SphereEnergy = SphereHits.energy() * fADC2MeV;
+        TrueSphereEnergy = TrueSphereHits.energy() * fADC2MeV;
 
         /*
 

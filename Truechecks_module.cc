@@ -148,12 +148,18 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
 
     tMuon = tfs->make<TTree>("muon", "Muon Tree"); 
     tMuon->Branch("EndProcess", &EndProcess);
-    tMuon->Branch("HasMichel", &HasMichel, "HasMichel/I");
-    tMuon->Branch("TrueE", &TrueE, "TrueE/F");
-    tMuon->Branch("HitE", &HitE, "HitE/F");
-    tMuon->Branch("SharedE", &SharedE, "SharedE/F");
-    tMuon->Branch("SphereTrueE", &SphereTrueE, "SphereTrueE/F");
-    tMuon->Branch("SphereE", &SphereE, "SphereE/F");
+    // tMuon->Branch("HasMichel", &HasMichel, "HasMichel/I");
+    // tMuon->Branch("TrueE", &TrueE, "TrueE/F");
+    // tMuon->Branch("HitE", &HitE, "HitE/F");
+    // tMuon->Branch("SharedE", &SharedE, "SharedE/F");
+    // tMuon->Branch("SphereTrueE", &SphereTrueE, "SphereTrueE/F");
+    // tMuon->Branch("SphereE", &SphereE, "SphereE/F");
+    tMuon->Branch("HasMichel", &HasMichel);
+    tMuon->Branch("TrueE", &TrueE);
+    tMuon->Branch("HitE", &HitE);
+    tMuon->Branch("SharedE", &SharedE);
+    tMuon->Branch("SphereTrueE", &SphereTrueE);
+    tMuon->Branch("SphereE", &SphereE);
 }
 
 void ana::Truechecks::analyze(art::Event const& e)
@@ -243,11 +249,13 @@ void ana::Truechecks::analyze(art::Event const& e)
             ) != vp_mcp_hit.end()) {
                 // shared_hits.push_back(p_hit);
                 // shared_e += p_hit->Integral() * fADC2MeV;
-                SharedE += p_hit->Integral() * fADC2MeV;
+                SharedE += p_hit->Integral();
             }
 
-            HitE += p_hit->Integral() * fADC2MeV;
+            HitE += p_hit->Integral();
         }
+        SharedE *= fADC2MeV;
+        HitE *= fADC2MeV;
 
         float Oz = GetSpace(mcp_end->WireID());
         float Ot = mcp_end->PeakTime() * fTick2cm;

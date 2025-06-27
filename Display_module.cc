@@ -109,8 +109,9 @@ private:
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     // Verbosity
-    int iLogLevel;
     enum EnumFlag { kImportant, kBasics, kInfos, kDetails };
+
+    int iEvent = 0;
 
     // Products
     std::vector<std::vector<std::string>> vvsProducts;
@@ -121,7 +122,7 @@ private:
                     tag_clu,
                     tag_trk,
                     tag_spt;
-
+    int iRequestedEvent;
     
     TGraph2D* g_spt;
 
@@ -131,10 +132,9 @@ private:
 
 ana::Display::Display(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
-    iLogLevel(p.get<int>("LogLevel")),
-    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products"))
+    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    iRequestedEvent(p.get<int>("Event", -1))
 {
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Display::Display: ============================================================" << "\033[0m" << std::endl;
     // Basic Utilities
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -162,16 +162,10 @@ ana::Display::Display(fhicl::ParameterSet const& p)
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
     }
-
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Display::Display ======================================================" << "\033[0m" << std::endl;
 }
 
 void ana::Display::analyze(art::Event const& e)
 {
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Display::analyze: Initialization evt#" << std::setw(5) << e.event() << " ====================================" << "\033[0m" << std::endl;
-
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
 
@@ -186,32 +180,31 @@ void ana::Display::analyze(art::Event const& e)
     // art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     // art::FindManyP<recob::Track> fmp_hit2trk(vh_hit, e, tag_trk);
 
-    auto const & vh_spt = e.getValidHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    auto const & vh_spt = e.getHandle<std::vector<recob::SpacePoint>>(tag_spt);
+    if (!vh_spt.isValid()) return;
     // std::vector<art::Ptr<recob::SpacePoint>> vp_spt;
     // art::fill_ptr_vector(vp_spt, vh_spt);
+
+    if (iRequestedEvent >= 0 && iEvent != iRequestedEvent) {
+        iEvent++;
+        return;
+    }
 
     for (recob::SpacePoint const& spt : *vh_spt) {
         g_spt->AddPoint(spt.position().Y(), spt.position().Z(), spt.position().X());
     }
 
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Display::analyze =======================================================" << "\033[0m" << std::endl;
+    iEvent++;
 } // end analyze
 
 void ana::Display::beginJob()
 {
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Display::beginJob: ============================================================" << "\033[0m" << std::endl;
-
     g_spt = new TGraph2D();
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Display::beginJob ======================================================" << "\033[0m" << std::endl;
 } // end beginJob
 
 
 void ana::Display::endJob()
 {
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "Display::endJob: ==============================================================" << "\033[0m" << std::endl;
-
     TCanvas* c_spt = tfs->make<TCanvas>("c_spt", "SpacePoints");
 
     TGraph2D* axes = new TGraph2D(2, new double[2]{-400,400}, new double[2]{-10,310}, new double[2]{-400,400});
@@ -225,8 +218,6 @@ void ana::Display::endJob()
     g_spt->Draw("same P");
 
     c_spt->Write();
-
-    if (iLogLevel >= kBasics) std::cout << "\033[93m" << "End of Display::endJob ========================================================" << "\033[0m" << std::endl;
 } // end endJob
 
 
