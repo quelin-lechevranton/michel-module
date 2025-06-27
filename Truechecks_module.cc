@@ -65,6 +65,7 @@ private:
 
     // Output
     TTree* tMuon;
+    bool IsAnti;
     std::string EndProcess;
     int HasMichel;
     float TrueE;
@@ -147,6 +148,7 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     }
 
     tMuon = tfs->make<TTree>("muon", "Muon Tree"); 
+    tMuon->Branch("IsAnti", &IsAnti);
     tMuon->Branch("EndProcess", &EndProcess);
     // tMuon->Branch("HasMichel", &HasMichel, "HasMichel/I");
     // tMuon->Branch("TrueE", &TrueE, "TrueE/F");
@@ -179,6 +181,7 @@ void ana::Truechecks::analyze(art::Event const& e)
     for (simb::MCParticle const& mcp : *vh_mcp) {
         if (abs(mcp.PdgCode()) != 13) continue;
 
+        IsAnti = mcp.PdgCode() < 0;
         EndProcess = mcp.EndProcess();
 
         HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
