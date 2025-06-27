@@ -42,7 +42,7 @@ physics: {
             TrackLengthCut: 40.
 
             MichelSpaceRadius: 20.
-            NearbySpaceRadius: 40.
+            NearbySpaceRadius: 60.
 
             CoincidenceWindow: 10.
             CoincidenceRadius: 1.

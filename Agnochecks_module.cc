@@ -61,6 +61,8 @@ private:
     std::map<geo::PlaneID, ana::axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
 
+    std::unordered_map<int, std::string> tid2gen;
+
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
     art::InputTag tag_mcp, tag_sed, tag_wir,
@@ -119,6 +121,11 @@ private:
     bool MuonEndHasGood3DAssociation;
 
     ana::Hits NearbyHits;
+    std::vector<std::string> NearbyHitGenerator;
+    std::vector<int> NearbyHitPdgCode;
+    std::vector<int> NearbyHitMiMoMu;
+    std::vector<bool> NearbyHitFromTrack;
+    enum EnumNearbyHitMiMu { kNone, kMichel, kMotherMuon, kBoth };
     // ana::Hits NearbyUHits, NearbyVHits;
     // ana::Points NearbySpacePoints;
     // ana::Points NearbyHitSpacePoints;
@@ -128,9 +135,10 @@ private:
 
     float MichelTrackLength;
 
-    ana::Hits MichelHits, SphereHits;
+    // ana::Hits MichelHits, SphereHits;
 
-    float MichelTrueEnergy, MichelHitEnergy, SphereEnergy, TrueSphereEnergy;
+    float MichelTrueEnergy;
+    // float MichelTrueEnergy, MichelHitEnergy, SphereEnergy, TrueSphereEnergy;
     // unsigned SphereTruePositive, SphereFalsePositive;
     // float SphereEnergyTruePositive, SphereEnergyFalsePositive;
 
@@ -324,18 +332,22 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
 
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
-    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
-    tMuon->Branch("SphereEnergy", &SphereEnergy); // MeV
-    tMuon->Branch("TrueSphereEnergy", &TrueSphereEnergy); // MeV
+    // tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
+    // tMuon->Branch("SphereEnergy", &SphereEnergy); // MeV
+    // tMuon->Branch("TrueSphereEnergy", &TrueSphereEnergy); // MeV
 
     // tMuon->Branch("SphereTruePositive", &SphereTruePositive);
     // tMuon->Branch("SphereFalsePositive", &SphereFalsePositive);
     // tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive);
     // tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive);
 
-    MichelHits.SetBranches(tMuon, "Michel");
-    SphereHits.SetBranches(tMuon, "Sphere");
+    // MichelHits.SetBranches(tMuon, "Michel");
+    // SphereHits.SetBranches(tMuon, "Sphere");
     NearbyHits.SetBranches(tMuon, "Nearby");
+    tMuon->Branch("NearbyHitGenerator", &NearbyHitGenerator);
+    tMuon->Branch("NearbyHitPdgCode", &NearbyHitPdgCode);
+    tMuon->Branch("NearbyHitMiMoMu", &NearbyHitMiMoMu);
+    tMuon->Branch("NearbyHitFromTrack", &NearbyHitFromTrack);
     // NearbyUHits.SetBranches(tMuon, "NearbyU");
     // NearbyVHits.SetBranches(tMuon, "NearbyV");
     // NearbySpacePoints.SetBranches(tMuon, "NearbySpace");
@@ -352,6 +364,20 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
+
+    // get MCParticle generator
+    std::vector<art::Handle<std::vector<simb::MCTruth>>> vhs_mct = e.getMany<std::vector<simb::MCTruth>>();
+    for (auto const& vh_mct : vhs_mct) {
+        if (!vh_mct.isValid()) continue;
+        std::string gen = vh_mct.provenance()->moduleLabel();
+        simb::MCTruth const& mct = vh_mct->at(0);
+
+        for (unsigned i_mcp=0; i_mcp<mct.NParticles(); i_mcp++) {
+            simb::MCParticle const& mcp = mct.GetParticle(i_mcp);
+            tid2gen[mcp.TrackId()] = gen; 
+        }
+    }
+
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
@@ -416,6 +442,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         // if (!mcp) continue;
         // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
+
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
         if (!LOG(vp_hit_muon.size())) continue;
@@ -432,6 +459,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             increasing_z = p_trk->Start().Z() > p_trk->End().Z();
         }
 
+        HitPtrVec vp_hit_mcp_muon;
         if (mcp) {
             // HitPtr deephit = getdeepesthit(
             //     ana::mcp2hits(mcp, vp_hit, clockData, false),
@@ -440,10 +468,9 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             
             // if (deephit) MuonTrueEndHit = GetHit(deephit);
 
+            vp_hit_mcp_muon = ana::mcp2hits(mcp, vp_hit, clockData, false);
             HitPtrPair ends;
-            ends = GetTrackEndsHits(ana::mcp2hits(
-                mcp, vp_hit, clockData, false
-            ));
+            ends = GetTrackEndsHits(vp_hit_mcp_muon);
 
             if (ends.first && ends.second) {
                 int dir_z = mcp->EndZ() > mcp->Vz() ? 1 : -1;
@@ -571,6 +598,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
+        HitPtrVec vp_hit_mcp_michel;
         if (mcp && mcp->NumberDaughters() >= 3) {
             bool has_numu = false, has_nue = false;
             for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
@@ -607,20 +635,21 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
                 // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
-                HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-                for (HitPtr p_hit_michel : vp_hit_michel) {
-                    if (p_hit_michel->View() != geo::kW) continue;
+                vp_hit_mcp_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+                // HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+                // for (HitPtr p_hit_michel : vp_hit_michel) {
+                //     if (p_hit_michel->View() != geo::kW) continue;
 
-                    MichelHits.push_back(GetHit(p_hit_michel));
-                }
+                //     // MichelHits.push_back(GetHit(p_hit_michel));
+                // }
 
-                MichelHitEnergy = MichelHits.energy() * fADC2MeV;
+                // MichelHitEnergy = MichelHits.energy() * fADC2MeV;
             } else MuonHasMichel = kNoMichel;
 
         } else {
             MuonHasMichel = -1;
             MichelTrackLength = -1;
-            MichelHitEnergy = -1;
+            // MichelHitEnergy = -1;
         }
 
         // get induction hits nearby muon end point
@@ -655,19 +684,15 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
 
         // get all hits nearby muon end point
-        Hits TrueSphereHits;
+        // Hits TrueSphereHits;
         // HitPtrVec NearbyPHits;
         for (HitPtr const& p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
 
-            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
-            bool from_track = p_hit_trk and p_hit_trk->Length() > fTrackLengthCut;
+            // if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
-
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
             ana::Hit hit = GetHit(p_hit);
-            if (geoDet == kPDVD && hit.slice() != MuonEndHit.slice()) continue;
-            if (geoDet == kPDHD && hit.tpc != MuonEndHit.tpc) continue;
 
             float dz = (hit.space - MuonEndHit.space);
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
@@ -676,6 +701,57 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             if (dr2 > fNearbySpaceRadius * fNearbySpaceRadius) continue;
 
             NearbyHits.push_back(hit);
+
+            art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
+            NearbyHitFromTrack.push_back(p_hit_trk and p_hit_trk->Length() > fTrackLengthCut);
+
+            if (!EventIsReal) {}
+                std::vector<sim::TrackIDE> const& v_ide = bt_serv->HitToTrackIDEs(clockData, p_hit);
+                if (v_ide.empty()) {
+                    NearbyHitGenerator.push_back("");
+                    NearbyHitPdgCode.push_back(0);
+                } else {
+                    double max_e = std::numeric_limits<double>::lowest();
+                    sim::TrackIDE max_ide;
+                    for (sim::TrackIDE const& ide : v_ide) {
+                        if (ide.energy > max_e) {
+                            max_e = ide.energy;
+                            max_ide = ide;
+                        } 
+                    }
+                    NearbyHitGenerator.push_back(tid2gen[max_ide.trackID]);
+                    simb::MCParticle const* mcp_gen = pi_serv->TrackIdToParticle_P(max_ide.trackID);
+                    if (mcp_gen)
+                        NearbyHitPdgCode.push_back(pi_serv->TrackIdToParticle_P(max_ide.trackID)->PdgCode());
+                    else
+                        NearbyHitPdgCode.push_back(0);
+                }
+
+                bool from_michel = std::find_if(
+                    vp_hit_mcp_michel.begin(),
+                    vp_hit_mcp_michel.end(),
+                    [&p_hit](HitPtr const& p_hit_michel) { return p_hit_michel.key() == p_hit.key(); }
+                ) != vp_hit_mcp_michel.end();
+
+                bool from_mother_muon = std::find_if(
+                    vp_hit_mcp_muon.begin(),
+                    vp_hit_mcp_muon.end(),
+                    [&p_hit](HitPtr const& p_hit_muon) { return p_hit_muon.key() == p_hit.key(); }
+                ) != vp_hit_mcp_muon.end();
+
+                if (from_michel) {
+                    if (from_mother_muon)
+                        NearbyHitMiMoMu.push_back(kBoth);
+                    else
+                        NearbyHitMiMoMu.push_back(kMichel);
+                } else {
+                    if (from_mother_muon)
+                        NearbyHitMiMoMu.push_back(kMotherMuon);
+                    else
+                        NearbyHitMiMoMu.push_back(kNone);
+                }
+            }
+
             // NearbyPHits.push_back(p_hit);
 
             // art::Ptr<recob::SpacePoint> p_hit_spt = fop_hit2spt.at(p_hit.key());
@@ -684,19 +760,19 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             // else 
             //     NearbyHitSpacePoints.push_back(ana::Point{});
 
-            if (from_track) continue;
+            // if (from_track) continue;
 
-            if (mcp_michel) {
-                float dzt = (hit.space - MuonTrueEndHit.space);
-                float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
-                float dr2t = dzt*dzt + dtt*dtt;
-                if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
-                    TrueSphereHits.push_back(hit);
-            }
+            // if (mcp_michel) {
+            //     float dzt = (hit.space - MuonTrueEndHit.space);
+            //     float dtt = (hit.tick - MuonTrueEndHit.tick) * fTick2cm;
+            //     float dr2t = dzt*dzt + dtt*dtt;
+            //     if (dr2t <= fMichelSpaceRadius * fMichelSpaceRadius)
+            //         TrueSphereHits.push_back(hit);
+            // }
 
-            if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
+            // if (dr2 > fMichelSpaceRadius * fMichelSpaceRadius) continue;
 
-            SphereHits.push_back(hit);
+            // SphereHits.push_back(hit);
 
             // checking if the hit is associated to the michel MCParticle
             // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
@@ -709,8 +785,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             //     SphereEnergyFalsePositive += hit.adc;
             // }
         } // end of loop over event hits
-        SphereEnergy = SphereHits.energy() * fADC2MeV;
-        TrueSphereEnergy = TrueSphereHits.energy() * fADC2MeV;
+        // SphereEnergy = SphereHits.energy() * fADC2MeV;
+        // TrueSphereEnergy = TrueSphereHits.energy() * fADC2MeV;
 
         /*
 
@@ -874,6 +950,10 @@ void ana::Agnochecks::resetMuon() {
     // MuonVHits.clear();
 
     NearbyHits.clear();
+    NearbyHitGenerator.clear();
+    NearbyHitMiMoMu.clear();
+    NearbyHitPdgCode.clear();
+    NearbyHitFromTrack.clear();
     // NearbyUHits.clear();
     // NearbyVHits.clear();
     // NearbySpacePoints.clear();
@@ -886,12 +966,12 @@ void ana::Agnochecks::resetMuon() {
 
     MichelTrueEnergy = 0;
 
-    MichelHits.clear();
-    MichelHitEnergy = 0;
+    // MichelHits.clear();
+    // MichelHitEnergy = 0;
 
-    SphereHits.clear();
-    SphereEnergy = 0;
-    TrueSphereEnergy = 0;
+    // SphereHits.clear();
+    // SphereEnergy = 0;
+    // TrueSphereEnergy = 0;
 
     // SphereTruePositive = 0;
     // SphereFalsePositive = 0;
