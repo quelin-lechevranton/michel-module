@@ -95,7 +95,8 @@ private:
     TTree* tMuon;
     unsigned iMuon=0;
 
-    bool MuonIsAnti;
+    int MuonPdgCode;
+    int MuonIsAnti;
     std::string MuonEndProcess;
     int MuonHasMichel;
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside };
@@ -302,6 +303,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     tMuon->Branch("iMuon", &iMuon);
     tMuon->Branch("iMuonInEvent", &EventNMuon);
 
+    tMuon->Branch("PdgCode", &MuonPdgCode);
     tMuon->Branch("IsAnti", &MuonIsAnti);
     tMuon->Branch("EndProcess", &MuonEndProcess);
     tMuon->Branch("HasMichel", &MuonHasMichel);
@@ -473,6 +475,12 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             ends = GetTrackEndsHits(vp_hit_mcp_muon);
 
             if (ends.first && ends.second) {
+
+                /* 
+                also take the drift direction into account?
+                some ends may be flipped...
+                */
+
                 int dir_z = mcp->EndZ() > mcp->Vz() ? 1 : -1;
                 float fz = GetSpace(ends.first->WireID());
                 float sz = GetSpace(ends.second->WireID());
@@ -518,7 +526,8 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         EventiMuon.push_back(iMuon);
 
-        MuonIsAnti = mcp ? mcp->PdgCode() < 0 : false;
+        MuonPdgCode = mcp ? mcp->PdgCode() : 0;
+        MuonIsAnti = abs(MuonPdgCode) == 13 ? (MuonPdgCode > 0 ? 1 : 0) : -1;
         MuonTrackLength = p_trk->Length();
 
         /*
