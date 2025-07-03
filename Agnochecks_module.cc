@@ -137,9 +137,9 @@ private:
 
     float MichelTrackLength;
 
-    // ana::Hits MichelHits, SphereHits;
+    ana::Hits MichelHits; //, SphereHits;
 
-    float MichelTrueEnergy;
+    float MichelTrueEnergy, MichelHitEnergy;
     // float MichelTrueEnergy, MichelHitEnergy, SphereEnergy, TrueSphereEnergy;
     // unsigned SphereTruePositive, SphereFalsePositive;
     // float SphereEnergyTruePositive, SphereEnergyFalsePositive;
@@ -335,7 +335,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
 
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
-    // tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
+    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
     // tMuon->Branch("SphereEnergy", &SphereEnergy); // MeV
     // tMuon->Branch("TrueSphereEnergy", &TrueSphereEnergy); // MeV
 
@@ -344,7 +344,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     // tMuon->Branch("SphereEnergyTruePositive", &SphereEnergyTruePositive);
     // tMuon->Branch("SphereEnergyFalsePositive", &SphereEnergyFalsePositive);
 
-    // MichelHits.SetBranches(tMuon, "Michel");
+    MichelHits.SetBranches(tMuon, "Michel");
     // SphereHits.SetBranches(tMuon, "Sphere");
     NearbyHits.SetBranches(tMuon, "Nearby");
     tMuon->Branch("NearbyHitGenerator", &NearbyHitGenerator);
@@ -647,19 +647,19 @@ void ana::Agnochecks::analyze(art::Event const& e) {
                 // std::vector<const recob::Hit*> v_hit_michel = truthUtil.GetMCParticleHits(clockData, *mcp_michel, e, tag_hit.label());
                 vp_hit_mcp_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
                 // HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-                // for (HitPtr p_hit_michel : vp_hit_michel) {
-                //     if (p_hit_michel->View() != geo::kW) continue;
+                for (HitPtr p_hit_michel : vp_hit_mcp_michel) {
+                    if (p_hit_michel->View() != geo::kW) continue;
 
-                //     // MichelHits.push_back(GetHit(p_hit_michel));
-                // }
+                    MichelHits.push_back(GetHit(p_hit_michel));
+                }
 
-                // MichelHitEnergy = MichelHits.energy() * fADC2MeV;
+                MichelHitEnergy = MichelHits.energy() * fADC2MeV;
             } else MuonHasMichel = kNoMichel;
 
         } else {
             MuonHasMichel = -1;
             MichelTrackLength = -1;
-            // MichelHitEnergy = -1;
+            MichelHitEnergy = -1;
         }
 
         // get induction hits nearby muon end point
@@ -978,8 +978,8 @@ void ana::Agnochecks::resetMuon() {
 
     MichelTrueEnergy = 0;
 
-    // MichelHits.clear();
-    // MichelHitEnergy = 0;
+    MichelHits.clear();
+    MichelHitEnergy = 0;
 
     // SphereHits.clear();
     // SphereEnergy = 0;
