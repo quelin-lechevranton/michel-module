@@ -125,8 +125,9 @@ private:
     std::vector<std::string> NearbyHitGenerator;
     std::vector<int> NearbyHitPdgCode;
     std::vector<int> NearbyHitMiMoMu;
-    std::vector<bool> NearbyHitFromTrack;
-    enum EnumNearbyHitMiMu { kNone, kMichel, kMotherMuon, kBoth };
+    enum EnumNearbyHitMiMoMu { kNone, kMichel, kMotherMuon, kBoth };
+    std::vector<int> NearbyHitFromTrack;
+    enum EnumNearbyHitFromTrack { kNotFromTrack, kFromOtherTrack, kFromMotherTrack };
     // ana::Hits NearbyUHits, NearbyVHits;
     // ana::Points NearbySpacePoints;
     // ana::Points NearbyHitSpacePoints;
@@ -712,7 +713,13 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             NearbyHits.push_back(hit);
 
             art::Ptr<recob::Track> p_hit_trk = fop_hit2trk.at(p_hit.key());
-            NearbyHitFromTrack.push_back(p_hit_trk and p_hit_trk->Length() > fTrackLengthCut);
+            if (p_hit_trk and p_hit_trk->Length() > fTrackLengthCut) {
+                if (p_hit_trk.key() == p_trk.key())
+                    NearbyHitFromTrack.push_back(kFromMotherTrack);
+                else
+                    NearbyHitFromTrack.push_back(kFromOtherTrack);
+            } else
+                NearbyHitFromTrack.push_back(kNotFromTrack);
 
             if (!EventIsReal) {
                 std::vector<sim::TrackIDE> const& v_ide = bt_serv->HitToTrackIDEs(clockData, p_hit);
