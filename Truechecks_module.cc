@@ -201,6 +201,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         if (vp_mcp_hit.empty()) continue;
 
         HitPtrVec vp_mcp_sorted_hit = GetSortedHits(vp_mcp_hit, (mcp.EndZ() > mcp.Vz() ? 1 : -1));
+        if (vp_mcp_sorted_hit.empty()) continue;
 
         Hits.clear();
         for (HitPtr const& p_hit : vp_mcp_sorted_hit) {
@@ -346,17 +347,15 @@ void ana::Truechecks::analyze(art::Event const& e)
 
                 // not from other muons?
                 std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, *p_hit);
-                if (!hit_ides.empty()) {
-                    std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
-                        hit_ides.begin(),
-                        hit_ides.end(),
-                        [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
-                    );
-                    if (source_ide_it != hit_ides.end()) {
-                        simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
-                        if (source_mcp && abs(source_mcp->PdgCode()) == 13)
-                            continue;
-                    }
+                std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
+                    hit_ides.begin(),
+                    hit_ides.end(),
+                    [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
+                );
+                if (source_ide_it != hit_ides.end()) {
+                    simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
+                    if (source_mcp && abs(source_mcp->PdgCode()) == 13)
+                        continue;
                 }
                 
                 // sphere_hits.push_back(p_hit);
