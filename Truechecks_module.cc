@@ -346,15 +346,17 @@ void ana::Truechecks::analyze(art::Event const& e)
 
                 // not from other muons?
                 std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, *p_hit);
-                std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
-                    hit_ides.begin(),
-                    hit_ides.end(),
-                    [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
-                );
-                if (source_ide_it != hit_ides.end()) {
-                    simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
-                    if (source_mcp && abs(source_mcp->PdgCode()) == 13)
-                        continue;
+                if (!hit_ides.empty()) {
+                    std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
+                        hit_ides.begin(),
+                        hit_ides.end(),
+                        [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
+                    );
+                    if (source_ide_it != hit_ides.end()) {
+                        simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
+                        if (source_mcp && abs(source_mcp->PdgCode()) == 13)
+                            continue;
+                    }
                 }
                 
                 // sphere_hits.push_back(p_hit);

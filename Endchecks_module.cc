@@ -110,7 +110,7 @@ ana::Endchecks::Endchecks(fhicl::ParameterSet const& p)
     fNearbySpaceRadius(p.get<float>("NearbySpaceRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), // in cm
     fRegNmin(p.get<unsigned>("RegNmin", 6)),
-    fBraggThreshold(p.get<float>("BraggThreshold", 1.7)), // in MIP dE/dx
+    fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
     asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
@@ -216,99 +216,99 @@ ana::Endchecks::Endchecks(fhicl::ParameterSet const& p)
 }
 
 void ana::Endchecks::analyze(art::Event const& e) {
-    auto const clockData = asDetClocks->DataFor(e);
-    auto const detProp = asDetProp->DataFor(e,clockData);
-    fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    fDriftVelocity = detProp.DriftVelocity();
-    fTick2cm = fDriftVelocity * fSamplingRate;
+    // auto const clockData = asDetClocks->DataFor(e);
+    // auto const detProp = asDetProp->DataFor(e,clockData);
+    // fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
+    // fDriftVelocity = detProp.DriftVelocity();
+    // fTick2cm = fDriftVelocity * fSamplingRate;
 
-    auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
-    if (!vh_hit.isValid()) return;
-    HitPtrVec vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
+    // auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
+    // if (!vh_hit.isValid()) return;
+    // HitPtrVec vp_hit;
+    // art::fill_ptr_vector(vp_hit, vh_hit);
 
-    auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
-    if (!vh_trk.isValid()) return;
-    std::vector<art::Ptr<recob::Track>> vp_trk;
-    art::fill_ptr_vector(vp_trk, vh_trk);
+    // auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
+    // if (!vh_trk.isValid()) return;
+    // std::vector<art::Ptr<recob::Track>> vp_trk;
+    // art::fill_ptr_vector(vp_trk, vh_trk);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+    // art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    // art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
 
-    std::vector<HitPtrVec> BraggTrackHits;
+    // std::vector<HitPtrVec> BraggTrackHits;
 
-    // loop over tracks to find muons
-    for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
+    // // loop over tracks to find muons
+    // for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
 
-        if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
-
-        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
+        // if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
 
         // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
-        // tracks associated to a MCTruth muon
-        // if (!mcp) continue;
-        // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
-        if (!LOG(vp_hit_muon.size())) continue;
+        // // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
+        // // tracks associated to a MCTruth muon
+        // // if (!mcp) continue;
+        // // if (!LOG(abs(mcp->PdgCode()) == 13)) continue;
 
-        HitPtr mcp_end;
-        if (mcp) {
-            HitPtrPair ends;
-            ends = GetTrackEndsHits(ana::mcp2hits(
-                mcp, vp_hit, clockData, false
-            ));
+        // HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
+        // if (!LOG(vp_hit_muon.size())) continue;
 
-            if (ends.first && ends.second) {
-                int dir_z = mcp->EndZ() > mcp->Vz() ? 1 : -1;
-                float fz = GetSpace(ends.first->WireID());
-                float sz = GetSpace(ends.second->WireID());
-                mcp_end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
-            }
-        }
+        // HitPtr mcp_end;
+        // if (mcp) {
+        //     HitPtrPair ends;
+        //     ends = GetTrackEndsHits(ana::mcp2hits(
+        //         mcp, vp_hit, clockData, false
+        //     ));
 
-        HitPtrPair trk_ends;
-        std::vector<HitPtrVec> vvp_sec_sorted_hits;
-        trk_ends = GetTrackEndsHits(vp_hit_muon, nullptr, nullptr, &vvp_sec_sorted_hits);
+        //     if (ends.first && ends.second) {
+        //         int dir_z = mcp->EndZ() > mcp->Vz() ? 1 : -1;
+        //         float fz = GetSpace(ends.first->WireID());
+        //         float sz = GetSpace(ends.second->WireID());
+        //         mcp_end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
+        //     }
+        // }
 
-        if (!LOG(trk_ends.first && trk_ends.second)) continue;
+        // HitPtrPair trk_ends;
+        // std::vector<HitPtrVec> vvp_sec_sorted_hits;
+        // trk_ends = GetTrackEndsHits(vp_hit_muon, nullptr, nullptr, &vvp_sec_sorted_hits);
 
-        // fiducial cuts
-        std::pair<bool, bool> trk_isin;
-        trk_isin.first = wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
-            && geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
-        trk_isin.second = wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
-            && geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
+        // if (!LOG(trk_ends.first && trk_ends.second)) continue;
 
-        if (!LOG(trk_isin.first || trk_isin.second)) continue;
+        // // fiducial cuts
+        // std::pair<bool, bool> trk_isin;
+        // trk_isin.first = wireWindow.isInside(trk_ends.first->PeakTime(), fMichelTickRadius)
+        //     && geoHighX.InFiducialZ(GetSpace(trk_ends.first->WireID()), fMichelSpaceRadius);
+        // trk_isin.second = wireWindow.isInside(trk_ends.second->PeakTime(), fMichelTickRadius)
+        //     && geoHighX.InFiducialZ(GetSpace(trk_ends.second->WireID()), fMichelSpaceRadius);
 
-
-        HitPtrPair bragg_ends;
-        std::pair<double, double> braggs;
-        if (trk_isin.first)
-            bragg_ends.first = GetBraggEnd(
-                vp_hit,
-                p_trk,
-                fop_hit2trk,
-                trk_ends.first,
-                vvp_sec_sorted_hits,
-                &braggs.first
-            );
-        if (trk_isin.second)
-            bragg_ends.second = GetBraggEnd(
-                vp_hit,
-                p_trk,
-                fop_hit2trk,
-                trk_ends.second,
-                vvp_sec_sorted_hits,
-                &braggs.second
-            );
+        // if (!LOG(trk_isin.first || trk_isin.second)) continue;
 
 
-        if (bragg_ends.first && braggs.first > fBraggThreshold) {
+        // HitPtrPair bragg_ends;
+        // std::pair<double, double> braggs;
+        // if (trk_isin.first)
+        //     bragg_ends.first = GetBraggEnd(
+        //         vp_hit,
+        //         p_trk,
+        //         fop_hit2trk,
+        //         trk_ends.first,
+        //         vvp_sec_sorted_hits,
+        //         &braggs.first
+        //     );
+        // if (trk_isin.second)
+        //     bragg_ends.second = GetBraggEnd(
+        //         vp_hit,
+        //         p_trk,
+        //         fop_hit2trk,
+        //         trk_ends.second,
+        //         vvp_sec_sorted_hits,
+        //         &braggs.second
+        //     );
+
+
+        // if (bragg_ends.first && braggs.first > fBraggThreshold) {
             
-        }
+        // }
 
 
 
@@ -401,7 +401,7 @@ void ana::Endchecks::analyze(art::Event const& e) {
         //     MichelTrackLength = -1;
         //     MichelHitEnergy = -1;
         // }
-    } // end of loop over tracks
+    // } // end of loop over tracks
 }
 
 void ana::Endchecks::beginJob() {}
