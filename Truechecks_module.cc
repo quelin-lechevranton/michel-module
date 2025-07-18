@@ -189,6 +189,8 @@ void ana::Truechecks::analyze(art::Event const& e)
     std::vector<art::Ptr<recob::Hit>> vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
+    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+
     for (simb::MCParticle const& mcp : *vh_mcp) {
         if (abs(mcp.PdgCode()) != 13) continue;
 
@@ -267,7 +269,13 @@ void ana::Truechecks::analyze(art::Event const& e)
                 // shared_hits.push_back(p_hit);
                 // shared_e += p_hit->Integral() * fADC2MeV;
                 SharedEnergy += p_hit->Integral();
+
+
+
                 // shared is Me + mu energy
+
+
+
             }
             MichelHitEnergy += p_hit->Integral();
         }
@@ -337,12 +345,17 @@ void ana::Truechecks::analyze(art::Event const& e)
                 ) != vp_mcp_hit.end()) continue;
 
                 // not from other muons?
-
-
-
-
-
-
+                std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, *p_hit);
+                std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
+                    hit_ides.begin(),
+                    hit_ides.end(),
+                    [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
+                );
+                if (source_ide_it != hit_ides.end()) {
+                    simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
+                    if (source_mcp && abs(source_mcp->PdgCode()) == 13)
+                        continue;
+                }
                 
                 // sphere_hits.push_back(p_hit);
                 sphere_e += p_hit->Integral() * fADC2MeV;

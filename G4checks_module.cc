@@ -133,15 +133,14 @@ ana::G4checks::G4checks(fhicl::ParameterSet const& p)
     }
 }
 
-void ana::G4checks::analyze(art::Event const& e)
-{
+void ana::G4checks::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
 
-    auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
+    // auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
 
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     std::vector<art::Ptr<recob::Hit>> vp_hit;
@@ -317,7 +316,6 @@ void ana::G4checks::analyze(art::Event const& e)
 
 void ana::G4checks::beginJob() {}
 
-
 void ana::G4checks::endJob() {
     std::cout << "µ+ decay rate: " << 100.*n_mep / n_mup << "% (" << n_mup << ")" << std::endl;
     for (auto const& [key, val] : map_mup_endproc) {
@@ -327,7 +325,7 @@ void ana::G4checks::endJob() {
     for (auto const& [key, val] : map_mum_endproc) {
         std::cout << "  " << key << ": " << val << std::endl;
     }
-    std::cout << "µ- decaying after capture: " << n_cme_wh + n_cme_nh << "% (" << (n_cme_wh + n_cme_nh) / map_mum_endproc["muMinusCaptureAtRest"] << ")" << std::endl;
+    std::cout << "µ- decaying after capture: " << 100.*(n_cme_wh + n_cme_nh) / map_mum_endproc["muMinusCaptureAtRest"] << "% (" << n_cme_wh + n_cme_nh << ")" << std::endl;
     std::cout << "  w/ hits: " << n_cme_wh << " (~" << mean_cme_h/n_cme_wh << " hits/michel)" << std::endl;
     std::cout << "  w/o hit: " << n_cme_nh << std::endl;
 } // end endJob
