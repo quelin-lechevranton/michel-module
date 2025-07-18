@@ -2,10 +2,10 @@
 #include "services_protodunehd.fcl" 
 #include "tools_dune.fcl"	
 
-process_name: RunTruechecks
+process_name: RunG4checks
 
 services: {
-    TFileService: { fileName: "pdhd_Truechecks.root" }
+    TFileService: { fileName: "pdhd_G4checks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -23,7 +23,7 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "Truechecks"
+            module_type:    "G4checks"
             Products:       [
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
@@ -37,9 +37,9 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
+            LogLevel: 10
             ADC2el: 1000
             MichelRadius: 20.
-            Keep
         }
     }
     ana: [ checks ]

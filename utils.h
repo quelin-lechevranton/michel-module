@@ -128,7 +128,7 @@ namespace ana {
         Hit(unsigned T, float s, unsigned c, float t, float a) :
             tpc(T), space(s), channel(c), tick(t), adc(a) {}
 
-        unsigned slice() { return 2*(tpc/4) + tpc%2; }
+        // unsigned slice() { return 2*(tpc/4) + tpc%2; }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
@@ -180,8 +180,6 @@ namespace ana {
             t->Branch(Form("%sHitTick", pre), &tick);
             t->Branch(Form("%sHitADC", pre), &adc);
         }
-
-
 
         Hit at(unsigned i) const { return Hit{tpc[i], space[i], channel[i], tick[i], adc[i]}; }
         struct iterator {

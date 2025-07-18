@@ -1,17 +1,17 @@
 #include "services_dune.fcl"
-#include "services_protodunehd.fcl" 
+#include "services_protodunevd.fcl" 
 #include "tools_dune.fcl"	
 
-process_name: RunTruechecks
+process_name: RunG4checks
 
 services: {
-    TFileService: { fileName: "pdhd_Truechecks.root" }
+    TFileService: { fileName: "pdvd_G4checks.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
-    DetectorPropertiesService:  @local::protodunehd_detproperties
+    DetectorPropertiesService:  @local::protodunevd_detproperties
     FileCatalogMetadata:        @local::art_file_catalog_mc
-                                @table::protodunehd_reco_services
+                                @table::protodunevd_reco_services
     LArPropertiesService:       @local::dunefd_properties
 }
 
@@ -23,12 +23,12 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "Truechecks"
+            module_type:    "G4checks"
             Products:       [
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
                 ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
-                ["Reco",       "wclsdatahd",    "gauss",  "recob::Wire"],
+                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
                 ["Reco",       "hitpdune",      "",       "recob::Hit"],
                 ["Reco",       "pandora",       "",       "recob::Cluster"],
                 ["Reco",       "pandoraTrack",  "",       "recob::Track"],
@@ -37,9 +37,9 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
 
-            ADC2el: 1000
+            LogLevel: 10
+            ADC2el: 200
             MichelRadius: 20.
-            Keep
         }
     }
     ana: [ checks ]
