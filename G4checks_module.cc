@@ -226,7 +226,7 @@ void ana::G4checks::analyze(art::Event const& e)
 
         map_el_proc_count[mcp_mich->Process()]++;
 
-        HitPtrVec vp_hit_michel = ana::mcp2hits(mcp, vp_hit, clockData, true);
+        HitPtrVec vp_hit_michel = ana::mcp2hits(mcp_mich, vp_hit, clockData, true);
         if (mcp->EndProcess() == "muMinusCaptureAtRest") {
             if (vp_hit_michel.size()) {
                 n_cme_wh++;
@@ -247,9 +247,9 @@ void ana::G4checks::analyze(art::Event const& e)
             mich_hit_energy += hit_michel->Integral() * fADC2MeV;
 
             std::vector<sim::TrackIDE> v_tid = bt_serv->HitToTrackIDEs(clockData, *hit_michel); 
-            std::cout << "\thit#" << i_hit++
+            std::cout << "\t\thit#" << i_hit++
                 << " Integral: " << hit_michel->Integral() * fADC2MeV
-                << " MeV  / ROIADC: " << hit_michel->ROISummedADC() * fADC2MeV
+                << " MeV / ROIADC: " << hit_michel->ROISummedADC() * fADC2MeV
                 << " MeV / "  << v_tid.size() << " trackIDEs"
                 << std::endl;
 
@@ -264,9 +264,18 @@ void ana::G4checks::analyze(art::Event const& e)
                     << " numElectrons: " << tid.numElectrons
                     << " (" << tid.numElectrons *  23.6 * 1e-6 / 0.7 << " MeV)"
                     << std::endl;
-                if (tid.trackID == mcp_mich->TrackId()) {
-                   mich_ide_energy += tid.energy; 
+
+                int mother_tid = tid.trackID;
+                bool is_mich_daughter = mother_tid == mcp_mich->TrackId();
+                while (!is_mich_daughter && mother_tid != 0) {
+                    simb::MCParticle const * mcp_mother = pi_serv->TrackIdToParticle_P(mother_tid);
+                    if (!mcp_mother) break;
+                    mother_tid = mcp_mother->Mother();
+                    if (mother_tid == mcp_mich->TrackId())
+                        is_mich_daughter = true;
                 }
+                if (is_mich_daughter) 
+                   mich_ide_energy += tid.energy; 
             }
         }
 
