@@ -71,6 +71,7 @@ private:
     ana::Hits Hits;
 
     float MichelTrueEnergy;
+    unsigned MichelNHit;
     float MichelHitEnergy;
     float SharedEnergy;
     std::vector<float> MichelSphereTrueEnergy;
@@ -169,6 +170,7 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     Hits.SetBranches(tMuon, "");
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
+    tMuon->Branch("MichelNHit", &MichelNHit);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
     tMuon->Branch("SharedEnergy", &SharedEnergy);
     tMuon->Branch("MichelSphereTrueEnergy", &MichelSphereTrueEnergy);
@@ -241,6 +243,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         }
 
         MichelTrueEnergy = -1.F;
+        MichelNHit = 0;
         MichelHitEnergy = -1.F;
         SharedEnergy = -1.F;
         MichelSphereTrueEnergy.clear();
@@ -278,6 +281,7 @@ void ana::Truechecks::analyze(art::Event const& e)
 
 
             }
+            MichelNHit++;
             MichelHitEnergy += p_hit->Integral();
         }
         SharedEnergy *= fADC2MeV;
