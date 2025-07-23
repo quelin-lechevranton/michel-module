@@ -73,6 +73,10 @@ private:
     float MichelTrueEnergy;
     unsigned MichelNHit;
     float MichelHitEnergy;
+    float MichelHitTIDEEnergy;
+    float MichelHitEveTIDEEnergy;
+    float MichelHitSimIDEEnergy;
+    float MichelSphereRadius;
     float SharedEnergy;
     std::vector<float> MichelSphereTrueEnergy;
     std::vector<float> MichelSphereEnergy; 
@@ -172,6 +176,9 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
     tMuon->Branch("MichelNHit", &MichelNHit);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
+    tMuon->Branch("MichelHitTIDEEnergy", &MichelHitTIDEEnergy);
+    tMuon->Branch("MichelHitEveTIDEEnergy", &MichelHitEveTIDEEnergy);
+    tMuon->Branch("MichelHitSimIDEEnergy", &MichelHitSimIDEEnergy);
     tMuon->Branch("SharedEnergy", &SharedEnergy);
     tMuon->Branch("MichelSphereTrueEnergy", &MichelSphereTrueEnergy);
     tMuon->Branch("MichelSphereEnergy", &MichelSphereEnergy);
@@ -245,6 +252,9 @@ void ana::Truechecks::analyze(art::Event const& e)
         MichelTrueEnergy = -1.F;
         MichelNHit = 0;
         MichelHitEnergy = -1.F;
+        MichelHitTIDEEnergy = -1.F;
+        MichelHitEveTIDEEnergy = -1.F;
+        MichelHitSimIDEEnergy = -1.F;
         SharedEnergy = -1.F;
         MichelSphereTrueEnergy.clear();
         MichelSphereEnergy.clear();
@@ -283,6 +293,16 @@ void ana::Truechecks::analyze(art::Event const& e)
             }
             MichelNHit++;
             MichelHitEnergy += p_hit->Integral();
+
+            for (sim::TrackIDE const& ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
+                if (ide.trackID == mcp_michel->TrackId())
+                    MichelHitTIDEEnergy += ide.energy; // MeV
+            for (sim::TrackIDE const& ide : bt_serv->HitToEveTrackIDEs(clockData, p_hit))
+                if (ide.trackID == mcp_michel->TrackId())
+                    MichelHitEveTIDEEnergy += ide.energy; // MeV
+            for (sim::IDE const& ide : bt_serv->HitToAvgSimIDEs(clockData, p_hit))
+                if (ide.trackID == mcp_michel->TrackId())
+                    MichelHitSimIDEEnergy += ide.energy; // MeV
         }
         SharedEnergy *= fADC2MeV;
         MichelHitEnergy *= fADC2MeV;
@@ -291,84 +311,78 @@ void ana::Truechecks::analyze(art::Event const& e)
         float Ot = mcp_end->PeakTime() * fTick2cm;
 
         std::vector<float> radii = { 10, 20, 30, 40, 50 };
-        // std::vector<float> sphere_true_e(radii.size(), 0.F);
-        // std::vector<float> sphere_e(radii.size(), 0.F);
-        for (unsigned i=0; i<radii.size(); i++) {
-            float r2 = pow(radii[i], 2);
-            
-            // float r2 = fMichelRadius * fMichelRadius;
+        float r2_max = pow(radii.back(), 2);
 
-            // HitPtrVec sphere_true_hits;
-            float sphere_true_e = 0.F;
-            for (HitPtr const& p_hit : vp_michel_hit) {
-                // collection hits
-                if (p_hit->View() != geo::kW) continue;
+        MichelSphereEnergy.resize(radii.size(), 0.F);
+        MichelSphereTrueEnergy.resize(radii.size(), 0.F);
+        
+        for (HitPtr const& p_hit : vp_michel_hit) {
+            // collection hits
+            if (p_hit->View() != geo::kW) continue;
 
-                // same section of the detector
-                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
+            // same section of the detector
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
 
-                float z = GetSpace(p_hit->WireID());
-                float t = p_hit->PeakTime() * fTick2cm;
-                float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
+            float z = GetSpace(p_hit->WireID());
+            float t = p_hit->PeakTime() * fTick2cm;
+            float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
 
-                // at less then r cm from muon's end
-                if (dr2 > r2) continue;
+            // at less then r cm from muon's end
+            if (dr2 > r2_max) continue;
 
-                // not from the mother muon
-                if (std::find_if(
-                    vp_mcp_hit.begin(),
-                    vp_mcp_hit.end(),
-                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-                ) != vp_mcp_hit.end()) continue;
+            // not from the mother muon
+            if (std::find_if(
+                vp_mcp_hit.begin(),
+                vp_mcp_hit.end(),
+                [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+            ) != vp_mcp_hit.end()) continue;
 
-                // sphere_true_hits.push_back(p_hit);
-                sphere_true_e += p_hit->Integral() * fADC2MeV;
-                // sphere_true_e[i] += p_hit->Integral() * fADC2MeV;
+            for (unsigned i=radii.size()-1; i>=0; i--) {
+                float r2 = pow(radii[i], 2);
+                if (dr2 > r2) break;
+                MichelSphereTrueEnergy[i] += p_hit->Integral() * fADC2MeV;
+            }
+        }
+
+        for (HitPtr const& p_hit : vp_hit) {
+            // collection hits
+            if (p_hit->View() != geo::kW) continue;
+
+            // same section of the detector
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
+
+            float z = GetSpace(p_hit->WireID());
+            float t = p_hit->PeakTime() * fTick2cm;
+            float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
+
+            // at less then r cm from muon's end
+            if (dr2 > r2_max) continue;
+
+            // not from the mother muon
+            if (std::find_if(
+                vp_mcp_hit.begin(),
+                vp_mcp_hit.end(),
+                [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+            ) != vp_mcp_hit.end()) continue;
+
+            // not from other muons?
+            std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, p_hit);
+            std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
+                hit_ides.begin(),
+                hit_ides.end(),
+                [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
+            );
+            if (source_ide_it != hit_ides.end()) {
+                simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
+                if (source_mcp && abs(source_mcp->PdgCode()) == 13)
+                    continue;
             }
 
-            // HitPtrVec sphere_hits;
-            float sphere_e = 0.F;
-            for (HitPtr const& p_hit : vp_hit) {
-                // collection hits
-                if (p_hit->View() != geo::kW) continue;
-
-                // same section of the detector
-                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][mcp_end->WireID().TPC]) continue;
-
-                float z = GetSpace(p_hit->WireID());
-                float t = p_hit->PeakTime() * fTick2cm;
-                float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
-
-                // at less then r cm from muon's end
-                if (dr2 > r2) continue;
-
-                // not from the mother muon
-                if (std::find_if(
-                    vp_mcp_hit.begin(),
-                    vp_mcp_hit.end(),
-                    [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-                ) != vp_mcp_hit.end()) continue;
-
-                // not from other muons?
-                std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, *p_hit);
-                std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
-                    hit_ides.begin(),
-                    hit_ides.end(),
-                    [](sim::TrackIDE const& a, sim::TrackIDE const& b) { return a.energy < b.energy; }
-                );
-                if (source_ide_it != hit_ides.end()) {
-                    simb::MCParticle const* source_mcp = pi_serv->TrackIdToParticle_P(source_ide_it->trackID);
-                    if (source_mcp && abs(source_mcp->PdgCode()) == 13)
-                        continue;
-                }
-                
-                // sphere_hits.push_back(p_hit);
-                sphere_e += p_hit->Integral() * fADC2MeV;
-                // sphere_e[i] += p_hit->Integral() * fADC2MeV;
+            for (unsigned i=radii.size()-1; i>=0; i--) {
+                float r2 = pow(radii[i], 2);
+                if (dr2 > r2) break;
+                MichelSphereEnergy[i] += p_hit->Integral() * fADC2MeV;
             }
-
-            MichelSphereEnergy.push_back(sphere_e);
-            MichelSphereTrueEnergy.push_back(sphere_true_e);
         }
 
         tMuon->Fill();
