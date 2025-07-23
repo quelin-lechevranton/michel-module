@@ -76,7 +76,6 @@ private:
     float MichelHitTIDEEnergy;
     float MichelHitEveTIDEEnergy;
     float MichelHitSimIDEEnergy;
-    float MichelSphereRadius;
     float SharedEnergy;
     std::vector<float> MichelSphereTrueEnergy;
     std::vector<float> MichelSphereEnergy; 
@@ -265,6 +264,10 @@ void ana::Truechecks::analyze(art::Event const& e)
         }
 
         MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3; // MeV
+        MichelHitEnergy = 0.F;
+        MichelHitTIDEEnergy = 0.F;
+        MichelHitEveTIDEEnergy = 0.F;
+        MichelHitSimIDEEnergy = 0.F;
 
         HitPtrVec vp_michel_hit = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
 
@@ -313,8 +316,8 @@ void ana::Truechecks::analyze(art::Event const& e)
         std::vector<float> radii = { 10, 20, 30, 40, 50 };
         float r2_max = pow(radii.back(), 2);
 
-        MichelSphereEnergy.resize(radii.size(), 0.F);
         MichelSphereTrueEnergy.resize(radii.size(), 0.F);
+        MichelSphereEnergy.resize(radii.size(), 0.F);
         
         for (HitPtr const& p_hit : vp_michel_hit) {
             // collection hits
@@ -337,7 +340,7 @@ void ana::Truechecks::analyze(art::Event const& e)
                 [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
             ) != vp_mcp_hit.end()) continue;
 
-            for (unsigned i=radii.size()-1; i>=0; i--) {
+            for (int i=radii.size()-1; i>=0; i--) {
                 float r2 = pow(radii[i], 2);
                 if (dr2 > r2) break;
                 MichelSphereTrueEnergy[i] += p_hit->Integral() * fADC2MeV;
@@ -378,7 +381,7 @@ void ana::Truechecks::analyze(art::Event const& e)
                     continue;
             }
 
-            for (unsigned i=radii.size()-1; i>=0; i--) {
+            for (int i=radii.size()-1; i>=0; i--) {
                 float r2 = pow(radii[i], 2);
                 if (dr2 > r2) break;
                 MichelSphereEnergy[i] += p_hit->Integral() * fADC2MeV;
