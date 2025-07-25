@@ -270,6 +270,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         // SharedEnergy = -1.F;
         // MichelSphereTrueEnergy.clear();
         // MichelSphereEnergy.clear();
+        NearbyHits.clear();
 
         if (!mcp_michel) {
             tMuon->Fill();
