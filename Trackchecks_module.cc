@@ -1247,6 +1247,7 @@ ana::Hit ana::Trackchecks::GetHit(HitPtr const p_hit) {
     
     return ana::Hit{
         wid.TPC,
+        ana::tpc2sec[geoDet][wid.TPC],
         float(GetSpace(wid)),
         p_hit->Channel(),
         p_hit->PeakTime(),

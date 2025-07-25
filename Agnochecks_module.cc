@@ -39,8 +39,8 @@ private:
     const detinfo::DetectorClocksService* asDetClocks;
     geo::BoxBoundedGeo geoHighX, geoLowX;
 
-    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     int geoDet;
     enum EnumDet { kPDVD, kPDHD };
@@ -119,7 +119,7 @@ private:
     // ana::Hit MuonEndUHit, MuonEndVHit;
     ana::Hit MuonTrueEndHit;
     bool MuonEndIsInWindowT, MuonEndIsInVolumeYZ;
-    bool MuonEndHasGood3DAssociation;
+    // bool MuonEndHasGood3DAssociation;
 
     ana::Hits NearbyHits;
     std::vector<std::string> NearbyHitGenerator;
@@ -313,7 +313,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     tMuon->Branch("TrackIsNotBroken", &MuonTrackIsNotBroken);
     tMuon->Branch("EndIsInWindowT", &MuonEndIsInWindowT);
     tMuon->Branch("EndIsInVolumeYZ", &MuonEndIsInVolumeYZ);
-    tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
+    // tMuon->Branch("EndHasGood3DAssociation", &MuonEndHasGood3DAssociation);
 
     MuonHits.SetBranches(tMuon);
     // MuonUHits.SetBranches(tMuon, "U");
@@ -1005,6 +1005,7 @@ ana::Hit ana::Agnochecks::GetHit(HitPtr const p_hit) {
     
     return ana::Hit{
         wid.TPC,
+        ana::tpc2sec[geoDet][wid.TPC],
         float(GetSpace(wid)),
         p_hit->Channel(),
         p_hit->PeakTime(),

@@ -120,13 +120,14 @@ namespace ana {
 
     struct Hit {
         unsigned tpc;
+        int section;
         float space;
         unsigned channel;
         float tick;
         float adc;
-        Hit() : tpc(0), space(0), channel(0), tick(0), adc(0) {}
-        Hit(unsigned T, float s, unsigned c, float t, float a) :
-            tpc(T), space(s), channel(c), tick(t), adc(a) {}
+        Hit() : tpc(0), section(0), space(0), channel(0), tick(0), adc(0) {}
+        Hit(unsigned T, int S, float s, unsigned c, float t, float a) :
+            tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
 
         // unsigned slice() { return 2*(tpc/4) + tpc%2; }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
@@ -134,6 +135,7 @@ namespace ana {
         }
         void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sHitTPC", pre), &tpc);
+            t->Branch(Form("%sHitSection", pre), &section);
             t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
@@ -143,14 +145,16 @@ namespace ana {
     struct Hits {
         unsigned N;
         std::vector<unsigned> tpc;
+        std::vector<int> section;
         std::vector<float> space;
         std::vector<unsigned> channel;
         std::vector<float> tick;
         std::vector<float> adc;
-        Hits() : N(0), tpc(), space(), channel(), tick(), adc() {}
+        Hits() : N(0), tpc(), section(), space(), channel(), tick(), adc() {}
         void push_back(Hit const& hit) {
             N++;
             tpc.push_back(hit.tpc);
+            section.push_back(hit.section);
             space.push_back(hit.space);
             channel.push_back(hit.channel);
             tick.push_back(hit.tick);
@@ -159,6 +163,7 @@ namespace ana {
         void clear() {
             N = 0;
             tpc.clear();
+            section.clear();
             space.clear();
             channel.clear();
             tick.clear();
@@ -175,13 +180,14 @@ namespace ana {
         void SetBranches(TTree *t, const char* pre="") {
             t->Branch(Form("%sNHit", pre), &N);
             t->Branch(Form("%sHitTPC", pre), &tpc);
+            t->Branch(Form("%sHitSection", pre), &section);
             t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
             t->Branch(Form("%sHitADC", pre), &adc);
         }
 
-        Hit at(unsigned i) const { return Hit{tpc[i], space[i], channel[i], tick[i], adc[i]}; }
+        Hit at(unsigned i) const { return Hit{tpc[i], section[i], space[i], channel[i], tick[i], adc[i]}; }
         struct iterator {
             const Hits* hits;
             unsigned i;
