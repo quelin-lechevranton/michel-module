@@ -386,12 +386,12 @@ void ana::Truechecks::analyze(art::Event const& e)
             // collection hits
             if (p_hit->View() != geo::kW) continue;
 
-            // same section of the detector
-            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != EndHit.section) continue;
+            ana::Hit hit = GetHit(p_hit);
 
-            float z = GetSpace(p_hit->WireID());
-            float t = p_hit->PeakTime() * fTick2cm;
-            float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
+            // same section of the detector
+            if (hit.section != EndHit.section) continue;
+
+            float dr2 = pow(hit.space-EndHit.space, 2) + pow((hit.tick-EndHit.tick) * fTick2cm, 2);
 
             // at less then r cm from muon's end
             if (dr2 > r2_max) continue;
@@ -416,7 +416,7 @@ void ana::Truechecks::analyze(art::Event const& e)
                     continue;
             }
             
-            NearbyHits.push_back(GetHit(p_hit));
+            NearbyHits.push_back(hit);
 
             // for (int i=radii.size()-1; i>=0; i--) {
             //     float r2 = pow(radii[i], 2);
