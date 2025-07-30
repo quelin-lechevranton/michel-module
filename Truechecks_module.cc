@@ -80,6 +80,7 @@ private:
     int HasMichel;
     ana::Hits Hits;
     ana::Hit EndHit;
+    ana::Point EndPoint;
 
     int RegDirZ;
     double RegM, RegP, RegR2;
@@ -207,6 +208,7 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
 
     Hits.SetBranches(tMuon, "");
     EndHit.SetBranches(tMuon, "End");
+    EndPoint.SetBranches(tMuon, "End");
 
     tMuon->Branch("RegDirZ", &RegDirZ);
     tMuon->Branch("RegM", &RegM);
@@ -328,6 +330,8 @@ void ana::Truechecks::analyze(art::Event const& e)
         RegR2 = side_reg[side_pair.second].r2();
 
         EndHit = GetHit(vp_mcp_sorted_hit.back());
+
+        EndPoint = ana::Point(mcp.EndPosition().Vect());
 
         simb::MCParticle const* mcp_michel = nullptr;
         if (mcp.NumberDaughters() >= 3) {
@@ -591,27 +595,12 @@ HitPtrVec ana::Truechecks::GetSortedHits(
     geo::View_t view
 ) {
     unsigned const static nmin = ana::LinearRegression::nmin;
-    std::vector<std::map<unsigned, int>> static tpc2side = {
-        { // PDVD
-            { 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 },
-            { 4, 0 }, { 5, 0 }, { 6, 0 }, { 7, 0 },
-            { 8, 1 }, { 9, 1 }, {10, 1 }, {11, 1 },
-            {12, 1 }, {13, 1 }, {14, 1 }, {15, 1 }
-        },
-        { // PDHD
-            { 0, -1 }, { 1, 0 }, { 2, 1 }, { 3, -1 },
-            { 4, -1 }, { 5, 0 }, { 6, 1 }, { 7, -1 }
-        }
-    };
-    std::map<int, int> static side2dirx = {
-        { 0, -1 }, { 1, 1 }
-    };
 
     std::vector<ana::LinearRegression> side_reg(2);
     std::vector<HitPtrVec> side_hit(2);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
-        int side = tpc2side[geoDet][p_hit->WireID().TPC];
+        int side = ana::tpc2side[geoDet][p_hit->WireID().TPC];
         if (side == -1) continue; // skip hits on the other side of the anodes
         double z = GetSpace(p_hit->WireID());
         double t = p_hit->PeakTime() * fTick2cm;
