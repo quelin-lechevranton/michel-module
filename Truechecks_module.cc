@@ -62,6 +62,7 @@ private:
 
     // Input
     float fMichelRadius;
+    bool fKeepTransportation;
 
     // Output
     unsigned evRun, evSubRun, evEvent;
@@ -124,7 +125,8 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fADC2el(p.get<float>("ADC2el", 0.F)), // e-/ADC.tick
-    fMichelRadius(p.get<float>("MichelRadius", 20.F))
+    fMichelRadius(p.get<float>("MichelRadius", 20.F)),
+    fKeepTransportation(p.get<bool>("KeepTransportation", true))
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>();
     asWire = &art::ServiceHandle<geo::WireReadout>()->Get();
@@ -263,6 +265,8 @@ void ana::Truechecks::analyze(art::Event const& e)
         IsAnti = mcp.PdgCode() < 0;
         EndProcess = mcp.EndProcess();
 
+        if (!fKeepTransportation && EndProcess == "Transportation") continue;
+
         HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
         if (vp_mcp_hit.empty()) continue;
 
@@ -312,22 +316,33 @@ void ana::Truechecks::analyze(art::Event const& e)
             );
         }
         HitPtrVec vp_mcp_sorted_hit;
-        std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * RegDirZ > 0
-            ? std::make_pair(0, 1)
-            : std::make_pair(1, 0);
+        if (side_reg[0].n < ana::LinearRegression::nmin) {
+            vp_mcp_sorted_hit = side_hit[1];
+            RegM = side_reg[1].m();
+            RegP = side_reg[1].p();
+            RegR2 = side_reg[1].r2();
+        } else if (side_reg[1].n < ana::LinearRegression::nmin) {
+            vp_mcp_sorted_hit = side_hit[0];
+            RegM = side_reg[0].m();
+            RegP = side_reg[0].p();
+            RegR2 = side_reg[0].r2();
+        } else {
+            std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * RegDirZ > 0
+                ? std::make_pair(0, 1)
+                : std::make_pair(1, 0);
 
-        vp_mcp_sorted_hit.insert(
-            vp_mcp_sorted_hit.end(),
-            side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
-        );
-        vp_mcp_sorted_hit.insert(
-            vp_mcp_sorted_hit.end(),
-            side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
-        );
-
-        RegM = side_reg[side_pair.second].m();
-        RegP = side_reg[side_pair.second].p();
-        RegR2 = side_reg[side_pair.second].r2();
+            vp_mcp_sorted_hit.insert(
+                vp_mcp_sorted_hit.end(),
+                side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
+            );
+            vp_mcp_sorted_hit.insert(
+                vp_mcp_sorted_hit.end(),
+                side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
+            );
+            RegM = side_reg[side_pair.second].m();
+            RegP = side_reg[side_pair.second].p();
+            RegR2 = side_reg[side_pair.second].r2();
+        }
 
         EndHit = GetHit(vp_mcp_sorted_hit.back());
 
@@ -376,6 +391,8 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         if (!mcp_michel) {
             tMuon->Fill();
+            iMuon++;
+            EventNMuon++;
             continue;
         }
 
