@@ -39,6 +39,7 @@ physics: {
 
             ADC2el: 1000
             MichelRadius: 20.
+            KeepTransportation: false
         }
     }
     ana: [ checks ]

@@ -133,6 +133,8 @@ namespace ana {
         }
     };
 
+    // class Hit: public recob::Hit {};
+
     struct Hit {
         unsigned tpc;
         int section;

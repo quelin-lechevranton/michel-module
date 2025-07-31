@@ -80,6 +80,7 @@ private:
     std::string EndProcess;
     int HasMichel;
     ana::Hits Hits;
+    std::vector<float> HitProjection;
     ana::Hit EndHit;
     ana::Point EndPoint;
 
@@ -209,6 +210,7 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     tMuon->Branch("HasMichel", &HasMichel);
 
     Hits.SetBranches(tMuon, "");
+    tMuon->Branch("HitProjection", &HitProjection);
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
 
@@ -270,16 +272,10 @@ void ana::Truechecks::analyze(art::Event const& e)
         HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
         if (vp_mcp_hit.empty()) continue;
 
-        Hits.clear();
-        for (HitPtr const& p_hit : vp_mcp_hit) {
-            if (p_hit->View() != geo::kW) continue;
-            Hits.push_back(GetHit(p_hit));
-        }
-
         // HitPtrVec vp_mcp_sorted_hit = GetSortedHits(vp_mcp_hit, (mcp.EndZ() > mcp.Vz() ? 1 : -1));
         // if (vp_mcp_sorted_hit.empty()) continue;
 
-        int RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
+        RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
         std::vector<ana::LinearRegression> side_reg(2);
         std::vector<HitPtrVec> side_hit(2);
         for (HitPtr const& p_hit : vp_mcp_hit) {
@@ -291,7 +287,7 @@ void ana::Truechecks::analyze(art::Event const& e)
             side_reg[side].add(z, t);
             side_hit[side].push_back(p_hit);
         }
-        if (side_reg[0].n < ana::LinearRegression::nmin && side_reg[1].n < ana::LinearRegression::nmin) continue;
+        if (side_reg[0].n < ana::LinearRegression::nmin || side_reg[1].n < ana::LinearRegression::nmin) continue;
         for (ana::LinearRegression& reg : side_reg)
             if (reg.n >= ana::LinearRegression::nmin)
                 reg.normalize();
@@ -316,35 +312,33 @@ void ana::Truechecks::analyze(art::Event const& e)
             );
         }
         HitPtrVec vp_mcp_sorted_hit;
-        if (side_reg[0].n < ana::LinearRegression::nmin) {
-            vp_mcp_sorted_hit = side_hit[1];
-            RegM = side_reg[1].m();
-            RegP = side_reg[1].p();
-            RegR2 = side_reg[1].r2();
-        } else if (side_reg[1].n < ana::LinearRegression::nmin) {
-            vp_mcp_sorted_hit = side_hit[0];
-            RegM = side_reg[0].m();
-            RegP = side_reg[0].p();
-            RegR2 = side_reg[0].r2();
-        } else {
-            std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * RegDirZ > 0
-                ? std::make_pair(0, 1)
-                : std::make_pair(1, 0);
-
-            vp_mcp_sorted_hit.insert(
-                vp_mcp_sorted_hit.end(),
-                side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
-            );
-            vp_mcp_sorted_hit.insert(
-                vp_mcp_sorted_hit.end(),
-                side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
-            );
-            RegM = side_reg[side_pair.second].m();
-            RegP = side_reg[side_pair.second].p();
-            RegR2 = side_reg[side_pair.second].r2();
-        }
+        std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * RegDirZ > 0
+            ? std::make_pair(0, 1) : std::make_pair(1, 0);
+        vp_mcp_sorted_hit.insert(
+            vp_mcp_sorted_hit.end(),
+            side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
+        );
+        vp_mcp_sorted_hit.insert(
+            vp_mcp_sorted_hit.end(),
+            side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
+        );
+        RegM = side_reg[side_pair.second].m();
+        RegP = side_reg[side_pair.second].p();
+        RegR2 = side_reg[side_pair.second].r2();
 
         EndHit = GetHit(vp_mcp_sorted_hit.back());
+
+        Hits.clear();
+        HitProjection.clear();
+        for (HitPtr const& p_hit : vp_mcp_sorted_hit) {
+            ana::Hit hit = GetHit(p_hit);
+            Hits.push_back(hit);
+            HitProjection.push_back(
+                side_reg[ana::tpc2side[geoDet][hit.tpc]].projection(
+                    hit.space, hit.tick * fTick2cm
+                )
+            );
+        }
 
         EndPoint = ana::Point(mcp.EndPosition().Vect());
 
