@@ -306,7 +306,7 @@ void ana::Truechecks::analyze(art::Event const& e)
                         GetSpace(h2->WireID()),
                         h2->PeakTime() * fTick2cm
                     );
-                    return (s2 - s1) * RegDirZ > 0;
+                    return (s2 - s1) * RegDirZ * reg.m() > 0;
                     // return s2 > s1;
                 }
             );
