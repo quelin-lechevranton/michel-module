@@ -733,16 +733,16 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
             TF1* f = new TF1();
             if (geoDet == kPDVD) {
-                double xmin = reg.m() > 1 ? reg.mz - 10 : reg.m() * (reg.mt - 10) + reg.p();
-                double xmax = reg.m() > 1 ? reg.mz + 10 : reg.m() * (reg.mt + 10) + reg.p();
+                double xmin = reg.m() > 1 ? reg.mx - 10 : reg.m() * (reg.my - 10) + reg.p();
+                double xmax = reg.m() > 1 ? reg.mx + 10 : reg.m() * (reg.my + 10) + reg.p();
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "(x - [1]) / [0]",
                     xmin, xmax
                 );
             } else if (geoDet == kPDHD) {
-                double xmin = reg.m() > 1 ? (reg.mz - 10 - reg.p()) / reg.m() : reg.mt - 10;
-                double xmax = reg.m() > 1 ? (reg.mz + 10 - reg.p()) / reg.m() : reg.mt + 10;
+                double xmin = reg.m() > 1 ? (reg.mx - 10 - reg.p()) / reg.m() : reg.my - 10;
+                double xmax = reg.m() > 1 ? (reg.mx + 10 - reg.p()) / reg.m() : reg.my + 10;
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "[0]*x + [1]",

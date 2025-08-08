@@ -486,9 +486,9 @@ bool ana::Tagchecks::IsUpright(recob::Track const& T) {
 HitPtrVec ana::Tagchecks::GetSortedHits(
     HitPtrVec const& vp_hit,
     int dirz,
-    HitPtrPair *pp_cathode_crossing = nullptr,
-    HitPtrVec *vp_tpc_crossing = nullptr,
-    std::vector<ana::LinearRegression> *p_side_reg = nullptr,
+    HitPtrPair *pp_cathode_crossing,
+    HitPtrVec *vp_tpc_crossing,
+    std::vector<ana::LinearRegression> *p_side_reg,
     geo::View_t view = geo::kW
 ) {
     std::vector<ana::LinearRegression> side_reg(2);
@@ -549,7 +549,7 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
     if (vp_tpc_crossing) {
         vp_tpc_crossing->clear();
         HitPtr& prev_hit = side_hit[side_pair.first].front();
-        int prev_tpc = prev_hit->WireID().TPC;
+        unsigned prev_tpc = prev_hit->WireID().TPC;
         for (HitPtr const& p_hit : side_hit[side_pair.first]) {
             vp_sorted_hit.push_back(p_hit);
             if (p_hit->WireID().TPC != prev_tpc) {
