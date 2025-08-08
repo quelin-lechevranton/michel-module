@@ -287,6 +287,9 @@ void ana::Truechecks::analyze(art::Event const& e)
             side_reg[side].add(z, t);
             side_hit[side].push_back(p_hit);
         }
+
+
+        // CATHODE CROSSING ???
         if (side_reg[0].n < ana::LinearRegression::nmin || side_reg[1].n < ana::LinearRegression::nmin) continue;
         for (ana::LinearRegression& reg : side_reg)
             if (reg.n >= ana::LinearRegression::nmin)
@@ -306,13 +309,13 @@ void ana::Truechecks::analyze(art::Event const& e)
                         GetSpace(h2->WireID()),
                         h2->PeakTime() * fTick2cm
                     );
-                    return (s2 - s1) * RegDirZ * reg.m() > 0;
+                    return (s2 - s1) * RegDirZ > 0;
                     // return s2 > s1;
                 }
             );
         }
         HitPtrVec vp_mcp_sorted_hit;
-        std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * RegDirZ > 0
+        std::pair<unsigned, unsigned> side_pair = (side_reg[1].mx - side_reg[0].mx) * RegDirZ > 0
             ? std::make_pair(0, 1) : std::make_pair(1, 0);
         vp_mcp_sorted_hit.insert(
             vp_mcp_sorted_hit.end(),

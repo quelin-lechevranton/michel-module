@@ -94,21 +94,21 @@ namespace ana {
     struct LinearRegression {
         static constexpr unsigned nmin = 4;
         unsigned n=0;
-        double mz=0, mt=0, mz2=0, mt2=0, mzt=0;
-        void add(double z, double t) {
-            mz+=z; mt+=t; mz2+=z*z; mt2+=t*t; mzt+=z*t; n++;
+        double mx=0, my=0, mx2=0, my2=0, mxy=0;
+        void add(double x, double y) {
+            mx+=x; my+=y; mx2+=x*x; my2+=y*y; mxy+=x*y; n++;
         }
         void normalize() {
-            mz/=n; mt/=n; mz2/=n; mt2/=n; mzt/=n;
+            mx/=n; my/=n; mx2/=n; my2/=n; mxy/=n;
         }
-        double cov() const { return mzt - mz*mt; }
-        double varz() const { return mz2 - mz*mz; }
-        double vart() const { return mt2 - mt*mt; }
-        double m() const { return n<nmin ? 0 : cov()/vart(); }
-        double p() const { return mz - m()*mt; }
-        double r2() const { return n<nmin ? 0 : cov()*cov() / (varz()*vart()); }
-        double projection(double z, double t) const {
-            return (t + m()*(z-p())) / (1 + m()*m());
+        double varx() const { return mx2 - mx*mx; }
+        double vary() const { return my2 - my*my; }
+        double cov() const { return mxy - my*mx; }
+        double m() const { return n<nmin ? 0 : cov()/varx(); }
+        double p() const { return my - m()*mx; }
+        double r2() const { return n<nmin ? 0 : cov()*cov() / (varx()*vary()); }
+        double projection(double x, double y) const {
+            return (x + m()*(y-p())) / (1 + m()*m());
         }
     };
 
