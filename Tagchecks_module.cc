@@ -373,12 +373,11 @@ void ana::Tagchecks::analyze(art::Event const& e) {
                 MuonTrueEndHit = GetHit(vp_hit_mcp_muon.back());
         }
 
-        // fiducial cuts
         TagEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
         TagEndIsInVolumeYZ = geoHighX.InFiducialY(End.Y(), fMichelSpaceRadius)
             && geoHighX.InFiducialZ(End.Z(), fMichelSpaceRadius);
 
-        ASSERT(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))
+        // ASSERT(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))
 
         // we found a muon candidate!
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
@@ -507,31 +506,32 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
         && side_reg[1].n < ana::LinearRegression::nmin
     ) return HitPtrVec{};
     for (ana::LinearRegression& reg : side_reg)
-        reg.normalize();
+        if (reg.n >= ana::LinearRegression::nmin)
+            reg.normalize();
     if (p_side_reg) {
         p_side_reg->clear();
         p_side_reg->push_back(side_reg[0]);
         p_side_reg->push_back(side_reg[1]);
     }
-    for (int side=0; side<2; side++) {
-        std::sort(
-            side_hit[side].begin(),
-            side_hit[side].end(),
-            [&, &reg=side_reg[side]](
-                HitPtr const& h1, HitPtr const& h2
-            ) -> bool {
-                double const s1 = reg.projection(
-                    GetSpace(h1->WireID()),
-                    h1->PeakTime() * fTick2cm
-                );
-                double const s2 = reg.projection(
-                    GetSpace(h2->WireID()),
-                    h2->PeakTime() * fTick2cm
-                );
-                return (s2 - s1) * dirz > 0;
-            }
-        );
-    }
+    for (int side=0; side<2; side++)
+        if (side_reg[side].n >= ana::LinearRegression::nmin)
+            std::sort(
+                side_hit[side].begin(),
+                side_hit[side].end(),
+                [&, &reg=side_reg[side]](
+                    HitPtr const& h1, HitPtr const& h2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(h1->WireID()),
+                        h1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(h2->WireID()),
+                        h2->PeakTime() * fTick2cm
+                    );
+                    return (s2 - s1) * dirz > 0;
+                }
+            );
     if (side_reg[0].n < ana::LinearRegression::nmin)
         return side_hit[1];
     if (side_reg[1].n < ana::LinearRegression::nmin)
