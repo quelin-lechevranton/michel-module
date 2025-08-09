@@ -319,7 +319,7 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
 
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
-        if (vp_hit_muon.size() < 2*ana::LinearRegression::nmin) continue;
+        ASSERT(vp_hit_muon.size() >= 2*ana::LinearRegression::nmin)
 
         CutTrackLength = p_trk->Length();
         TagCathodeCrossing = (
@@ -343,7 +343,7 @@ void ana::Tagchecks::analyze(art::Event const& e) {
             );
 
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
-        if (!mcp) continue;
+        ASSERT(mcp)
 
         TrueTagPdg = mcp->PdgCode();
         TrueTagEndProcess = mcp->EndProcess();
@@ -378,7 +378,7 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         TagEndIsInVolumeYZ = geoHighX.InFiducialY(End.Y(), fMichelSpaceRadius)
             && geoHighX.InFiducialZ(End.Z(), fMichelSpaceRadius);
 
-        if (!LOG(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))) continue;
+        ASSERT(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))
 
         // we found a muon candidate!
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
@@ -489,7 +489,7 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
     HitPtrPair *pp_cathode_crossing,
     HitPtrVec *vp_tpc_crossing,
     std::vector<ana::LinearRegression> *p_side_reg,
-    geo::View_t view = geo::kW
+    geo::View_t view
 ) {
     std::vector<ana::LinearRegression> side_reg(2);
     std::vector<HitPtrVec> side_hit(2);
