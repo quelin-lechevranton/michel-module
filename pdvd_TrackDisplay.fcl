@@ -1,0 +1,48 @@
+#include "services_dune.fcl"
+#include "services_protodunevd.fcl" 
+#include "tools_dune.fcl"	
+
+process_name: RunTrackDisplay
+
+services: {
+    TFileService: { fileName: "pdvd_TrackDisplay.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::protodunevd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::protodunevd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "TrackDisplay"
+            Products:       [
+                ["SingleGen",  "generator",     "",       "simb::MCTruth"],
+                ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
+                ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
+                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
+                ["Reco",       "hitpdune",      "",       "recob::Hit"],
+                ["Reco",       "pandora",       "",       "recob::Cluster"],
+                ["Reco",       "pandoraTrack",  "",       "recob::Track"],
+                ["Reco",       "pandoraShower", "",       "recob::Shower"],
+                ["Reco",       "pandora",       "",       "recob::SpacePoint"],
+                ["Reco",       "pandora",       "",       "recob::PFParticle"]
+            ]
+
+            Log: false
+            TrackLengthCut: 40.
+            Sort: true
+            MichelSpaceRadius: 20.
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}

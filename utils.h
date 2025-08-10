@@ -33,7 +33,7 @@
 #include <ranges>
 
 #define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
-#define ASSERT(x)  if (!(fLog ? printf("\t" #x ": " "\033[1;91m" "%s" "\033[0m\n", x?"true":"false") : 0, x)) continue; 
+#define ASSERT(x)  if (!(fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };

@@ -1,29 +1,49 @@
 ////////////////////////////////////////////////////////////////////////
-// Class:       Tagchecks
+// Class:       TrackDisplay
 // Plugin Type: analyzer (Unknown Unknown)
-// File:        Agnochecks_module.cc
+// File:        TrackDisplay_module.cc
 //
 // Generated at Fri Feb 21 03:35:05 2025 by Jeremy Quelin Lechevranton using cetskelgen
 // from cetlib version 3.18.02.
 ////////////////////////////////////////////////////////////////////////
 
-#include "utils.h"
-
-namespace ana {
-    class Tagchecks;
-}
+#include "event_display.h"
 
 using HitPtr = art::Ptr<recob::Hit>;
 using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
 using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
-class ana::Tagchecks : public art::EDAnalyzer {
+namespace ana {
+    class TrackDisplay;
+    struct MarkerStyle {
+        Color_t c = kBlack;
+        Style_t m = kFullCircle;
+        Size_t s = 1.;
+    };
+    struct LineStyle {
+        Color_t c = kBlack;
+        Style_t l = kSolid;
+        Width_t w = 1;
+    };
+    void inline setMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
+        m->SetMarkerColor(ms.c);
+        m->SetMarkerStyle(ms.m);
+        m->SetMarkerSize(ms.s);
+    };
+    void inline setLineStyle(TAttLine* l, LineStyle const& ls) {
+        l->SetLineColor(ls.c);
+        l->SetLineStyle(ls.l);
+        l->SetLineWidth(ls.w);
+    };
+}
+
+class ana::TrackDisplay : public art::EDAnalyzer {
 public:
-    explicit Tagchecks(fhicl::ParameterSet const& p);
-    Tagchecks(Tagchecks const&) = delete;
-    Tagchecks(Tagchecks&&) = delete;
-    Tagchecks& operator=(Tagchecks const&) = delete;
-    Tagchecks& operator=(Tagchecks&&) = delete;
+    explicit TrackDisplay(fhicl::ParameterSet const& p);
+    TrackDisplay(TrackDisplay const&) = delete;
+    TrackDisplay(TrackDisplay&&) = delete;
+    TrackDisplay& operator=(TrackDisplay const&) = delete;
+    TrackDisplay& operator=(TrackDisplay&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -32,84 +52,59 @@ private:
 
     // Utilities
     art::ServiceHandle<art::TFileService> asFile;
-    art::ServiceHandle<cheat::ParticleInventoryService> asPartInv;
-    art::ServiceHandle<cheat::BackTrackerService> asBackTrack;
 
     const geo::GeometryCore* asGeo;
     const geo::WireReadoutGeom* asWire;
     const detinfo::DetectorPropertiesService* asDetProp;
     const detinfo::DetectorClocksService* asDetClocks;
+    geo::BoxBoundedGeo geoHighX, geoLowX;
 
-    int geoDet;
+    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+
     enum EnumDet { kPDVD, kPDHD };
+    EnumDet geoDet;
 
     // Detector Properties
-    float fADC2MeV;
+    // float fADC2MeV;
     float fTick2cm; // cm/tick
     float fSamplingRate; // µs/tick
     float fDriftVelocity; // cm/µs
+    float fChannelPitch; // cm/channel
     float fCathodeGap; // cm
 
-    geo::BoxBoundedGeo geoHighX, geoLowX;
     bounds<float> wireWindow;
+    // bounds3D<float> lower_bounds, upper_bounds;
+    // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
+    // std::map<int,float> map_ch_z;
+
     std::map<geo::PlaneID, ana::axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
     art::InputTag tag_mcp, tag_sed, tag_wir,
-        tag_hit, tag_clu, tag_trk,
-        tag_spt, tag_pfp, tag_r3d;
+        tag_hit, tag_clu, tag_trk, tag_shw,
+        tag_spt, tag_pfp;
 
     // Input Parameters
     bool fLog;
-    bool fKeepOutside;
     float fTrackLengthCut; // in cm
+    bool fSort;
     float fMichelSpaceRadius; // in cm
     float fMichelTickRadius; // in ticks
-    float fCoincidenceWindow; // in ticks
-    float fCoincidenceRadius; // in cm
 
-    // Output Variables
-    unsigned evRun, evSubRun, evEvent;
+    unsigned cn=0;
+    unsigned gn=0;
 
-    TTree* tEvent;
-    bool EventIsReal;
-    unsigned iEvent=0;
-    unsigned EventNMuon;
-    std::vector<unsigned> EventiMuon;
+    Int_t pal = kCividis;
+    MarkerStyle
+        ms_ev = {kGray, kMultiply, 0.5};
 
-    ana::Hits EventHits;
-
-
-    TTree* tMuon;
-    unsigned iMuon=0;
-
-
-    bool TagIsUpright; // Supposition: Muon is downward
-    bool TagCathodeCrossing;
-    bool TagAnodeCrossing;
-    float CutTrackLength;
-    bool TagEndIsInWindowT;
-    bool TagEndIsInVolumeYZ;
-
-    bool TrueTagDownward;
-    int TrueTagPdg;
-    std::string TrueTagEndProcess;
-
-    int TrueTagHasMichel;
-    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside };
-
-    ana::Hits MuonHits;
-    ana::Hit MuonEndHit;
-    ana::Hit MuonTrueEndHit;
-
-    float MichelTrackLength;
-    ana::Hits MichelHits;
-    float MichelTrueEnergy, MichelHitEnergy;
-
-    void resetEvent();
-    void resetMuon();
+    LineStyle
+        ls_pass = {kP10Blue, kSolid, 2},
+        ls_fail = {kP10Red, kSolid, 2},
+        ls_back = {kGray, kSolid, 1};
 
     bool IsUpright(recob::Track const& T);
     double GetSpace(geo::WireID);
@@ -125,28 +120,27 @@ private:
 };
 
 
-ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
+ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log", false)),
-    fKeepOutside(p.get<bool>("KeepOutside", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
-    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)), //in cm
-    fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)), // in ticks
-    fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
+    fSort(p.get<bool>("Sort", false)), 
+    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)) //in cm
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
     asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
     asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
     asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
+
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
 
     for (std::vector<std::string> prod : vvsProducts) {
-        const std::string process  = prod[0],
-                          label    = prod[1],
-                          instance = prod[2],
-                          type     = prod[3];
+        const std::string   process     = prod[0],
+                            label       = prod[1],
+                            instance    = prod[2],
+                            type        = prod[3];
 
         const art::InputTag tag = art::InputTag{label,instance};
 
@@ -156,6 +150,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Wire")             tag_wir = tag;
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
@@ -170,8 +165,10 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         exit(1);
     }
 
-    // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    // fADC2MeV = (geoDet == kPDVD ? 200 : 1000) * 23.6 * 1e-6 / 0.7;
+    fChannelPitch = geo::WireGeo::WirePitch(
+        asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0}),
+        asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1})
+    );
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
@@ -205,9 +202,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
 
     for (unsigned t=0; t<asGeo->NTPC(); t++) {
         for (unsigned p=0; p<asWire->Nplanes(); p++) {
-            unsigned c = 0; // cryostat
-            geo::PlaneID pid{c, t, p};
-            // assume constant wire pitch in one plane
+            geo::PlaneID pid{0, t, p};
             geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
             geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
 
@@ -223,62 +218,50 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         << "  Detector Geometry: " << asGeo->DetectorName()
         << "  (" << (!geoDet ? "PDVD" : "PDHD") << ")" << std::endl
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
+        << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
+        << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
         << "  Tick Window: " << wireWindow << std::endl
         << "  HighX Bounds: " << geoHighX.Min() << " -> " << geoHighX.Max() << std::endl
         << "  LowX Bounds: " << geoLowX.Min() << " -> " << geoLowX.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelSpaceRadius << " cm"
-        << " (" << fMichelTickRadius << " ticks)" << std::endl
-        << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
-
-    tEvent = asFile->make<TTree>("event","");
-
-    tEvent->Branch("eventRun", &evRun);
-    tEvent->Branch("eventSubRun", &evSubRun);
-    tEvent->Branch("eventEvent", &evEvent);
-    tEvent->Branch("isReal", &EventIsReal);
-
-    tEvent->Branch("iEvent", &iEvent);
-    tEvent->Branch("NMuon", &EventNMuon);
-    tEvent->Branch("iMuon", &EventiMuon);
-    EventHits.SetBranches(tEvent);
-
-    tMuon = asFile->make<TTree>("muon","");
-
-    tMuon->Branch("eventRun", &evRun);
-    tMuon->Branch("eventSubRun", &evSubRun);
-    tMuon->Branch("eventEvent", &evEvent);
-
-    tMuon->Branch("iEvent", &iEvent);
-    tMuon->Branch("iMuon", &iMuon);
-    tMuon->Branch("iMuonInEvent", &EventNMuon);
-
-    tMuon->Branch("TagIsUpright", &TagIsUpright);
-    tMuon->Branch("TagCathodeCrossing", &TagCathodeCrossing);
-    tMuon->Branch("TagAnodeCrossing", &TagAnodeCrossing);
-    tMuon->Branch("CutTrackLength", &CutTrackLength);
-    tMuon->Branch("TagEndIsInWindowT", &TagEndIsInWindowT);
-    tMuon->Branch("TagEndIsInVolumeYZ", &TagEndIsInVolumeYZ);
-
-    tMuon->Branch("TrueTagPdg", &TrueTagPdg);
-    tMuon->Branch("TrueTagDownward", &TrueTagDownward);
-    tMuon->Branch("TrueTagEndProcess", &TrueTagEndProcess);
-    tMuon->Branch("TrueTagHasMichel", &TrueTagHasMichel);
-
-    MuonHits.SetBranches(tMuon);
-    MuonEndHit.SetBranches(tMuon, "End");
-    MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
-
-    tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
-    tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
-    tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // MeV
-
-    MichelHits.SetBranches(tMuon, "Michel");
+        << " (" << fMichelTickRadius << " ticks)" << std::endl;
 }
 
-void ana::Tagchecks::analyze(art::Event const& e) {
+void ana::TrackDisplay::beginJob() {
+    TCanvas *c = asFile->make<TCanvas>(
+        "legend", "legend",
+        1300, 800
+    );
+    c->cd();
+
+    float top_margin = 0.1;
+    float indent = 0.05;
+    float title_indent = 0.04;
+    float label_indent = 0.1;
+    float line_height = 0.05;
+    float line_length = 0.03;
+    float ncol = 4;
+    Style_t font = 43;
+    Style_t font_bold = 63;
+    Float_t title_size = 20;
+    Float_t label_size = 16;
+
+    TText* title = new TText();
+    title->SetTextFont(font_bold);
+    title->SetTextSize(title_size);
+    TText* label = new TText();
+    label->SetTextFont(font);
+    label->SetTextSize(label_size);
+
+    title->DrawText(title_indent, 1 - top_margin, "Event Markers");
+
+    c->Write();
+}
+
+void ana::TrackDisplay::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
@@ -295,46 +278,124 @@ void ana::Tagchecks::analyze(art::Event const& e) {
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
-    auto const & vh_pfp = e.getHandle<std::vector<recob::PFParticle>>(tag_pfp);
-    if (!vh_pfp.isValid()) return;
-
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
-    art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
-    art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
+    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    if (!vh_shw.isValid()) return;
+    std::vector<art::Ptr<recob::Shower>> vp_shw;
+    art::fill_ptr_vector(vp_shw, vh_shw);
 
-    resetEvent();
+    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
+    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
-    evRun = e.run();
-    evSubRun = e.subRun();
-    evEvent = e.event();
-    EventIsReal = e.isRealData();
+    auto drawMarker = [&](TCanvas* c, TMarker* m, HitPtr const& p_hit) -> void {
+        if (geoDet == kPDVD) {
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            c->cd(s+1);
+            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+        } else if (geoDet == kPDHD) {
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) return;
+            c->cd(s+1);
+            m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+        }
+    };
 
-    for (HitPtr p_hit : vp_hit)
-        if (p_hit->View() == geo::kW)
-            EventHits.push_back(GetHit(p_hit));
+    auto drawGraph = [&](TCanvas* c, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
+        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            gs[s] = new TGraph();
+            gs[s]->SetEditable(kFALSE);
+            gs[s]->SetName(Form("g%u_s%u", gn++, s));
+            setMarkerStyle(gs[s], ms);
+            setLineStyle(gs[s], ls);
+        }
+        for (HitPtr p_hit : vp_hit) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
+            if (geoDet == kPDVD)
+                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+            else if (geoDet == kPDHD)
+                gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+        }
+        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+            if (!gs[s]->GetN()) continue;
+            c->cd(s+1);
+            gs[s]->Draw(draw);
+        }
+    };
 
-    // loop over tracks to find muons
+    // TCanvas *c = asFile->make<TCanvas>(
+    //     Form("c%u", cn++),
+    //     Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
+    //     1300,800
+    // );
+    // ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
+
+    unsigned nc=4;
+    std::vector<TCanvas*> cs;
+    for (unsigned ic=0; ic<nc; ic++) {
+        TCanvas* c = asFile->make<TCanvas>(
+            Form("c%u_cut%u", cn++, ic),
+            Form("run:%u, subrun:%u, event:%u, cut:%u", e.run(), e.subRun(), e.event(), ic),
+            1300,800
+        );
+        ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
+        drawGraph(c, vp_hit, "p", ms_ev);
+        cs.push_back(c);
+    }
+
+    gStyle->SetPalette(pal);
+
+    unsigned ic=0;
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
-
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         ASSERT(vp_hit_muon.size())
 
-        CutTrackLength = p_trk->Length();
-        TagCathodeCrossing = (
+        bool isUpright =  IsUpright(*p_trk);
+        geo::Point_t Start = isUpright ? p_trk->Start() : p_trk->End();
+        geo::Point_t End = isUpright ? p_trk->End() : p_trk->Start();
+        HitPtrVec vp_hit_muon_sorted = GetSortedHits(
+            vp_hit_muon, 
+            End.Z() > Start.Z() ? 1 : -1
+        );
+        ASSERT(vp_hit_muon_sorted.size())
+
+        // MuonEndHit = GetHit(vp_hit_muon_sorted.back());
+    
+        ic=0;
+        drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_pass);
+
+        ic++;
+        bool TagTrackLength = p_trk->Length() > fTrackLengthCut;
+        if (!TagTrackLength) {
+            drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_fail);
+            for (unsigned jc=ic+1; jc<nc; jc++)
+                drawGraph(cs[jc], vp_hit_muon_sorted, "l", {}, ls_back);
+            continue;
+        }
+        drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_pass);
+
+        ic++;
+        bool TagCathodeCrossing = (
             geoLowX.ContainsPosition(p_trk->Start()) 
             && geoHighX.ContainsPosition(p_trk->End())
         ) || (
             geoHighX.ContainsPosition(p_trk->Start())
             && geoLowX.ContainsPosition(p_trk->End())
         );
+        if (!TagCathodeCrossing) {
+            drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_fail);
+            for (unsigned jc=ic+1; jc<nc; jc++)
+                drawGraph(cs[jc], vp_hit_muon_sorted, "l", {}, ls_back);
+            continue;
+        }
+        drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_pass);
 
-        // Anode crossing: SUPPOSITION: Muon is downward
-        TagIsUpright =  IsUpright(*p_trk);
-        geo::Point_t Start = TagIsUpright ? p_trk->Start() : p_trk->End();
-        geo::Point_t End = TagIsUpright ? p_trk->End() : p_trk->Start();
+        ic++;
+        bool TagAnodeCrossing;
         if (geoDet == kPDVD)
             TagAnodeCrossing = geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8);
         else if (geoDet == kPDHD)
@@ -342,124 +403,34 @@ void ana::Tagchecks::analyze(art::Event const& e) {
                 geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
                 || geoLowX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
             );
-
-        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
-        ASSERT(mcp)
-
-        TrueTagPdg = mcp->PdgCode();
-        TrueTagEndProcess = mcp->EndProcess();
-
-        if (geoDet == kPDVD)
-            TrueTagDownward = mcp->Position(0).X() > mcp->EndPosition().X();
-        else if (geoDet == kPDHD)
-            TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
-
-        resetMuon();
-
-        HitPtrVec vp_hit_muon_sorted = GetSortedHits(
-            vp_hit_muon, 
-            End.Z() > Start.Z() ? 1 : -1
-        );
-        ASSERT(vp_hit_muon_sorted.size())
-        MuonEndHit = GetHit(vp_hit_muon_sorted.back());
-
-        HitPtrVec vp_hit_mcp_muon;
-        MuonTrueEndHit = ana::Hit{};
-        if (mcp) {
-            vp_hit_mcp_muon = ana::mcp2hits(mcp, vp_hit, clockData, false);
-            vp_hit_mcp_muon = GetSortedHits(
-                vp_hit_mcp_muon, 
-                mcp->EndZ() > mcp->Vz() ? 1 : -1
-            );
-            if (vp_hit_mcp_muon.size())
-                MuonTrueEndHit = GetHit(vp_hit_mcp_muon.back());
+        if (!TagAnodeCrossing) {
+            drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_fail);
+            for (unsigned jc=ic+1; jc<nc; jc++)
+                drawGraph(cs[jc], vp_hit_muon_sorted, "l", {}, ls_back);
+            continue;
         }
+        drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_pass);
+    }
 
-        TagEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
-        TagEndIsInVolumeYZ = geoHighX.InFiducialY(End.Y(), fMichelSpaceRadius)
-            && geoHighX.InFiducialZ(End.Z(), fMichelSpaceRadius);
-
-        // ASSERT(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))
-
-        // we found a muon candidate!
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
-
-        EventiMuon.push_back(iMuon);
-
-        // getting all muon hits
-        for (HitPtr const& p_hit_muon : vp_hit_muon_sorted)
-            if (p_hit_muon->View() == geo::kW)
-                MuonHits.push_back(GetHit(p_hit_muon));
-
-        // a decaying muon has nu_mu, nu_e and elec as last daughters
-        simb::MCParticle const* mcp_michel = nullptr;
-        HitPtrVec vp_hit_mcp_michel;
-        if (mcp && mcp->NumberDaughters() >= 3) {
-            bool has_numu = false, has_nue = false;
-            for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
-                simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
-                if (!mcp_dau) continue;
-                switch (abs(mcp_dau->PdgCode())) {
-                    case 14: has_numu = true; break;
-                    case 12: has_nue = true; break;
-                    case 11: mcp_michel = mcp_dau; break;
-                    default: break;
-                }
-            }
-
-            if (mcp_michel and has_numu and has_nue) {
-                TrueTagHasMichel = (
-                    geoHighX.ContainsPosition(mcp_michel->Position().Vect())
-                    || geoLowX.ContainsPosition(mcp_michel->Position().Vect())
-                )   ? kHasMichelInside
-                    : kHasMichelOutside;
-
-                art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
-                MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
-                MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
-
-                vp_hit_mcp_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-                for (HitPtr p_hit_michel : vp_hit_mcp_michel)
-                    if (p_hit_michel->View() == geo::kW)
-                        MichelHits.push_back(GetHit(p_hit_michel));
-                MichelHitEnergy = MichelHits.energy();
-            } else TrueTagHasMichel = kNoMichel;
-        } else {
-            TrueTagHasMichel = -1;
-            MichelTrackLength = -1;
-            MichelHitEnergy = -1;
-        }
-        tMuon->Fill();
-        iMuon++;
-        EventNMuon++;
-    } // end of loop over tracks
-    tEvent->Fill();
-    iEvent++;
+    for (TCanvas* c : cs)
+        c->Write();
 }
 
-void ana::Tagchecks::beginJob() {}
-void ana::Tagchecks::endJob() {}
+void ana::TrackDisplay::endJob() {}
 
-
-void ana::Tagchecks::resetEvent() {
-    EventNMuon = 0;
-    EventiMuon.clear();
-    EventHits.clear();
-}
-void ana::Tagchecks::resetMuon() {
-    MuonHits.clear();
-    MichelTrackLength = 0;
-    MichelTrueEnergy = 0;
-    MichelHits.clear();
-    MichelHitEnergy = 0;
+bool ana::TrackDisplay::IsUpright(recob::Track const& T) {
+    if (geoDet == kPDVD)
+        return T.Start().X() > T.End().X();
+    if (geoDet == kPDHD)
+        return T.Start().Y() > T.End().Y();
+    return false;
 }
 
-
-double ana::Tagchecks::GetSpace(geo::WireID wid) {
+double ana::TrackDisplay::GetSpace(geo::WireID wid) {
     return plane2axis[wid].space(asWire->Wire(wid));
 }
 
-ana::Hit ana::Tagchecks::GetHit(HitPtr const p_hit) {
+ana::Hit ana::TrackDisplay::GetHit(HitPtr const p_hit) {
     geo::WireID wid = p_hit->WireID();
     // if (geoDet == kPDHD)
     //     for (int t : (int[]){0, 4, 3, 7})
@@ -476,15 +447,7 @@ ana::Hit ana::Tagchecks::GetHit(HitPtr const p_hit) {
     };
 }
 
-bool ana::Tagchecks::IsUpright(recob::Track const& T) {
-    if (geoDet == kPDVD)
-        return T.Start().X() > T.End().X();
-    if (geoDet == kPDHD)
-        return T.Start().Y() > T.End().Y();
-    return false;
-}
-
-HitPtrVec ana::Tagchecks::GetSortedHits(
+HitPtrVec ana::TrackDisplay::GetSortedHits(
     HitPtrVec const& vp_hit,
     int dirz,
     HitPtrPair *pp_cathode_crossing,
@@ -587,4 +550,4 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
     return vp_sorted_hit;
 }
 
-DEFINE_ART_MODULE(ana::Tagchecks)
+DEFINE_ART_MODULE(ana::TrackDisplay)
