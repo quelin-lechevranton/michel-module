@@ -281,18 +281,18 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
-    auto drawMarker = [&](TCanvas* c, TMarker* m, HitPtr const& p_hit) -> void {
-        if (geoDet == kPDVD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            c->cd(s+1);
-            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
-        } else if (geoDet == kPDHD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) return;
-            c->cd(s+1);
-            m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
-        }
-    };
+    // auto drawMarker = [&](TCanvas* c, TMarker* m, HitPtr const& p_hit) -> void {
+    //     if (geoDet == kPDVD) {
+    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         c->cd(s+1);
+    //         m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+    //     } else if (geoDet == kPDHD) {
+    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         if (s == -1) return;
+    //         c->cd(s+1);
+    //         m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+    //     }
+    // };
 
     auto drawGraph = [&](TCanvas* c, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
@@ -387,7 +387,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         drawGraph(cs[ic], vp_hit_muon_sorted, "l", {}, ls_pass);
 
         ic++;
-        bool TagAnodeCrossing;
+        bool TagAnodeCrossing = false;
         if (geoDet == kPDVD)
             TagAnodeCrossing = geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8);
         else if (geoDet == kPDHD)
