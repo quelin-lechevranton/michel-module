@@ -90,9 +90,6 @@ private:
     // Input Parameters
     bool fLog;
     float fTrackLengthCut; // in cm
-    bool fSort;
-    float fMichelSpaceRadius; // in cm
-    float fMichelTickRadius; // in ticks
 
     unsigned cn=0;
     unsigned gn=0;
@@ -102,8 +99,8 @@ private:
         ms_ev = {kGray, kMultiply, 0.5};
 
     LineStyle
-        ls_pass = {kP10Blue, kSolid, 2},
-        ls_fail = {kP10Red, kSolid, 2},
+        ls_pass = {kBlue, kSolid, 2},
+        ls_fail = {kRed, kSolid, 2},
         ls_back = {kGray, kSolid, 1};
 
     bool IsUpright(recob::Track const& T);
@@ -124,9 +121,7 @@ ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log", false)),
-    fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
-    fSort(p.get<bool>("Sort", false)), 
-    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)) //in cm
+    fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)) // in cm
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
     asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
@@ -172,7 +167,6 @@ ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
-    fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
@@ -225,40 +219,38 @@ ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
         << "  HighX Bounds: " << geoHighX.Min() << " -> " << geoHighX.Max() << std::endl
         << "  LowX Bounds: " << geoLowX.Min() << " -> " << geoLowX.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
-        << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
-        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm"
-        << " (" << fMichelTickRadius << " ticks)" << std::endl;
+        << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl;
 }
 
 void ana::TrackDisplay::beginJob() {
-    TCanvas *c = asFile->make<TCanvas>(
-        "legend", "legend",
-        1300, 800
-    );
-    c->cd();
+    // TCanvas *c = asFile->make<TCanvas>(
+    //     "legend", "legend",
+    //     1300, 800
+    // );
+    // c->cd();
 
-    float top_margin = 0.1;
-    float indent = 0.05;
-    float title_indent = 0.04;
-    float label_indent = 0.1;
-    float line_height = 0.05;
-    float line_length = 0.03;
-    float ncol = 4;
-    Style_t font = 43;
-    Style_t font_bold = 63;
-    Float_t title_size = 20;
-    Float_t label_size = 16;
+    // float top_margin = 0.1;
+    // float indent = 0.05;
+    // float title_indent = 0.04;
+    // float label_indent = 0.1;
+    // float line_height = 0.05;
+    // float line_length = 0.03;
+    // float ncol = 4;
+    // Style_t font = 43;
+    // Style_t font_bold = 63;
+    // Float_t title_size = 20;
+    // Float_t label_size = 16;
 
-    TText* title = new TText();
-    title->SetTextFont(font_bold);
-    title->SetTextSize(title_size);
-    TText* label = new TText();
-    label->SetTextFont(font);
-    label->SetTextSize(label_size);
+    // TText* title = new TText();
+    // title->SetTextFont(font_bold);
+    // title->SetTextSize(title_size);
+    // TText* label = new TText();
+    // label->SetTextFont(font);
+    // label->SetTextSize(label_size);
 
-    title->DrawText(title_indent, 1 - top_margin, "Event Markers");
+    // title->DrawText(title_indent, 1 - top_margin, "Event Markers");
 
-    c->Write();
+    // c->Write();
 }
 
 void ana::TrackDisplay::analyze(art::Event const& e) {
