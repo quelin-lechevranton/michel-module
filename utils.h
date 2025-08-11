@@ -98,7 +98,7 @@ namespace ana {
         }, { // PDHD
             {0, 0}, {1, 1} 
         }
-    }
+    };
     std::map<int, int> side2dirx = {
         { 0, -1 }, { 1, 1 }
     };

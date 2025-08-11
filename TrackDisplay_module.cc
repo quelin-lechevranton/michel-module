@@ -389,7 +389,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     }
         
 
-    unsigned im=-1;
+    unsigned im=0;
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         ASSERT(vp_hit_muon.size())
@@ -544,9 +544,9 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
                 [&, &reg=side_reg[side]](
                     HitPtr const& h1, HitPtr const& h2
                 ) -> bool {
-                    int const sec1 = ana::tpc2sec[geoDet][h1->WireID().TPC];
-                    int const sec2 = ana::tpc2sec[geoDet][h2->WireID().TPC];
-                    if (sec1 != sec2) return sec2 > sec1
+                    // int const sec1 = ana::tpc2sec[geoDet][h1->WireID().TPC];
+                    // int const sec2 = ana::tpc2sec[geoDet][h2->WireID().TPC];
+                    // if (sec1 != sec2) return sec2 > sec1
                     double const s1 = reg.projection(
                         GetSpace(h1->WireID()),
                         h1->PeakTime() * fTick2cm
@@ -575,11 +575,17 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
     if (vp_section_crossing) {
         vp_section_crossing->clear();
         std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : side_hit[side_pair.first])
-            vp_sec_hit[ana::tpc2sec[geoDet][p_hit->WireID().TPC]].push_back(p_hit);
-        for (HitPtr const& p_hit : side_hit[side_pair.second])
-            vp_sec_hit[ana::tpc2sec[geoDet][p_hit->WireID().TPC]].push_back(p_hit);
-        for (int sec=0; sec<ana::n_sec[geoDet]; sec++) {
+        for (HitPtr const& p_hit : side_hit[side_pair.first]) {
+            int sec = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (sec == -1) continue;
+            vp_sec_hit[sec].push_back(p_hit);
+        }
+        for (HitPtr const& p_hit : side_hit[side_pair.second]) {
+            int sec = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (sec == -1) continue;
+            vp_sec_hit[sec].push_back(p_hit);
+        }
+        for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
             if (vp_sec_hit[sec].front() != side_hit[ana::sec2side[geoDet][sec]].front())
                 vp_section_crossing->push_back(vp_sec_hit[sec].front());
             if (vp_sec_hit[sec].back() != side_hit[ana::sec2side[geoDet][sec]].back())
