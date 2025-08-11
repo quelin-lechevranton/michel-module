@@ -12,6 +12,8 @@
 #include <TColor.h>
 #include <TText.h>
 
+#include <TGraph2D.h>
+
 namespace ana {
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
         Style_t const font = 43;
@@ -53,13 +55,13 @@ namespace ana {
             gPad->SetTicks(1, 1);
             TH2F* f = new TH2F();  // -Werror=maybe-uninitialized
             if (geoDet == kPDVD) {
-                f = new TH2F(Form("f%u", s), ";Z;T",
+                f = new TH2F(Form("f%u", s), ";Z (cm);T (cm)",
                     600, 0, 300,
                     // 600, 0, 6000
                     600, 0, 480
                 );
             } else if (geoDet == kPDHD) {
-                f = new TH2F(Form("f%u", s), ";T;Z",
+                f = new TH2F(Form("f%u", s), ";T (cm);Z (cm)",
                     // 600, 0, 6000,
                     600, 0, 480,
                     600, 0, 464

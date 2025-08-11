@@ -95,14 +95,20 @@ private:
     unsigned gn=0;
 
     Int_t pal = kCividis;
+    std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+3, kAzure-2, kAzure+2, kAzure+7};
+    std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
     MarkerStyle
-        ms_ev = {kGray, kMultiply, 0.5},
+        ms_ev = {kGray, kPlus, 0.5},
+        ms_end = {kViolet+6, kFullSquare},
         ms_cc = {kViolet+6, kFullTriangleDown},
-        ms_sc = {kViolet+6, kFullCircle};
+        ms_sc = {kViolet+6, kFullCircle},
+        ms_pass = {vc_pass.front(), kFullCircle},
+        ms_fail = {vc_fail.front(), kFullCircle},
+        ms_back = {kGray, kFullCircle, 0.5};
 
     LineStyle
-        ls_pass = {kBlue, kSolid, 2},
-        ls_fail = {kRed, kSolid, 2},
+        ls_pass = {vc_pass.front(), kSolid, 2},
+        ls_fail = {vc_fail.front(), kSolid, 2},
         ls_back = {kGray, kSolid, 1};
 
     bool IsUpright(recob::Track const& T);
@@ -112,7 +118,7 @@ private:
         HitPtrVec const& vp_hit,
         int dirz,
         HitPtrPair *pp_cathode_crossing = nullptr,
-        HitPtrVec *vp_tpc_crossing = nullptr,
+        HitPtrVec *vp_section_crossing = nullptr,
         std::vector<ana::LinearRegression> *p_side_reg = nullptr,
         geo::View_t view = geo::kW
     );
@@ -283,27 +289,27 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
-    auto drawMarker = [&](TCanvas* c, HitPtr const& p_hit, MarkerStyle const& ms) -> void {
+    auto drawMarker = [&](TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) -> void {
         TMarker *m = new TMarker();
         setMarkerStyle(m, ms);
         if (geoDet == kPDVD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            c->cd(s+1);
+            hc->cd(s+1);
             m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
         } else if (geoDet == kPDHD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             if (s == -1) return;
-            c->cd(s+1);
+            hc->cd(s+1);
             m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
         }
     };
 
-    auto drawGraph = [&](TCanvas* c, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
+    auto drawGraph = [&](TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             gs[s] = new TGraph();
             gs[s]->SetEditable(kFALSE);
-            gs[s]->SetName(Form("g%u_s%u", gn++, s));
+            gs[s]->SetName(Form("g%u_s%u", gn, s));
             setMarkerStyle(gs[s], ms);
             setLineStyle(gs[s], ls);
         }
@@ -318,31 +324,71 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         }
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             if (!gs[s]->GetN()) continue;
-            c->cd(s+1);
+            hc->cd(s+1);
             gs[s]->Draw(draw);
         }
+        gn++;
+    };
+
+    auto drawGraph2D = [&](TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms) -> void {
+        TGraph2D* g = new TGraph2D();
+        setMarkerStyle(g, ms);
+        for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
+            if (!p_trk->HasValidPoint(it)) continue;
+            geo::Point_t pt = p_trk->LocationAtPoint(it);
+            if (geoDet == kPDVD)
+                g->AddPoint(pt.Y(), pt.Z(), pt.X());
+            else if (geoDet == kPDHD)
+                g->AddPoint(pt.Z(), pt.X(), pt.Y());
+        }
+        tc->cd();
+        g->Draw("p");
     };
 
     std::vector<std::string> cuts = {
         "None",
-        Form("TrackLength > %.0f cm", fTrackLengthCut),
+        Form("TrackLength >= %.0f cm", fTrackLengthCut),
+        "EndInVolume (20 cm)",
         "CathodeCrossing",
-        "AnodeCrossing"
+        "AnodeCrossing (20 cm)"
     };
-    std::vector<TCanvas*> cs;
-    for (unsigned ic=0; ic<cuts.size(); ic++) {
-        TCanvas* c = asFile->make<TCanvas>(
-            Form("c%ucut%u", ev, ic),
-            Form("run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[ic].c_str()),
-            1300,800
-        );
-        ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
-        drawGraph(c, vp_hit, "p", ms_ev);
-        cs.push_back(c);
-    }
 
     gStyle->SetPalette(pal);
 
+    std::vector<TCanvas*> hcs;
+    for (unsigned ihc=0; ihc<cuts.size(); ihc++) {
+        TCanvas* hc = asFile->make<TCanvas>(
+            Form("hc%ucut%u", ev, ihc),
+            Form("Hits: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[ihc].c_str()),
+            1300,800
+        );
+        ana::drawFrame(hc, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
+        drawGraph(hc, vp_hit, "p", ms_ev);
+        hcs.push_back(hc);
+    }
+
+    std::vector<TCanvas*> tcs;
+    for (unsigned itc=0; itc<cuts.size(); itc++) {
+        TCanvas* tc = asFile->make<TCanvas>(
+            Form("tc%ucut%u", ev, itc),
+            Form("Tracks: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[itc].c_str()),
+            1300,800
+        );
+        TGraph2D* axes = nullptr;
+        if (geoDet == kPDVD) {
+            axes = new TGraph2D(2, new double[2]{-400,400}, new double[2]{-10,310}, new double[2]{-400,400});
+            axes->SetTitle(";Y (cm);Z (cm);X (cm)");
+        } else if (geoDet == kPDHD) {
+            axes = new TGraph2D(2, new double[2]{-10,470}, new double[2]{-400,400}, new double[2]{-10,610});
+            axes->SetTitle(";Z (cm);X (cm);Y (cm)");
+        }
+        tc->cd();
+        axes->Draw("ap");
+        tcs.push_back(tc);
+    }
+        
+
+    unsigned im=0;
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         ASSERT(vp_hit_muon.size())
@@ -360,31 +406,41 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         );
         ASSERT(vp_hit_muon_sorted.size())
 
-        // MuonEndHit = GetHit(vp_hit_muon_sorted.back());
-    
-        std::vector<TCanvas*>::iterator ic = cs.begin();
+        std::vector<TCanvas*>::iterator ihc = hcs.begin();
+        std::vector<TCanvas*>::iterator itc = tcs.begin();
         auto filter = [&](bool cut) -> bool {
             if (cut) {
-                drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_fail);
-                for (auto jc=ic+1; jc<cs.end(); jc++)
-                    drawGraph(*jc, vp_hit_muon_sorted, "l", {}, ls_back);
+                drawGraph(*ihc, vp_hit_muon_sorted, "l", {}, LineStyle{vc_fail[im%vc_fail.size()], ls_fail.l, ls_fail.w});
+                drawGraph2D(*itc, p_trk, MarkerStyle{vc_fail[im%vc_fail.size()], ms_fail.m, ms_fail.s});
+                for (auto jhc=ihc+1; jhc<hcs.end(); jhc++)
+                    drawGraph(*jhc, vp_hit_muon_sorted, "l", {}, ls_back);
+                for (auto jtc=itc+1; jtc<tcs.end(); jtc++)
+                    drawGraph2D(*jtc, p_trk, ms_back);
                 return true;
             }
-            drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-            if (cathode_crossing.first)
-                drawMarker(*ic, cathode_crossing.first, ms_cc);
-            if (cathode_crossing.second)
-                drawMarker(*ic, cathode_crossing.second, ms_cc);
+            drawGraph(*ihc, vp_hit_muon_sorted, "l", {}, LineStyle{vc_pass[im%vc_pass.size()], ls_pass.l, ls_pass.w});
+            drawGraph2D(*itc, p_trk, MarkerStyle{vc_pass[im%vc_pass.size()], ms_pass.m, ms_pass.s});
             for (HitPtr const& p_hit_sc : section_crossing)
-                drawMarker(*ic, p_hit_sc, ms_sc);
-            ic++;
+                drawMarker(*ihc, p_hit_sc, ms_sc);
+            drawMarker(*ihc, vp_hit_muon_sorted.front(), ms_end);
+            drawMarker(*ihc, vp_hit_muon_sorted.back(), ms_end);
+            if (cathode_crossing.first) {
+                drawMarker(*ihc, cathode_crossing.first, ms_cc);
+                drawMarker(*ihc, cathode_crossing.second, ms_cc);
+            }
+            ihc++;
             return false;
         };
 
         filter(false);
 
-        bool TagTrackLength = p_trk->Length() > fTrackLengthCut;
+        bool TagTrackLength = p_trk->Length() >= fTrackLengthCut;
         if (filter(!TagTrackLength)) continue;
+
+        bool TagEndInVolume = geoHighX.InFiducialY(End.Y(), 20.)
+            && geoHighX.InFiducialZ(End.Z(), 20.);
+        if (filter(!TagEndInVolume)) continue;
+        // MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
 
         bool TagCathodeCrossing = (
             geoLowX.ContainsPosition(Start)
@@ -397,80 +453,25 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
 
         bool TagAnodeCrossing = false;
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8);
+            TagAnodeCrossing = geoHighX.InFiducialY(Start.Y(), 20.)
+                && geoHighX.InFiducialZ(Start.Z(), 20.);
         else if (geoDet == kPDHD)
             TagAnodeCrossing = (
-                geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
-                || geoLowX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
+                geoHighX.InFiducialY(Start.Y(), 20.)
+                && geoHighX.InFiducialZ(Start.Z(), 20.)
+            ) || (
+                geoLowX.InFiducialY(Start.Y(), 20.)
+                && geoLowX.InFiducialZ(Start.Z(), 20.)
             );
         if (filter(!TagAnodeCrossing)) continue;
         
-
-        // drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-        // drawMarker(*ic, cathode_crossing.first, ms_cc);
-        // drawMarker(*ic, cathode_crossing.second, ms_cc);
-        // for (HitPtr const& p_hit_sc : section_crossing)
-        //     drawMarker(*ic, p_hit_sc, ms_sc);
-
-
-        // ic++;
-        // bool TagTrackLength = p_trk->Length() > fTrackLengthCut;
-        // if (!TagTrackLength) {
-        //     drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_fail);
-        //     for (auto jc=ic+1; jc<cs.end(); jc++)
-        //         drawGraph(*jc, vp_hit_muon_sorted, "l", {}, ls_back);
-        //     continue;
-        // }
-        // drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-        // drawMarker(*ic, cathode_crossing.first, ms_cc);
-        // drawMarker(*ic, cathode_crossing.second, ms_cc);
-        // for (HitPtr const& p_hit_sc : section_crossing)
-        //     drawMarker(*ic, p_hit_sc, ms_sc);
-
-        // ic++;
-        // bool TagCathodeCrossing = (
-        //     geoLowX.ContainsPosition(p_trk->Start()) 
-        //     && geoHighX.ContainsPosition(p_trk->End())
-        // ) || (
-        //     geoHighX.ContainsPosition(p_trk->Start())
-        //     && geoLowX.ContainsPosition(p_trk->End())
-        // );
-        // if (!TagCathodeCrossing) {
-        //     drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_fail);
-        //     for (auto jc=ic+1; jc<cs.end(); jc++)
-        //         drawGraph(*jc, vp_hit_muon_sorted, "l", {}, ls_back);
-        //     continue;
-        // }
-        // drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-        // drawMarker(*ic, cathode_crossing.first, ms_cc);
-        // drawMarker(*ic, cathode_crossing.second, ms_cc);
-        // for (HitPtr const& p_hit_sc : section_crossing)
-        //     drawMarker(*ic, p_hit_sc, ms_sc);
-
-        // ic++;
-        // bool TagAnodeCrossing = false;
-        // if (geoDet == kPDVD)
-        //     TagAnodeCrossing = geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8);
-        // else if (geoDet == kPDHD)
-        //     TagAnodeCrossing = (
-        //         geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
-        //         || geoLowX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
-        //     );
-        // if (!TagAnodeCrossing) {
-        //     drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_fail);
-        //     for (auto jc=ic+1; jc<cs.end(); jc++)
-        //         drawGraph(*jc, vp_hit_muon_sorted, "l", {}, ls_back);
-        //     continue;
-        // }
-        // drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-        // drawMarker(*ic, cathode_crossing.first, ms_cc);
-        // drawMarker(*ic, cathode_crossing.second, ms_cc);
-        // for (HitPtr const& p_hit_sc : section_crossing)
-        //     drawMarker(*ic, p_hit_sc, ms_sc);
+        im++;
     }
 
-    for (TCanvas* c : cs)
-        c->Write();
+    for (TCanvas* hc : hcs)
+        hc->Write();
+    for (TCanvas* tc : tcs)
+        tc->Write();
     
     ev++;
 }
@@ -510,7 +511,7 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
     HitPtrVec const& vp_hit,
     int dirz,
     HitPtrPair *pp_cathode_crossing,
-    HitPtrVec *vp_tpc_crossing,
+    HitPtrVec *vp_section_crossing,
     std::vector<ana::LinearRegression> *p_side_reg,
     geo::View_t view
 ) {
@@ -570,27 +571,23 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
         pp_cathode_crossing->second = side_hit[side_pair.second].front();
     }
     HitPtrVec vp_sorted_hit;
-    if (vp_tpc_crossing) {
-        vp_tpc_crossing->clear();
+    if (vp_section_crossing) {
+        vp_section_crossing->clear();
         HitPtr& prev_hit = side_hit[side_pair.first].front();
-        unsigned prev_tpc = prev_hit->WireID().TPC;
         for (HitPtr const& p_hit : side_hit[side_pair.first]) {
             vp_sorted_hit.push_back(p_hit);
-            if (p_hit->WireID().TPC != prev_tpc) {
-                vp_tpc_crossing->push_back(prev_hit);
-                vp_tpc_crossing->push_back(p_hit);
-                prev_tpc = p_hit->WireID().TPC;
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
+                vp_section_crossing->push_back(prev_hit);
+                vp_section_crossing->push_back(p_hit);
             }
             prev_hit = p_hit;
         }
         prev_hit = side_hit[side_pair.second].front();
-        prev_tpc = prev_hit->WireID().TPC;
         for (HitPtr const& p_hit : side_hit[side_pair.second]) {
             vp_sorted_hit.push_back(p_hit);
-            if (p_hit->WireID().TPC != prev_tpc) {
-                vp_tpc_crossing->push_back(prev_hit);
-                vp_tpc_crossing->push_back(p_hit);
-                prev_tpc = p_hit->WireID().TPC;
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
+                vp_section_crossing->push_back(prev_hit);
+                vp_section_crossing->push_back(p_hit);
             }
             prev_hit = p_hit;
         }
