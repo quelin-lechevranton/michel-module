@@ -92,13 +92,12 @@ private:
     float fTrackLengthCut; // in cm
 
     unsigned ev=0;
-    unsigned gn=0;
 
     Int_t pal = kCividis;
     std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+2, kAzure-2, kAzure+2, kAzure+7};
     std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
     MarkerStyle
-        ms_ev = {kBlack, kPlus, 0.5},
+        ms_ev = {kBlack, 50, 0.5},
         ms_end = {kViolet+6, kFullSquare},
         ms_cc = {kViolet+6, kFullTriangleDown},
         ms_sc = {kViolet+6, kFullCircle},
@@ -305,6 +304,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     };
 
     auto drawGraph = [&](TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
+        unsigned static gn=0;
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             gs[s] = new TGraph();
@@ -389,7 +389,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     }
         
 
-    unsigned im=0;
+    unsigned im=-1;
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         ASSERT(vp_hit_muon.size())
@@ -406,6 +406,8 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
             &section_crossing
         );
         ASSERT(vp_hit_muon_sorted.size())
+
+        im++;
 
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
@@ -466,8 +468,6 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 && geoLowX.InFiducialZ(Start.Z(), 20.)
             );
         if (filter(!TagAnodeCrossing)) continue;
-        
-        im++;
     }
 
     for (TCanvas* hc : hcs)
@@ -535,11 +535,7 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
     for (ana::LinearRegression& reg : side_reg)
         if (reg.n >= ana::LinearRegression::nmin)
             reg.normalize();
-    if (p_side_reg) {
-        p_side_reg->clear();
-        p_side_reg->push_back(side_reg[0]);
-        p_side_reg->push_back(side_reg[1]);
-    }
+    if (p_side_reg) p_side_reg = &side_reg;
     for (int side=0; side<2; side++)
         if (side_reg[side].n >= ana::LinearRegression::nmin)
             std::sort(
@@ -548,6 +544,9 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
                 [&, &reg=side_reg[side]](
                     HitPtr const& h1, HitPtr const& h2
                 ) -> bool {
+                    int const sec1 = ana::tpc2sec[geoDet][h1->WireID().TPC];
+                    int const sec2 = ana::tpc2sec[geoDet][h2->WireID().TPC];
+                    if (sec1 != sec2) return sec2 > sec1
                     double const s1 = reg.projection(
                         GetSpace(h1->WireID()),
                         h1->PeakTime() * fTick2cm
@@ -575,25 +574,37 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
     HitPtrVec vp_sorted_hit;
     if (vp_section_crossing) {
         vp_section_crossing->clear();
-        HitPtr& prev_hit = side_hit[side_pair.first].front();
-        for (HitPtr const& p_hit : side_hit[side_pair.first]) {
-            vp_sorted_hit.push_back(p_hit);
-            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
-                vp_section_crossing->push_back(prev_hit);
-                vp_section_crossing->push_back(p_hit);
-            }
-            prev_hit = p_hit;
+        std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
+        for (HitPtr const& p_hit : side_hit[side_pair.first])
+            vp_sec_hit[ana::tpc2sec[geoDet][p_hit->WireID().TPC]].push_back(p_hit);
+        for (HitPtr const& p_hit : side_hit[side_pair.second])
+            vp_sec_hit[ana::tpc2sec[geoDet][p_hit->WireID().TPC]].push_back(p_hit);
+        for (int sec=0; sec<ana::n_sec[geoDet]; sec++) {
+            if (vp_sec_hit[sec].front() != side_hit[ana::sec2side[geoDet][sec]].front())
+                vp_section_crossing->push_back(vp_sec_hit[sec].front());
+            if (vp_sec_hit[sec].back() != side_hit[ana::sec2side[geoDet][sec]].back())
+                vp_section_crossing->push_back(vp_sec_hit[sec].back());
         }
-        prev_hit = side_hit[side_pair.second].front();
-        for (HitPtr const& p_hit : side_hit[side_pair.second]) {
-            vp_sorted_hit.push_back(p_hit);
-            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
-                vp_section_crossing->push_back(prev_hit);
-                vp_section_crossing->push_back(p_hit);
-            }
-            prev_hit = p_hit;
-        }
-        return vp_sorted_hit;
+        // vp_section_crossing->clear();
+        // HitPtr& prev_hit = side_hit[side_pair.first].front();
+        // for (HitPtr const& p_hit : side_hit[side_pair.first]) {
+        //     vp_sorted_hit.push_back(p_hit);
+        //     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
+        //         vp_section_crossing->push_back(prev_hit);
+        //         vp_section_crossing->push_back(p_hit);
+        //     }
+        //     prev_hit = p_hit;
+        // }
+        // prev_hit = side_hit[side_pair.second].front();
+        // for (HitPtr const& p_hit : side_hit[side_pair.second]) {
+        //     vp_sorted_hit.push_back(p_hit);
+        //     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
+        //         vp_section_crossing->push_back(prev_hit);
+        //         vp_section_crossing->push_back(p_hit);
+        //     }
+        //     prev_hit = p_hit;
+        // }
+        // return vp_sorted_hit;
     }
     vp_sorted_hit.insert(
         vp_sorted_hit.end(),
