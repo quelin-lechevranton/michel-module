@@ -15,19 +15,13 @@
 #include <TGraph2D.h>
 
 namespace ana {
-    inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {
+    inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {}
+    inline void drawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
         Style_t const font = 43;
         unsigned n_sec = 0;
         Style_t font_size;
         struct { Float_t l, r, b, t; } pad_margin;
         Float_t title_offset_x, title_offset_y;
-
-        std::string kind;
-        switch(real) {
-            case 0: kind = "Simulation"; break;
-            case 1: kind = "Data"; break;
-            default: kind = "Unknown";
-        }
 
         c->SetMargin(0, 0, 0, 0);
         if (geoDet == kPDVD) {
@@ -45,6 +39,18 @@ namespace ana {
             title_offset_x = 1.5;
             title_offset_y = 1.5;
         }
+
+        TText* t = new TText();
+        t->SetNDC();
+        t->SetTextFont(font);
+        t->SetTextSize(font_size);
+        t->SetTextAlign(kHAlignLeft + kVAlignBottom);
+
+        TText* title = new TText();
+        title->SetNDC();
+        title->SetTextFont(font);
+        title->SetTextSize(font_size);
+        title->SetTextAlign(kHAlignRight + kVAlignBottom);
 
         for (unsigned s=0; s<n_sec; s++) {
             c->cd(s+1);
@@ -77,28 +83,25 @@ namespace ana {
             for (TAxis* ax : {f->GetXaxis(), f->GetYaxis()}) ax->CenterTitle();
             f->Draw();
 
-            TText* t = new TText(
+            t->DrawText(
                 gPad->GetLeftMargin(),
                 1-gPad->GetTopMargin()+0.01,
                 Form("TPC %u & %u", sec2tpc[geoDet][s].first, sec2tpc[geoDet][s].second)
             );
-            t->SetNDC();
-            t->SetTextFont(font);
-            t->SetTextSize(font_size);
-            t->SetTextAlign(kHAlignLeft + kVAlignBottom);
-            t->Draw();
 
-            if ((geoDet == kPDHD && s==1) || (geoDet == kPDVD && s==3)) {
-                TText* title = new TText(
+            if (s == 0) {
+                title->DrawText(
                     1-gPad->GetRightMargin(),
                     1-gPad->GetTopMargin()+0.01,
-                    Form("%s R:%u SR:%u E:%u", kind.c_str(), r, sr, e)
+                    left_title
                 );
-                title->SetNDC();
-                title->SetTextFont(font); 
-                title->SetTextSize(font_size);
-                title->SetTextAlign(kHAlignRight + kVAlignBottom);
-                title->Draw();
+            }
+            if ((geoDet == kPDHD && s==1) || (geoDet == kPDVD && s==3)) {
+                title->DrawText(
+                    1-gPad->GetRightMargin(),
+                    1-gPad->GetTopMargin()+0.01,
+                    right_title
+                );
             }
         }
     }

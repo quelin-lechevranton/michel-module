@@ -95,10 +95,10 @@ private:
     unsigned gn=0;
 
     Int_t pal = kCividis;
-    std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+3, kAzure-2, kAzure+2, kAzure+7};
+    std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+2, kAzure-2, kAzure+2, kAzure+7};
     std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
     MarkerStyle
-        ms_ev = {kGray, kPlus, 0.5},
+        ms_ev = {kBlack, kPlus, 0.5},
         ms_end = {kViolet+6, kFullSquare},
         ms_cc = {kViolet+6, kFullTriangleDown},
         ms_sc = {kViolet+6, kFullCircle},
@@ -330,9 +330,10 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         gn++;
     };
 
-    auto drawGraph2D = [&](TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms) -> void {
+    auto drawGraph2D = [&](TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
         TGraph2D* g = new TGraph2D();
         setMarkerStyle(g, ms);
+        setLineStyle(g, ls);
         for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
             if (!p_trk->HasValidPoint(it)) continue;
             geo::Point_t pt = p_trk->LocationAtPoint(it);
@@ -342,10 +343,10 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 g->AddPoint(pt.Z(), pt.X(), pt.Y());
         }
         tc->cd();
-        g->Draw("p");
+        g->Draw("same l");
     };
 
-    std::vector<std::string> cuts = {
+    std::vector<char const*> cuts = {
         "None",
         Form("TrackLength >= %.0f cm", fTrackLengthCut),
         "EndInVolume (20 cm)",
@@ -359,10 +360,10 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     for (unsigned ihc=0; ihc<cuts.size(); ihc++) {
         TCanvas* hc = asFile->make<TCanvas>(
             Form("hc%ucut%u", ev, ihc),
-            Form("Hits: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[ihc].c_str()),
+            Form("Hits: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[ihc]),
             1300,800
         );
-        ana::drawFrame(hc, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
+        ana::drawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
         drawGraph(hc, vp_hit, "p", ms_ev);
         hcs.push_back(hc);
     }
@@ -371,7 +372,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     for (unsigned itc=0; itc<cuts.size(); itc++) {
         TCanvas* tc = asFile->make<TCanvas>(
             Form("tc%ucut%u", ev, itc),
-            Form("Tracks: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[itc].c_str()),
+            Form("Tracks: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[itc]),
             1300,800
         );
         TGraph2D* axes = nullptr;
@@ -429,6 +430,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 drawMarker(*ihc, cathode_crossing.second, ms_cc);
             }
             ihc++;
+            itc++;
             return false;
         };
 
