@@ -343,7 +343,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 g->AddPoint(pt.Z(), pt.X(), pt.Y());
         }
         tc->cd();
-        g->Draw("same l");
+        g->Draw("same line");
     };
 
     std::vector<char const*> cuts = {

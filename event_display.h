@@ -18,10 +18,10 @@ namespace ana {
     inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {}
     inline void drawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
         Style_t const font = 43;
-        unsigned n_sec = 0;
-        Style_t font_size;
-        struct { Float_t l, r, b, t; } pad_margin;
-        Float_t title_offset_x, title_offset_y;
+        unsigned n_sec=0;
+        Style_t font_size=0;
+        struct { Float_t l, r, b, t; } pad_margin={};
+        Float_t title_offset_x=0, title_offset_y=0;
 
         c->SetMargin(0, 0, 0, 0);
         if (geoDet == kPDVD) {
@@ -105,25 +105,4 @@ namespace ana {
             }
         }
     }
-    // inline void drawEventHits(TCanvas* c, int geoDet, std::vector<art::Ptr<recob::Hit>> vp_hit, std::function<double(geo::WireID)> GetSpace) {
-    //     float const max_adc = geoDet == kPDVD ? 1000 : 200;
-    //     gStyle->SetPalette(kCividis);
-    //     TArrayI const& colors = TColor::GetPalette();
-    //     TMarker* m = new TMarker();
-    //     m->SetMarkerStyle(kFullCircle);
-    //     for (art::Ptr<recob::Hit> p_hit : vp_hit) {
-    //         if (p_hit->View() != geo::kW) continue;
-    //         int s = tpc2sec[geoDet][p_hit->WireID().TPC];
-    //         if (s == -1) continue;
-    //         float const x = p_hit->Integral() / max_adc;
-    //         m->SetMarkerSize(2*x+0.1);
-    //         m->SetMarkerColor(colors[int((colors.GetSize()-1)*x)]);
-
-    //         c->cd(s+1);
-    //         if (geoDet == kPDVD)
-    //             m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime());
-    //         else if (geoDet == kPDHD)
-    //             m->DrawMarker(p_hit->PeakTime(), GetSpace(p_hit->WireID()));
-    //     }
-    // }
 }
