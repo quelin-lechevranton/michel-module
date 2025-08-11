@@ -20,11 +20,11 @@ namespace ana {
         struct { Float_t l, r, b, t; } pad_margin;
         Float_t title_offset_x, title_offset_y;
 
-        std::string data;
+        std::string kind;
         switch(real) {
-            case 0: data = "Simulation"; break;
-            case 1: data = "Data"; break;
-            default: data = "Unknown";
+            case 0: kind = "Simulation"; break;
+            case 1: kind = "Data"; break;
+            default: kind = "Unknown";
         }
 
         c->SetMargin(0, 0, 0, 0);
@@ -87,16 +87,16 @@ namespace ana {
             t->Draw();
 
             if ((geoDet == kPDHD && s==1) || (geoDet == kPDVD && s==3)) {
-                TText* tt = new TText(
+                TText* title = new TText(
                     1-gPad->GetRightMargin(),
                     1-gPad->GetTopMargin()+0.01,
-                    Form("%s - R:%u - SR:%u - E:%u", data.c_str(), r, sr, e)
+                    Form("%s R:%u SR:%u E:%u", kind.c_str(), r, sr, e)
                 );
-                tt->SetNDC();
-                tt->SetTextFont(103); 
-                tt->SetTextSize(font_size);
-                tt->SetTextAlign(kHAlignRight + kVAlignBottom);
-                tt->Draw();
+                title->SetNDC();
+                title->SetTextFont(font); 
+                title->SetTextSize(font_size);
+                title->SetTextAlign(kHAlignRight + kVAlignBottom);
+                title->Draw();
             }
         }
     }
