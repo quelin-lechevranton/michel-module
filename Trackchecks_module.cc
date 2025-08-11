@@ -15,6 +15,26 @@ using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 namespace ana {
     class Trackchecks;
+    struct MarkerStyle {
+        Color_t c = kBlack;
+        Style_t m = kFullCircle;
+        Size_t s = 1.;
+    };
+    struct LineStyle {
+        Color_t c = kBlack;
+        Style_t l = kSolid;
+        Width_t w = 1;
+    };
+    void inline setMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
+        m->SetMarkerColor(ms.c);
+        m->SetMarkerStyle(ms.m);
+        m->SetMarkerSize(ms.s);
+    };
+    void inline setLineStyle(TAttLine* l, LineStyle const& ls) {
+        l->SetLineColor(ls.c);
+        l->SetLineStyle(ls.l);
+        l->SetLineWidth(ls.w);
+    };
 }
 
 class ana::Trackchecks : public art::EDAnalyzer {
@@ -31,7 +51,7 @@ public:
 private:
 
     // Utilities
-    art::ServiceHandle<art::TFileService> tfs;
+    art::ServiceHandle<art::TFileService> asFile;
 
     const geo::GeometryCore* asGeo;
     const geo::WireReadoutGeom* asWire;
@@ -77,48 +97,26 @@ private:
     unsigned cn=0;
     unsigned gn=0;
 
-    struct {
-        Int_t i_pal = kCividis;
+    Int_t pal = kCividis;
+    MarkerStyle
+        ms_ev = {kGray, kMultiply, 0.5},
+        ms_mcp_mu = {kSpring+2, kOpenDiamond},
+        ms_mcp_me = {kAzure-4, kOpenDoubleDiamond},
+        ms_mu_in = {kOrange+6, kFullSquare},
+        ms_mu_out = {kOrange+6, kOpenSquare},
+        ms_cc_in = {kOrange+6, kFullTriangleDown},
+        ms_cc_out = {kOrange+6, kOpenTriangleDown},
+        ms_cc = {kPink-2, kFullTriangleUp},
+        ms_sc = {kPink-2, kFullCircle},
+        ms_shw = {kGreen-8, kOpenCircle};
 
-        Color_t c_ev = kGray;
-        Style_t m_ev = kMultiply;
-        Size_t s_ev = 0.5;
-
-        Color_t c_mcp_mu = kSpring+2;
-        Style_t m_mcp_mu = kOpenDiamond;
-        Size_t s_mcp_mu = 1;
-
-        Color_t c_mcp_me = kAzure-4;
-        Style_t m_mcp_me = kOpenDoubleDiamond;
-        Size_t s_mcp_me = 1;
-
-        Color_t c_small = kGray;
-        Color_t c_broken = kRed-4;
-        Style_t s_broken = kDashed;
-        Color_t c_no_end = kGreen-8;
-
-        Color_t c_mu = kOrange+6;
-        Width_t w_mu = 1;
-
-        Style_t m_mu_in = kFullSquare;
-        Style_t m_mu_out = kOpenSquare;
-
-        Style_t m_mu_cc_in = kFullTriangleUp;
-        Style_t m_mu_cc_out = kOpenTriangleUp;
-
-        Color_t c_cc = kPink-2;
-        Style_t m_cc = kFullTriangleDown;
-
-        Color_t c_sc = kPink-2;
-        Style_t m_sc = kFullCircle;
-
-        Color_t c_reg_good = kAzure-4;
-        Color_t c_reg_bad = kViolet+6;
-        Width_t w_reg = 2;
-
-        Color_t c_shw = kGreen;
-        Style_t m_shw = kOpenCircle;
-    } theme;
+    LineStyle
+        ls_mu = {kOrange+6, kSolid},
+        ls_small = {kGray, kSolid},
+        ls_broken = {kRed-4, kDashed},
+        ls_no_end = {kGreen-8, kSolid},
+        ls_reg_good = {kAzure-4, kSolid, 2},
+        ls_reg_bad = {kViolet+6, kSolid, 2};
 
 
     double GetSpace(geo::WireID);
@@ -241,12 +239,10 @@ ana::Trackchecks::Trackchecks(fhicl::ParameterSet const& p)
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelSpaceRadius << " cm"
         << " (" << fMichelTickRadius << " ticks)" << std::endl;
-        // << "  Nearby Space Radius: " << fNearbySpaceRadius << " cm" << std::endl
-        // << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
 }
 
 void ana::Trackchecks::beginJob() {
-    TCanvas *c = tfs->make<TCanvas>(
+    TCanvas *c = asFile->make<TCanvas>(
         "legend", "legend",
         1300, 800
     );
@@ -274,67 +270,54 @@ void ana::Trackchecks::beginJob() {
     title->DrawText(title_indent, 1 - top_margin, "Event Markers");
 
     TMarker* m_ev = new TMarker();
-    m_ev->SetMarkerColor(theme.c_ev);
-    m_ev->SetMarkerStyle(theme.m_ev);
-    m_ev->SetMarkerSize(2*theme.s_ev);
+    setMarkerStyle(m_ev, ms_ev);
     m_ev->DrawMarker(indent, 1 - top_margin - line_height);
     label->DrawText(label_indent, 1 - top_margin - line_height, "Event Hits");
 
     TMarker* m_mcp_mu = new TMarker();
-    m_mcp_mu->SetMarkerColor(theme.c_mcp_mu);
-    m_mcp_mu->SetMarkerStyle(theme.m_mcp_mu); 
-    m_mcp_mu->SetMarkerSize(2*theme.s_mcp_mu);
+    setMarkerStyle(m_mcp_mu, ms_mcp_mu);
     m_mcp_mu->DrawMarker(indent, 1 - top_margin - 2 * line_height);
     label->DrawText(label_indent, 1 - top_margin - 2 * line_height, "MCParticle Muon End Hit");
 
     TMarker* m_mcp_me = new TMarker();
-    m_mcp_me->SetMarkerColor(theme.c_mcp_me);
-    m_mcp_me->SetMarkerStyle(theme.m_mcp_me);
-    m_mcp_me->SetMarkerSize(2*theme.s_mcp_me);
+    setMarkerStyle(m_mcp_me, ms_mcp_me);
     m_mcp_me->DrawMarker(indent, 1 - top_margin - 3 * line_height);
     label->DrawText(label_indent, 1 - top_margin - 3 * line_height, "MCParticle Michel Hits");
 
     title->DrawText(1/ncol + title_indent, 1 - top_margin, "Tracks");
 
     TLine* l_small = new TLine();
-    l_small->SetLineColor(theme.c_small);
-    l_small->SetLineWidth(2*theme.w_mu);
+    setLineStyle(l_small, ls_small);
     l_small->DrawLine(1/ncol + indent, 1 - top_margin - line_height,
                       1/ncol + indent + line_length, 1 - top_margin - line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - line_height, "Small Tracks");
 
     TLine* l_broken = new TLine();
-    l_broken->SetLineColor(theme.c_broken);
-    l_broken->SetLineStyle(theme.s_broken);
-    l_broken->SetLineWidth(2*theme.w_mu);
+    setLineStyle(l_broken, ls_broken);
     l_broken->DrawLine(1/ncol + indent, 1 - top_margin - 2 * line_height,
                        1/ncol + indent + line_length, 1 - top_margin - 2 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 2 * line_height, "Broken Tracks");
 
     TLine* l_no_end = new TLine();
-    l_no_end->SetLineColor(theme.c_no_end);
-    l_no_end->SetLineWidth(2*theme.w_mu);
+    setLineStyle(l_no_end, ls_no_end);
     l_no_end->DrawLine(1/ncol + indent, 1 - top_margin - 3 * line_height,
                        1/ncol + indent + line_length, 1 - top_margin - 3 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 3 * line_height, "End Algorithm failed");
 
     TLine* l_mu = new TLine();
-    l_mu->SetLineColor(theme.c_mu);
-    l_mu->SetLineWidth(2*theme.w_mu);
+    setLineStyle(l_mu, ls_mu);
     l_mu->DrawLine(1/ncol + indent, 1 - top_margin - 4 * line_height,
                    1/ncol + indent + line_length, 1 - top_margin - 4 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 4 * line_height, "Tracks");
 
     TLine* l_reg_good = new TLine();
-    l_reg_good->SetLineColor(theme.c_reg_good);
-    l_reg_good->SetLineWidth(2*theme.w_reg);
+    setLineStyle(l_reg_good, ls_reg_good);
     l_reg_good->DrawLine(1/ncol + indent, 1 - top_margin - 5 * line_height,
                          1/ncol + indent + line_length, 1 - top_margin - 5 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 5 * line_height, "Regression Good");
 
     TLine* l_reg_bad = new TLine();
-    l_reg_bad->SetLineColor(theme.c_reg_bad);
-    l_reg_bad->SetLineWidth(2*theme.w_reg);
+    setLineStyle(l_reg_bad, ls_reg_bad);
     l_reg_bad->DrawLine(1/ncol + indent, 1 - top_margin - 6 * line_height,
                          1/ncol + indent + line_length, 1 - top_margin - 6 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 6 * line_height, "Regression Bad");
@@ -342,53 +325,34 @@ void ana::Trackchecks::beginJob() {
     title->DrawText(2/ncol + title_indent, 1 - top_margin, "Track Ends Markers");
 
     TMarker* m_mu_in = new TMarker();
-    m_mu_in->SetMarkerColor(theme.c_mu);
-    m_mu_in->SetMarkerStyle(theme.m_mu_in);
-    m_mu_in->SetMarkerSize(2);
+    setMarkerStyle(m_mu_in, ms_mu_in);
     m_mu_in->DrawMarker(2/ncol + indent, 1 - top_margin - line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - line_height, "Muon Track In");
 
     TMarker* m_mu_out = new TMarker();
-    m_mu_out->SetMarkerColor(theme.c_mu);
-    m_mu_out->SetMarkerStyle(theme.m_mu_out);
-    m_mu_out->SetMarkerSize(2);
+    setMarkerStyle(m_mu_out, ms_mu_out);
     m_mu_out->DrawMarker(2/ncol + indent, 1 - top_margin - 2 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 2 * line_height, "Muon Track Out");
 
     TMarker* m_mu_cc_in = new TMarker();
-    m_mu_cc_in->SetMarkerColor(theme.c_mu);
-    m_mu_cc_in->SetMarkerStyle(theme.m_mu_cc_in);
-    m_mu_cc_in->SetMarkerSize(2);
+    setMarkerStyle(m_mu_cc_in, ms_cc_in);
     m_mu_cc_in->DrawMarker(2/ncol + indent, 1 - top_margin - 3 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 3 * line_height, "Cathode Crossing Muon In");
 
     TMarker* m_mu_cc_out = new TMarker();
-    m_mu_cc_out->SetMarkerColor(theme.c_mu);
-    m_mu_cc_out->SetMarkerStyle(theme.m_mu_cc_out);
-    m_mu_cc_out->SetMarkerSize(2);
+    setMarkerStyle(m_mu_cc_out, ms_cc_out);
     m_mu_cc_out->DrawMarker(2/ncol + indent, 1 - top_margin - 4 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 4 * line_height, "Cathode Crossing Muon Out");
 
-    TMarker* m_cc = new TMarker();
-    m_cc->SetMarkerColor(theme.c_cc);
-    m_cc->SetMarkerStyle(theme.m_cc);
-    m_cc->SetMarkerSize(2);
-    m_cc->DrawMarker(2/ncol + indent, 1 - top_margin - 5 * line_height);
-    label->DrawText(2/ncol + label_indent, 1 - top_margin - 5 * line_height, "Cathode Crossing");
-
     TMarker* m_sc = new TMarker();
-    m_sc->SetMarkerColor(theme.c_sc);
-    m_sc->SetMarkerStyle(theme.m_sc);
-    m_sc->SetMarkerSize(2);
-    m_sc->DrawMarker(2/ncol + indent, 1 - top_margin - 6 * line_height);
-    label->DrawText(2/ncol + label_indent, 1 - top_margin - 6 * line_height, "Section Crossing");
+    setMarkerStyle(m_sc, ms_sc);
+    m_sc->DrawMarker(2/ncol + indent, 1 - top_margin - 5 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 5 * line_height, "Section Crossing");
 
     TMarker* m_shw = new TMarker();
-    m_shw->SetMarkerColor(theme.c_shw);
-    m_shw->SetMarkerStyle(theme.m_shw);
-    m_shw->SetMarkerSize(2);
-    m_shw->DrawMarker(2/ncol + indent, 1 - top_margin - 7 * line_height);
-    label->DrawText(2/ncol + label_indent, 1 - top_margin - 7 * line_height, "Shower Hits");
+    setMarkerStyle(m_shw, ms_shw);
+    m_shw->DrawMarker(2/ncol + indent, 1 - top_margin - 6 * line_height);
+    label->DrawText(2/ncol + label_indent, 1 - top_margin - 6 * line_height, "Shower Hits");
 
     c->Write();
 }
@@ -421,14 +385,16 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
-    TCanvas *c = tfs->make<TCanvas>(
+    TCanvas *c = asFile->make<TCanvas>(
         Form("c%u", cn++),
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
     );
     ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
 
-    auto drawMarker = [&](TMarker* m, HitPtr const& p_hit) -> void {
+    auto drawMarker = [&](HitPtr const& p_hit, MarkerStyle const& ms) -> void {
+        TMarker *m = new TMarker();
+        setMarkerStyle(m, ms);
         if (geoDet == kPDVD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             c->cd(s+1);
@@ -441,18 +407,14 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
     };
 
-    auto drawGraph = [&](TGraph* g, HitPtrVec const& vp_hit, char const* draw) -> void {
+    auto drawGraph = [&](HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
         std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             gs[s] = new TGraph();
             gs[s]->SetEditable(kFALSE);
             gs[s]->SetName(Form("g%u_s%u", gn++, s));
-            gs[s]->SetMarkerColor(g->GetMarkerColor());
-            gs[s]->SetMarkerStyle(g->GetMarkerStyle());
-            gs[s]->SetMarkerSize(g->GetMarkerSize());
-            gs[s]->SetLineColor(g->GetLineColor());
-            gs[s]->SetLineStyle(g->GetLineStyle());
-            gs[s]->SetLineWidth(g->GetLineWidth());
+            setMarkerStyle(gs[s], ms);
+            setLineStyle(gs[s], ls);
         }
         for (HitPtr p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
@@ -470,14 +432,10 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
     };
 
-    gStyle->SetPalette(theme.i_pal);
+    gStyle->SetPalette(pal);
 
     // all event hits TGraph
-    TGraph* g = new TGraph();
-    g->SetMarkerColor(theme.c_ev);
-    g->SetMarkerStyle(theme.m_ev);
-    g->SetMarkerSize(theme.s_ev);
-    drawGraph(g, vp_hit, "p");
+    drawGraph(vp_hit, "p", ms_ev);
 
     // all event hits simulate TScatter
     // TArrayI const& colors = TColor::GetPalette();
@@ -566,11 +524,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 float sz = GetSpace(mcp_ends.second->WireID());
                 HitPtr mcp_end = (sz-fz) * dir_z > 0 ? mcp_ends.second : mcp_ends.first;
 
-                TMarker* m = new TMarker();
-                m->SetMarkerColor(theme.c_mcp_mu);
-                m->SetMarkerStyle(theme.m_mcp_mu);
-                m->SetMarkerSize(theme.s_mcp_mu);
-                drawMarker(m, mcp_end);
+                drawMarker(mcp_end, ms_mcp_mu);
             } 
 
             if (mcp.NumberDaughters() >= 3) {
@@ -587,11 +541,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                     }
                 }
                 if (mcp_michel and has_numu and has_nue) {
-                    TGraph* g_mcp_me = new TGraph();
-                    g_mcp_me->SetMarkerColor(theme.c_mcp_me);
-                    g_mcp_me->SetMarkerStyle(theme.m_mcp_me);
-                    g_mcp_me->SetMarkerSize(theme.s_mcp_me);
-                    drawGraph(g_mcp_me, ana::mcp2hits(mcp_michel, vp_hit, clockData, true), "p");
+                    drawGraph(ana::mcp2hits(mcp_michel, vp_hit, clockData, true), "p", ms_mcp_me);
                 }
             }
         }
@@ -625,8 +575,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 gs[s] = new TGraph();
                 gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
                 gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-                gs[s]->SetLineWidth(1);
-                gs[s]->SetLineColor(theme.c_no_end);
+                setLineStyle(gs[s], ls_no_end);
             }
             continue;
         }
@@ -670,19 +619,11 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             // }
         }
 
-        Color_t c_mu = tooSmall ?   theme.c_small
-                    : (isBroken ?   theme.c_broken
-                    :               theme.c_mu);
-
         // track hits and regression
-        TGraph* g_mu = new TGraph();
-        g_mu->SetLineColor(c_mu);
-        g_mu->SetLineWidth(theme.w_mu);
-        g_mu->SetLineStyle(isBroken ? theme.s_broken : kSolid);
         if (fSort)
-            drawGraph(g_mu, vp_sorted_hit, "l");
+            drawGraph(vp_sorted_hit, "l", {}, isBroken ? ls_broken : ls_mu);
         else
-            drawGraph(g_mu, vp_hit_muon, "l");
+            drawGraph(vp_hit_muon, "l", {}, isBroken ? ls_broken : ls_mu);
 
         // std::vector<TGraph*> gs(ana::n_sec[geoDet]);
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
@@ -751,38 +692,26 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             }
             f->SetParameter(0, reg.m());
             f->SetParameter(1, reg.p());
-            f->SetLineColor(reg.r2() > 0.5 ? theme.c_reg_good : theme.c_reg_bad);
-            f->SetLineWidth(theme.w_reg);
+            setLineStyle(f, reg.r2() > 0.5 ? ls_reg_good : ls_reg_bad);
 
             c->cd(s+1);
             f->Draw("same");
         }
 
         // track ends and cathode/section crossing
-        TMarker* m = new TMarker();
         if (cathode_crossing.first.isNonnull()) {
-            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_mu);
-            m->SetMarkerStyle(outsideFront ? theme.m_mu_cc_out : theme.m_mu_cc_in);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? theme.m_mu_cc_out : theme.m_mu_cc_in);
-            drawMarker(m, trk_ends.second);
+            drawMarker(trk_ends.first, outsideFront ? ms_cc_in : ms_cc_in);
+            drawMarker(trk_ends.second, outsideBack ? ms_cc_out : ms_cc_in);
 
-            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_cc);
-            m->SetMarkerStyle(theme.m_cc);
-            drawMarker(m, cathode_crossing.first);
-            drawMarker(m, cathode_crossing.second);
+            drawMarker(cathode_crossing.first, ms_cc);
+            drawMarker(cathode_crossing.second, ms_cc);
         } else {
-            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_mu);
-            m->SetMarkerStyle(outsideFront ? theme.m_mu_out : theme.m_mu_in);
-            drawMarker(m, trk_ends.first);
-            m->SetMarkerStyle(outsideBack ? theme.m_mu_out : theme.m_mu_in);
-            drawMarker(m, trk_ends.second);
+            drawMarker(trk_ends.first, outsideFront ? ms_mu_in : ms_mu_in);
+            drawMarker(trk_ends.second, outsideBack ? ms_mu_out : ms_mu_in);
         }
         if (tpc_crossing.size()) {
-            m->SetMarkerColor(tooSmall ? theme.c_small : theme.c_sc);
-            m->SetMarkerStyle(theme.m_sc);
             for (HitPtr const& p_hit : tpc_crossing)
-                drawMarker(m, p_hit);
+                drawMarker(p_hit, ms_sc);
         }
 
         // simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
@@ -1221,12 +1150,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     for (art::Ptr<recob::Shower> const& p_shw : vp_shw) {
         HitPtrVec vp_hit_shw = fmp_shw2hit.at(p_shw.key());
         if (vp_hit_shw.empty()) continue;
-
-        TGraph* g_shw = new TGraph();
-        g_shw->SetMarkerColor(theme.c_shw);
-        g_shw->SetMarkerStyle(theme.m_shw);
-
-        drawGraph(g_shw, vp_hit_shw, "p");
+        drawGraph(vp_hit_shw, "p", ms_shw);
     }
 
     c->Write();
