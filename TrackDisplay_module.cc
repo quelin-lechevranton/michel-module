@@ -371,8 +371,10 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 return true;
             }
             drawGraph(*ic, vp_hit_muon_sorted, "l", {}, ls_pass);
-            drawMarker(*ic, cathode_crossing.first, ms_cc);
-            drawMarker(*ic, cathode_crossing.second, ms_cc);
+            if (cathode_crossing.first)
+                drawMarker(*ic, cathode_crossing.first, ms_cc);
+            if (cathode_crossing.second)
+                drawMarker(*ic, cathode_crossing.second, ms_cc);
             for (HitPtr const& p_hit_sc : section_crossing)
                 drawMarker(*ic, p_hit_sc, ms_sc);
             ic++;
