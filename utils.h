@@ -34,6 +34,7 @@
 
 #define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
 #define ASSERT(x)  if (!(fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
+#define DEBUG(x) if ((fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(1);
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };
@@ -130,6 +131,11 @@ namespace ana {
         }
         double theta(int dirx) {
             return atan2(dirx * abs(cov), dirx* abs(lp-vary));
+        }
+        void SetBranches(TTree* t, const char* pre="") {
+            t->Branch(Form("%sRegM", pre), &m);
+            t->Branch(Form("%sRegP", pre), &p);
+            t->Branch(Form("%sRegR2", pre), &r2);
         }
     };
 

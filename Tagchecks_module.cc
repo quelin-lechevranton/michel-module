@@ -132,8 +132,9 @@ private:
         art::Ptr<recob::Track> const& p_trk,
         HitPtrVec const& vph_ev,
         art::FindOneP<recob::Track> const& fop_hit2trk,
-        HitPtrVec *vph_sec_bragg,
-        double *max_dQdx
+        HitPtrVec *vph_sec_bragg = nullptr,
+        double *max_dQdx = nullptr,
+        std::string *error = nullptr
     );
 };
 
@@ -147,7 +148,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     fMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
-    fRegN(p.get<unsigned>("RegNmin", 6)),
+    fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
@@ -333,8 +334,8 @@ void ana::Tagchecks::analyze(art::Event const& e) {
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
 
-        HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
-        ASSERT(vp_hit_muon.size())
+        HitPtrVec vph_muon = fmp_trk2hit.at(p_trk.key());
+        ASSERT(vph_muon.size())
 
         CutTrackLength = p_trk->Length();
 
@@ -367,12 +368,12 @@ void ana::Tagchecks::analyze(art::Event const& e) {
             );
 
         // Last Hit: SUPPOSITION: Muon is downward
-        HitPtrVec vp_hit_muon_sorted = GetSortedHits(
-            vp_hit_muon, 
+        HitPtrVec vph_muon_sorted = GetSortedHits(
+            vph_muon, 
             End.Z() > Start.Z() ? 1 : -1
         );
-        ASSERT(vp_hit_muon_sorted.size())
-        MuonEndHit = GetHit(vp_hit_muon_sorted.back());
+        ASSERT(vph_muon_sorted.size())
+        MuonEndHit = GetHit(vph_muon_sorted.back());
 
         TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
@@ -384,22 +385,28 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         EventiMuon.push_back(iMuon);
         resetMuon();
 
-
         HitPtrVec vph_sec_bragg;
         double max_dQdx;
-        BraggEndHit = GetHit(GetBraggEnd(
-            vp_hit_muon_sorted, 
-            vp_hit_muon_sorted.back(),
+        std::string error;
+        HitPtr ph_bragg = GetBraggEnd(
+            vph_muon_sorted, 
+            vph_muon_sorted.back(),
             p_trk,
             vp_hit,
             fop_hit2trk,
             &vph_sec_bragg,
-            &max_dQdx
-        ));
+            &max_dQdx,
+            &error
+        );
+        if (!ph_bragg) {
+            std::cout << "\033[1;91m" "BraggEnd error: " "\033[0m" << error << std::endl;
+            continue;
+        }
+        BraggEndHit = GetHit(ph_bragg);
         CutdQdxMax = max_dQdx;
 
         // getting all muon hits
-        for (HitPtr const& p_hit_muon : vp_hit_muon_sorted)
+        for (HitPtr const& p_hit_muon : vph_muon_sorted)
             if (p_hit_muon->View() == geo::kW)
                 MuonHits.push_back(GetHit(p_hit_muon));
 
@@ -622,13 +629,17 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     HitPtrVec const& vph_ev,
     art::FindOneP<recob::Track> const& fop_hit2trk,
     HitPtrVec *vph_sec_bragg,
-    double *max_dQdx
+    double *max_dQdx,
+    std::string *error
 ) {
     HitPtrVec vph_sec_trk;
-    int sec = ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC];
     for (HitPtr const& p_hit : vph_trk) {
-        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != sec) continue;
+        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
         vph_sec_trk.push_back(p_hit);
+    }
+    if (vph_sec_trk.empty() || ph_trk_end != vph_sec_trk.back()) {
+        if (error) *error = "Track end hit not found in track hits";
+        return HitPtr{};
     }
 
     auto dist2 = [&](HitPtr const& ph1, HitPtr const& ph2) {
@@ -650,10 +661,12 @@ HitPtr ana::Tagchecks::GetBraggEnd(
             return dist2(h, ph_trk_end) > fBodyDistance * fBodyDistance;
         }
     );
-    if (std::distance(iph_body, vph_sec_trk.end()) < fRegN)
+    if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
+        if (error) *error = "Not enough hits in track body for regression";
         return HitPtr{};
+    }
 
-    HitPtrVec vph_reg{iph_body, iph_body + fRegN};
+    HitPtrVec vph_reg{iph_body, iph_body+fRegN};
     LinearRegression reg;
     for (HitPtr const& ph : vph_reg) {
         double z = GetSpace(ph->WireID());
@@ -661,6 +674,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         reg.add(z, t);
     }
     reg.compute();
+    DEBUG(reg.corr == 0)
     double sigma = TMath::Pi() / 4 / reg.corr;
 
     HitPtrVec vph_near;
@@ -701,9 +715,6 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         return TMath::Gaus(da, 0, sigma) / r;
     };
 
-    // double z0 = GetSpace(ph_trk_end->WireID());
-    // double t0 = ph_trk_end->PeakTime() * fTick2cm;
-    // double sec0 = ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC];
     HitPtrVec vph_sec{vph_reg.begin(), vph_reg.end()};
     std::reverse(vph_sec.begin(), vph_sec.end());
     HitPtr ph0 = ph_trk_end;
@@ -770,6 +781,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
             ph_max = *iph_sec;
         }
     }
+    if (vph_sec_bragg) *vph_sec_bragg = vph_sec;
     if (max_dQdx) *max_dQdx = max;
     return ph_max;
 }   
