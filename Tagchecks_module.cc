@@ -642,14 +642,14 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         return HitPtr{};
     }
 
-    auto dist2 = [&](HitPtr const& ph1, HitPtr const& ph2) {
+    auto dist2 = [&](HitPtr const& ph1, HitPtr const& ph2) -> double {
         return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
             + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
     };
     std::sort(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
-        [&](HitPtr const& ph1, HitPtr const& ph2) {
+        [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
             return dist2(ph2, ph_trk_end) > dist2(ph1, ph_trk_end);
         }
     );
@@ -657,7 +657,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     HitPtrVec::iterator iph_body = std::find_if(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
-        [&](HitPtr const& h) {
+        [&](HitPtr const& h) -> bool {
             return dist2(h, ph_trk_end) > fBodyDistance * fBodyDistance;
         }
     );
@@ -667,49 +667,60 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     }
 
     HitPtrVec vph_reg{iph_body, iph_body+fRegN};
-    LinearRegression reg;
-    for (HitPtr const& ph : vph_reg) {
-        double z = GetSpace(ph->WireID());
-        double t = ph->PeakTime() * fTick2cm;
-        reg.add(z, t);
-    }
-    reg.compute();
-    DEBUG(reg.corr == 0)
-    double sigma = TMath::Pi() / 4 / reg.corr;
+    auto orientation = [&](HitPtrVec const& vph) {
+        LinearRegression reg;
+        for (HitPtr const& ph : vph) {
+            double z = GetSpace(ph->WireID());
+            double t = ph->PeakTime() * fTick2cm;
+            reg.add(z, t);
+        }
+        reg.compute();
+        DEBUG(reg.corr == 0)
+        int dirz = GetSpace(vph.back()->WireID())
+            > GetSpace(vph.front()->WireID())
+            ? 1 : -1;
+        double sigma = TMath::Pi() / 4 / reg.corr;
+        double theta = reg.theta(dirz);
+        return (struct { double theta, sigma; }){theta, sigma};
+    };
+    auto reg = orientation(vph_reg);
 
     HitPtrVec vph_near;
     for (HitPtr const& ph_ev : vph_ev) {
         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
 
-        // check if the hit is in another track
+        // check if the hit is in a track
         art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
-        if (
-            pt_hit
-            && pt_hit.key() != p_trk.key() 
-            && pt_hit->Length() > fTrackLengthCut
-        ) continue;
-
-        // check if the hit is already treated
-        if (std::find_if(
-            iph_body, vph_sec_trk.end(),
-            [&](HitPtr const& ph) {
-                return ph.key() == ph_ev.key();
-            }
-        ) != vph_sec_trk.end()) continue;
+        if (pt_hit) {
+            // check if the hit is on the body of the track
+            if (pt_hit.key() == p_trk.key()
+                && std::find_if(
+                    iph_body, vph_sec_trk.end(),
+                    [&](HitPtr const& ph) -> bool {
+                        return ph.key() == ph_ev.key();
+                    }
+                ) != vph_sec_trk.end()
+            ) continue;
+            // check if the hit is on a long track
+            if (
+                pt_hit.key() != p_trk.key()
+                && pt_hit->Length() > fTrackLengthCut
+            ) continue;
+        }
 
         // check if the hit is close enough
-        double d2 = dist2(ph_ev, ph_trk_end);
-        if (d2 > fNearbyRadius) continue;
+        if (dist2(ph_ev, ph_trk_end) > fNearbyRadius) continue;
 
         vph_near.push_back(ph_ev);
     }
+    DEBUG(vph_near.empty())
 
-    auto score = [&](HitPtr const& ph1, HitPtr const& ph2, double theta, double sigma) {
+    auto score = [&](HitPtr const& ph1, HitPtr const& ph2, double theta, double sigma) -> double {
         double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
-        double dt = ph2->PeakTime() * fTick2cm - ph1->PeakTime() * fTick2cm;
+        double dt = (ph2->PeakTime() - ph1->PeakTime()) * fTick2cm;
         double da = atan2(dt, dz) - theta;
-        da = abs(da) < TMath::Pi() ? da : da - (da>0?1:-1) * 2 * TMath::Pi();
+        da = abs(da) < TMath::Pi() ? da : da - (da>0?1:-1)*2*TMath::Pi();
         double r = sqrt(dt*dt + dz*dz);
 
         return TMath::Gaus(da, 0, sigma) / r;
@@ -717,37 +728,38 @@ HitPtr ana::Tagchecks::GetBraggEnd(
 
     HitPtrVec vph_sec{vph_reg.begin(), vph_reg.end()};
     std::reverse(vph_sec.begin(), vph_sec.end());
-    HitPtr ph0 = ph_trk_end;
-    int dirz = GetSpace(vph_reg.back()->WireID())
-        > GetSpace(vph_reg.front()->WireID())
-        ? 1 : -1;
+    HitPtr ph_prev = ph_trk_end;
     while (vph_near.size()) {
-        HitPtrVec::iterator iph_max;
-        double max = std::numeric_limits<double>::lowest();
-        for (auto iph_near=vph_near.begin(); iph_near!=vph_near.end(); iph_near++) {
-            double s = score(ph0, *iph_near, reg.theta(dirz), sigma);
-            if (s > max) {
-                max= s;
-                iph_max = iph_near;
+        std::cout << vph_near.size() << std::endl;
+        HitPtrVec::iterator iph_max = std::max_element(
+            vph_near.begin(), vph_near.end(),
+            [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
+                return score(ph_prev, ph1, reg.theta, reg.sigma) 
+                    < score(ph_prev, ph2, reg.theta, reg.sigma);
             }
-        }
+        );
 
         vph_near.erase(iph_max);
         vph_reg.insert(vph_reg.begin(), *iph_max);
         vph_reg.pop_back();
         vph_sec.push_back(*iph_max);
+        ph_prev = *iph_max;
 
-        reg = LinearRegression{};
-        for (HitPtr const& ph : vph_reg) {
-            double z = GetSpace(ph->WireID());
-            double t = ph->PeakTime() * fTick2cm;
-            reg.add(z, t);
-        }
-        reg.compute();
-        dirz = GetSpace(vph_reg.back()->WireID())
-            > GetSpace(vph_reg.front()->WireID())
-            ? 1 : -1;
-        sigma = TMath::Pi() / 4 / reg.corr;
+        reg = orientation(vph_reg);
+
+        // reg = LinearRegression{};
+        // for (HitPtr const& ph : vph_reg) {
+        //     double z = GetSpace(ph->WireID());
+        //     double t = ph->PeakTime() * fTick2cm;
+        //     reg.add(z, t);
+        // }
+        // reg.compute();
+        // DEBUG(reg.corr == 0)
+        // dirz = GetSpace(vph_reg.back()->WireID())
+        //     > GetSpace(vph_reg.front()->WireID())
+        //     ? 1 : -1;
+        // sigma = TMath::Pi() / 4 / reg.corr;
+        // theta = reg.theta(dirz);
     }
 
     unsigned const trailing_radius = 6;
