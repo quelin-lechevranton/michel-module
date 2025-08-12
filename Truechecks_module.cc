@@ -325,9 +325,9 @@ void ana::Truechecks::analyze(art::Event const& e)
             vp_mcp_sorted_hit.end(),
             side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
         );
-        RegM = side_reg[side_pair.second].m();
-        RegP = side_reg[side_pair.second].p();
-        RegR2 = side_reg[side_pair.second].r2();
+        RegM = side_reg[side_pair.second].m;
+        RegP = side_reg[side_pair.second].p;
+        RegR2 = side_reg[side_pair.second].r2;
 
         EndHit = GetHit(vp_mcp_sorted_hit.back());
 

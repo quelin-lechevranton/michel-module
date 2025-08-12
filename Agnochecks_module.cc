@@ -1231,7 +1231,7 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
     if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
 
     // compute average from sum
-    for (ana::LinearRegression& reg : side_reg) reg.normalize();
+    for (ana::LinearRegression& reg : side_reg) reg.compute();
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
