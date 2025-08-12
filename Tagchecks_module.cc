@@ -667,7 +667,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     }
 
     HitPtrVec vph_reg{iph_body, iph_body+fRegN};
-    auto orientation = [&](HitPtrVec const& vph) {
+    auto orientation = [&](HitPtrVec const& vph) -> std::pair<double, double> {
         LinearRegression reg;
         for (HitPtr const& ph : vph) {
             double z = GetSpace(ph->WireID());
@@ -681,9 +681,9 @@ HitPtr ana::Tagchecks::GetBraggEnd(
             ? 1 : -1;
         double sigma = TMath::Pi() / 4 / reg.corr;
         double theta = reg.theta(dirz);
-        return (struct { double theta, sigma; }){theta, sigma};
+        return std::make_pair(theta, sigma);
     };
-    auto reg = orientation(vph_reg);
+    std::pair<double, double> reg = orientation(vph_reg);
 
     HitPtrVec vph_near;
     for (HitPtr const& ph_ev : vph_ev) {
@@ -734,8 +734,8 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         HitPtrVec::iterator iph_max = std::max_element(
             vph_near.begin(), vph_near.end(),
             [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
-                return score(ph_prev, ph1, reg.theta, reg.sigma) 
-                    < score(ph_prev, ph2, reg.theta, reg.sigma);
+                return score(ph_prev, ph1, reg.first, reg.second)
+                    < score(ph_prev, ph2, reg.first, reg.second);
             }
         );
 
