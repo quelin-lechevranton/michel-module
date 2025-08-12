@@ -675,7 +675,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
             reg.add(z, t);
         }
         reg.compute();
-        DEBUG(reg.corr == 0)
+        // DEBUG(reg.corr == 0)
         int dirz = GetSpace(vph.back()->WireID())
             > GetSpace(vph.front()->WireID())
             ? 1 : -1;
@@ -730,7 +730,6 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     std::reverse(vph_sec.begin(), vph_sec.end());
     HitPtr ph_prev = ph_trk_end;
     while (vph_near.size()) {
-        std::cout << vph_near.size() << std::endl;
         HitPtrVec::iterator iph_max = std::max_element(
             vph_near.begin(), vph_near.end(),
             [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
@@ -762,6 +761,11 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         // theta = reg.theta(dirz);
     }
 
+    if (vph_sec.size() < fRegN) {
+        if (error) *error = "Not enough hits in Bragg section for regression";
+        return HitPtr{};
+    }
+
     unsigned const trailing_radius = 6;
     double max = std::numeric_limits<double>::lowest();
     HitPtr ph_max;
@@ -780,7 +784,10 @@ HitPtr ana::Tagchecks::GetBraggEnd(
 
         double dx = iph_sec == vph_sec.begin()
             ? sqrt(dist2(*iph_sec, *(iph_sec+1)))
-            : .5*sqrt(dist2(*(iph_sec-1), *(iph_sec+1)));
+            : ( iph_sec == vph_sec.end()-1
+                ? sqrt(dist2(*(iph_sec-1), *iph_sec))
+                : .5*sqrt(dist2(*(iph_sec-1), *(iph_sec+1)))
+            );
         for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
             dx += iph == vph_sec.end()-1
                 ? sqrt(dist2(*(iph-1), *iph))
