@@ -65,10 +65,11 @@ private:
     bool fLog;
     bool fKeepOutside;
     float fTrackLengthCut; // in cm
-    float fMichelSpaceRadius; // in cm
-    float fMichelTickRadius; // in ticks
-    float fCoincidenceWindow; // in ticks
-    float fCoincidenceRadius; // in cm
+    float fMichelRadius; // in cm
+    float fNearbyRadius; // in cm
+    float fBodyDistance; // in cm
+    unsigned fRegN;
+    float fBraggThreshold; // in MIP
 
     // Output Variables
     unsigned evRun, evSubRun, evEvent;
@@ -90,8 +91,9 @@ private:
     bool TagCathodeCrossing;
     bool TagAnodeCrossing;
     float CutTrackLength;
-    bool TagEndIsInWindowT;
-    bool TagEndIsInVolumeYZ;
+    bool TagEndInWindow;
+    bool TagEndInVolume;
+    float CutdQdxMax;
 
     bool TrueTagDownward;
     int TrueTagPdg;
@@ -103,6 +105,7 @@ private:
     ana::Hits MuonHits;
     ana::Hit MuonEndHit;
     ana::Hit MuonTrueEndHit;
+    ana::Hit BraggEndHit;
 
     float MichelTrackLength;
     ana::Hits MichelHits;
@@ -122,6 +125,16 @@ private:
         std::vector<ana::LinearRegression> *p_side_reg = nullptr,
         geo::View_t view = geo::kW
     );
+    std::pair<double, double> LinRegPCA(HitPtrVec const& vp_hit);
+    HitPtr GetBraggEnd(
+        HitPtrVec const& vph_trk,
+        HitPtr const& ph_trk_end,
+        art::Ptr<recob::Track> const& p_trk,
+        HitPtrVec const& vph_ev,
+        art::FindOneP<recob::Track> const& fop_hit2trk,
+        HitPtrVec *vph_sec_bragg,
+        double *max_dQdx
+    );
 };
 
 
@@ -131,9 +144,11 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     fLog(p.get<bool>("Log", false)),
     fKeepOutside(p.get<bool>("KeepOutside", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
-    fMichelSpaceRadius(p.get<float>("MichelSpaceRadius", 20.F)), //in cm
-    fCoincidenceWindow(p.get<float>("CoincidenceWindow", 1.F)), // in ticks
-    fCoincidenceRadius(p.get<float>("CoincidenceRadius", 1.F)) // in cm
+    fMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
+    fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
+    fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
+    fRegN(p.get<unsigned>("RegNmin", 6)),
+    fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
     asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
@@ -175,7 +190,6 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
     fDriftVelocity = detProp.DriftVelocity();
     fTick2cm = fDriftVelocity * fSamplingRate;
-    fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
@@ -229,9 +243,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         << "  LowX Bounds: " << geoLowX.Min() << " -> " << geoLowX.Max() << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
-        << "  Michel Space Radius: " << fMichelSpaceRadius << " cm"
-        << " (" << fMichelTickRadius << " ticks)" << std::endl
-        << "  Coincidence Window: " << fCoincidenceWindow << " ticks" << std::endl;
+        << "  Michel Space Radius: " << fMichelRadius << " cm";
 
     tEvent = asFile->make<TTree>("event","");
 
@@ -259,8 +271,9 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     tMuon->Branch("TagCathodeCrossing", &TagCathodeCrossing);
     tMuon->Branch("TagAnodeCrossing", &TagAnodeCrossing);
     tMuon->Branch("CutTrackLength", &CutTrackLength);
-    tMuon->Branch("TagEndIsInWindowT", &TagEndIsInWindowT);
-    tMuon->Branch("TagEndIsInVolumeYZ", &TagEndIsInVolumeYZ);
+    tMuon->Branch("TagEndInWindow", &TagEndInWindow);
+    tMuon->Branch("TagEndInVolume", &TagEndInVolume);
+    tMuon->Branch("CutdQdxMax", &CutdQdxMax);
 
     tMuon->Branch("TrueTagPdg", &TrueTagPdg);
     tMuon->Branch("TrueTagDownward", &TrueTagDownward);
@@ -270,6 +283,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     MuonHits.SetBranches(tMuon);
     MuonEndHit.SetBranches(tMuon, "End");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
+    BraggEndHit.SetBranches(tMuon, "BraggEnd");
 
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
@@ -323,28 +337,71 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         ASSERT(vp_hit_muon.size())
 
         CutTrackLength = p_trk->Length();
-        TagCathodeCrossing = (
-            geoLowX.ContainsPosition(p_trk->Start()) 
-            && geoHighX.ContainsPosition(p_trk->End())
-        ) || (
-            geoHighX.ContainsPosition(p_trk->Start())
-            && geoLowX.ContainsPosition(p_trk->End())
-        );
 
-        // Anode crossing: SUPPOSITION: Muon is downward
         TagIsUpright =  IsUpright(*p_trk);
         geo::Point_t Start = TagIsUpright ? p_trk->Start() : p_trk->End();
         geo::Point_t End = TagIsUpright ? p_trk->End() : p_trk->Start();
+
+        TagEndInVolume = geoHighX.InFiducialY(End.Y(), 20.)
+            && geoHighX.InFiducialZ(End.Z(), 20.);
+
+        TagCathodeCrossing = (
+            geoLowX.ContainsPosition(Start) 
+            && geoHighX.ContainsPosition(End)
+        ) || (
+            geoHighX.ContainsPosition(Start)
+            && geoLowX.ContainsPosition(End)
+        );
+
+        // Anode Crossing: SUPPOSITION: Muon is downward
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8);
+            TagAnodeCrossing = geoHighX.InFiducialY(Start.Y(), 20.)
+                && geoHighX.InFiducialZ(Start.Z(), 20.);
         else if (geoDet == kPDHD)
             TagAnodeCrossing = (
-                geoHighX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
-                || geoLowX.ContainsYZ(Start.Y(), Start.Z(), 0.8)
+                geoHighX.InFiducialY(Start.Y(), 20.)
+                && geoHighX.InFiducialZ(Start.Z(), 20.)
+            ) || (
+                geoLowX.InFiducialY(Start.Y(), 20.)
+                && geoLowX.InFiducialZ(Start.Z(), 20.)
             );
+
+        // Last Hit: SUPPOSITION: Muon is downward
+        HitPtrVec vp_hit_muon_sorted = GetSortedHits(
+            vp_hit_muon, 
+            End.Z() > Start.Z() ? 1 : -1
+        );
+        ASSERT(vp_hit_muon_sorted.size())
+        MuonEndHit = GetHit(vp_hit_muon_sorted.back());
+
+        TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         ASSERT(mcp)
+
+        // we found a muon candidate!
+        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
+        EventiMuon.push_back(iMuon);
+        resetMuon();
+
+
+        HitPtrVec vph_sec_bragg;
+        double max_dQdx;
+        BraggEndHit = GetHit(GetBraggEnd(
+            vp_hit_muon_sorted, 
+            vp_hit_muon_sorted.back(),
+            p_trk,
+            vp_hit,
+            fop_hit2trk,
+            &vph_sec_bragg,
+            &max_dQdx
+        ));
+        CutdQdxMax = max_dQdx;
+
+        // getting all muon hits
+        for (HitPtr const& p_hit_muon : vp_hit_muon_sorted)
+            if (p_hit_muon->View() == geo::kW)
+                MuonHits.push_back(GetHit(p_hit_muon));
 
         TrueTagPdg = mcp->PdgCode();
         TrueTagEndProcess = mcp->EndProcess();
@@ -353,15 +410,6 @@ void ana::Tagchecks::analyze(art::Event const& e) {
             TrueTagDownward = mcp->Position(0).X() > mcp->EndPosition().X();
         else if (geoDet == kPDHD)
             TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
-
-        resetMuon();
-
-        HitPtrVec vp_hit_muon_sorted = GetSortedHits(
-            vp_hit_muon, 
-            End.Z() > Start.Z() ? 1 : -1
-        );
-        ASSERT(vp_hit_muon_sorted.size())
-        MuonEndHit = GetHit(vp_hit_muon_sorted.back());
 
         HitPtrVec vp_hit_mcp_muon;
         MuonTrueEndHit = ana::Hit{};
@@ -374,22 +422,6 @@ void ana::Tagchecks::analyze(art::Event const& e) {
             if (vp_hit_mcp_muon.size())
                 MuonTrueEndHit = GetHit(vp_hit_mcp_muon.back());
         }
-
-        TagEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
-        TagEndIsInVolumeYZ = geoHighX.InFiducialY(End.Y(), fMichelSpaceRadius)
-            && geoHighX.InFiducialZ(End.Z(), fMichelSpaceRadius);
-
-        // ASSERT(fKeepOutside or (TagEndIsInWindowT and TagEndIsInVolumeYZ))
-
-        // we found a muon candidate!
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
-
-        EventiMuon.push_back(iMuon);
-
-        // getting all muon hits
-        for (HitPtr const& p_hit_muon : vp_hit_muon_sorted)
-            if (p_hit_muon->View() == geo::kW)
-                MuonHits.push_back(GetHit(p_hit_muon));
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
@@ -509,27 +541,23 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
     ) return HitPtrVec{};
     for (ana::LinearRegression& reg : side_reg)
         if (reg.n >= ana::LinearRegression::nmin)
-            reg.normalize();
-    if (p_side_reg) {
-        p_side_reg->clear();
-        p_side_reg->push_back(side_reg[0]);
-        p_side_reg->push_back(side_reg[1]);
-    }
+            reg.compute();
+    if (p_side_reg) *p_side_reg = side_reg;
     for (int side=0; side<2; side++)
         if (side_reg[side].n >= ana::LinearRegression::nmin)
             std::sort(
                 side_hit[side].begin(),
                 side_hit[side].end(),
                 [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
+                    HitPtr const& ph1, HitPtr const& ph2
                 ) -> bool {
                     double const s1 = reg.projection(
-                        GetSpace(h1->WireID()),
-                        h1->PeakTime() * fTick2cm
+                        GetSpace(ph1->WireID()),
+                        ph1->PeakTime() * fTick2cm
                     );
                     double const s2 = reg.projection(
-                        GetSpace(h2->WireID()),
-                        h2->PeakTime() * fTick2cm
+                        GetSpace(ph2->WireID()),
+                        ph2->PeakTime() * fTick2cm
                     );
                     return (s2 - s1) * dirz > 0;
                 }
@@ -586,5 +614,166 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
     );
     return vp_sorted_hit;
 }
+
+HitPtr ana::Tagchecks::GetBraggEnd(
+    HitPtrVec const& vph_trk,
+    HitPtr const& ph_trk_end,
+    art::Ptr<recob::Track> const& p_trk,
+    HitPtrVec const& vph_ev,
+    art::FindOneP<recob::Track> const& fop_hit2trk,
+    HitPtrVec *vph_sec_bragg,
+    double *max_dQdx
+) {
+    HitPtrVec vph_sec_trk;
+    int sec = ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC];
+    for (HitPtr const& p_hit : vph_trk) {
+        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != sec) continue;
+        vph_sec_trk.push_back(p_hit);
+    }
+
+    auto dist2 = [&](HitPtr const& ph1, HitPtr const& ph2) {
+        return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
+            + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
+    };
+    std::sort(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](HitPtr const& ph1, HitPtr const& ph2) {
+            return dist2(ph2, ph_trk_end) > dist2(ph1, ph_trk_end);
+        }
+    );
+
+    HitPtrVec::iterator iph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](HitPtr const& h) {
+            return dist2(h, ph_trk_end) > fBodyDistance * fBodyDistance;
+        }
+    );
+    if (std::distance(iph_body, vph_sec_trk.end()) < fRegN)
+        return HitPtr{};
+
+    HitPtrVec vph_reg{iph_body, iph_body + fRegN};
+    LinearRegression reg;
+    for (HitPtr const& ph : vph_reg) {
+        double z = GetSpace(ph->WireID());
+        double t = ph->PeakTime() * fTick2cm;
+        reg.add(z, t);
+    }
+    reg.compute();
+    double sigma = TMath::Pi() / 4 / reg.corr;
+
+    HitPtrVec vph_near;
+    for (HitPtr const& ph_ev : vph_ev) {
+        if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
+            != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
+
+        // check if the hit is in another track
+        art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
+        if (
+            pt_hit
+            && pt_hit.key() != p_trk.key() 
+            && pt_hit->Length() > fTrackLengthCut
+        ) continue;
+
+        // check if the hit is already treated
+        if (std::find_if(
+            iph_body, vph_sec_trk.end(),
+            [&](HitPtr const& ph) {
+                return ph.key() == ph_ev.key();
+            }
+        ) != vph_sec_trk.end()) continue;
+
+        // check if the hit is close enough
+        double d2 = dist2(ph_ev, ph_trk_end);
+        if (d2 > fNearbyRadius) continue;
+
+        vph_near.push_back(ph_ev);
+    }
+
+    auto score = [&](HitPtr const& ph1, HitPtr const& ph2, double theta, double sigma) {
+        double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
+        double dt = ph2->PeakTime() * fTick2cm - ph1->PeakTime() * fTick2cm;
+        double da = atan2(dt, dz) - theta;
+        da = abs(da) < TMath::Pi() ? da : da - (da>0?1:-1) * 2 * TMath::Pi();
+        double r = sqrt(dt*dt + dz*dz);
+
+        return TMath::Gaus(da, 0, sigma) / r;
+    };
+
+    // double z0 = GetSpace(ph_trk_end->WireID());
+    // double t0 = ph_trk_end->PeakTime() * fTick2cm;
+    // double sec0 = ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC];
+    HitPtrVec vph_sec{vph_reg.begin(), vph_reg.end()};
+    std::reverse(vph_sec.begin(), vph_sec.end());
+    HitPtr ph0 = ph_trk_end;
+    int dirz = GetSpace(vph_reg.back()->WireID())
+        > GetSpace(vph_reg.front()->WireID())
+        ? 1 : -1;
+    while (vph_near.size()) {
+        HitPtrVec::iterator iph_max;
+        double max = std::numeric_limits<double>::lowest();
+        for (auto iph_near=vph_near.begin(); iph_near!=vph_near.end(); iph_near++) {
+            double s = score(ph0, *iph_near, reg.theta(dirz), sigma);
+            if (s > max) {
+                max= s;
+                iph_max = iph_near;
+            }
+        }
+
+        vph_near.erase(iph_max);
+        vph_reg.insert(vph_reg.begin(), *iph_max);
+        vph_reg.pop_back();
+        vph_sec.push_back(*iph_max);
+
+        reg = LinearRegression{};
+        for (HitPtr const& ph : vph_reg) {
+            double z = GetSpace(ph->WireID());
+            double t = ph->PeakTime() * fTick2cm;
+            reg.add(z, t);
+        }
+        reg.compute();
+        dirz = GetSpace(vph_reg.back()->WireID())
+            > GetSpace(vph_reg.front()->WireID())
+            ? 1 : -1;
+        sigma = TMath::Pi() / 4 / reg.corr;
+    }
+
+    unsigned const trailing_radius = 6;
+    double max = std::numeric_limits<double>::lowest();
+    HitPtr ph_max;
+    for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
+        HitPtrVec::iterator jph_sec = std::distance(iph_sec, vph_sec.end()) > trailing_radius
+            ? iph_sec+trailing_radius : vph_sec.end();
+        unsigned l = std::distance(iph_sec, jph_sec);
+
+        double dQ = std::accumulate(
+            iph_sec, jph_sec, 0.,
+            [](double sum, HitPtr const& ph) {
+                return sum+ph->Integral();
+            }
+        );
+        dQ /= l;
+
+        double dx = iph_sec == vph_sec.begin()
+            ? sqrt(dist2(*iph_sec, *(iph_sec+1)))
+            : .5*sqrt(dist2(*(iph_sec-1), *(iph_sec+1)));
+        for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
+            dx += iph == vph_sec.end()-1
+                ? sqrt(dist2(*(iph-1), *iph))
+                : .5*sqrt(dist2(*(iph-1), *(iph+1)));
+        dx /= l;
+
+        double dQdx = dQ / dx;
+        if (dQdx > max) {
+            max = dQdx;
+            ph_max = *iph_sec;
+        }
+    }
+    if (max_dQdx) *max_dQdx = max;
+    return ph_max;
+}   
+
+
 
 DEFINE_ART_MODULE(ana::Tagchecks)

@@ -15,7 +15,6 @@
 #include <TGraph2D.h>
 
 namespace ana {
-    inline void drawFrame(TCanvas* c, int geoDet, unsigned r=0, unsigned sr=0, unsigned e=0, int real=-1) {}
     inline void drawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
         Style_t const font = 43;
         unsigned n_sec=0;

@@ -390,7 +390,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
     );
-    ana::drawFrame(c, int(geoDet), e.run(), e.subRun(), e.event(), e.isRealData());
+    ana::drawFrame(c, int(geoDet), "", Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
 
     auto drawMarker = [&](HitPtr const& p_hit, MarkerStyle const& ms) -> void {
         TMarker *m = new TMarker();
@@ -550,7 +550,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
 
-        bool tooSmall = p_trk->Length() < fTrackLengthCut;
+        // bool tooSmall = p_trk->Length() < fTrackLengthCut;
 
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
         if (!LOG(vp_hit_muon.size())) continue;
@@ -670,29 +670,29 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
                 reg.add(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
             }
-            reg.normalize();
+            reg.compute();
 
             TF1* f = new TF1();
             if (geoDet == kPDVD) {
-                double xmin = reg.m() > 1 ? reg.mx - 10 : reg.m() * (reg.my - 10) + reg.p();
-                double xmax = reg.m() > 1 ? reg.mx + 10 : reg.m() * (reg.my + 10) + reg.p();
+                double xmin = reg.m > 1 ? reg.mx - 10 : reg.m * (reg.my - 10) + reg.m;
+                double xmax = reg.m > 1 ? reg.mx + 10 : reg.m * (reg.my + 10) + reg.m;
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "(x - [1]) / [0]",
                     xmin, xmax
                 );
             } else if (geoDet == kPDHD) {
-                double xmin = reg.m() > 1 ? (reg.mx - 10 - reg.p()) / reg.m() : reg.my - 10;
-                double xmax = reg.m() > 1 ? (reg.mx + 10 - reg.p()) / reg.m() : reg.my + 10;
+                double xmin = reg.m > 1 ? (reg.mx - 10 - reg.m) / reg.m : reg.my - 10;
+                double xmax = reg.m > 1 ? (reg.mx + 10 - reg.m) / reg.m : reg.my + 10;
                 f = new TF1(
                     Form("reg%u_s%u", p_trk->ID(), s),
                     "[0]*x + [1]",
                     xmin, xmax
                 );
             }
-            f->SetParameter(0, reg.m());
-            f->SetParameter(1, reg.p());
-            setLineStyle(f, reg.r2() > 0.5 ? ls_reg_good : ls_reg_bad);
+            f->SetParameter(0, reg.m);
+            f->SetParameter(1, reg.m);
+            setLineStyle(f, reg.r2 > 0.5 ? ls_reg_good : ls_reg_bad);
 
             c->cd(s+1);
             f->Draw("same");
@@ -1053,8 +1053,8 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                     (reg.mt + 10) / fTick2cm
                 );
             }
-            f->SetParameter(0, reg.m() / fTick2cm);
-            f->SetParameter(1, reg.p());
+            f->SetParameter(0, reg.m / fTick2cm);
+            f->SetParameter(1, reg.m);
             f->SetLineColor(kAzure-4);
             f->SetLineWidth(2);
 
@@ -1152,7 +1152,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         if (vp_hit_shw.empty()) continue;
         drawGraph(vp_hit_shw, "p", ms_shw);
     }
-
+        
     c->Write();
 }
 
@@ -1239,7 +1239,7 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
     if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
 
     // compute average from sum
-    for (ana::LinearRegression& reg : side_reg) reg.normalize();
+    for (ana::LinearRegression& reg : side_reg) reg.compute();
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);

@@ -97,9 +97,9 @@ private:
     std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+2, kAzure-2, kAzure+2, kAzure+7};
     std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
     MarkerStyle
-        ms_ev = {kBlack, 50, 0.5},
+        ms_ev = {kBlack, kDot, 0.5},
         ms_end = {kViolet+6, kFullSquare},
-        ms_cc = {kViolet+6, kFullTriangleDown},
+        ms_cc = {kViolet+6, kFullTriangleUp},
         ms_sc = {kViolet+6, kFullCircle},
         ms_pass = {vc_pass.front(), kFullCircle},
         ms_fail = {vc_fail.front(), kFullCircle},
@@ -416,9 +416,9 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
                 drawGraph(*ihc, vp_hit_muon_sorted, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
                 drawGraph2D(*itc, p_trk, {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
-                for (auto jhc=ihc+1; jhc<hcs.end(); jhc++)
+                for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
                     drawGraph(*jhc, vp_hit_muon_sorted, "l", {}, ls_back);
-                for (auto jtc=itc+1; jtc<tcs.end(); jtc++)
+                for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
                     drawGraph2D(*jtc, p_trk, ms_back);
                 return false;
             }
@@ -533,7 +533,7 @@ HitPtrVec ana::TrackDisplay::GetSortedHits(
     ) return HitPtrVec{};
     for (ana::LinearRegression& reg : side_reg)
         if (reg.n >= ana::LinearRegression::nmin)
-            reg.normalize();
+            reg.compute();
     for (int side=0; side<2; side++)
         if (side_reg[side].n >= ana::LinearRegression::nmin)
             std::sort(

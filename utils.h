@@ -30,7 +30,7 @@
 #include <TBranch.h>
 
 #include <cstdio>
-#include <ranges>
+#include <algorithm>
 
 #define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
 #define ASSERT(x)  if (!(fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
@@ -103,25 +103,33 @@ namespace ana {
         { 0, -1 }, { 1, 1 }
     };
 
-    // z = m*t + p
+    // y = m*x + p
     struct LinearRegression {
         static constexpr unsigned nmin = 4;
         unsigned n=0;
         double mx=0, my=0, mx2=0, my2=0, mxy=0;
+        double varx=0, vary=0, cov=0;
+        double m=0, p=0, r2=0;
+        double lp=0, corr=0;
         void add(double x, double y) {
             mx+=x; my+=y; mx2+=x*x; my2+=y*y; mxy+=x*y; n++;
         }
-        void normalize() {
+        void compute() {
             mx/=n; my/=n; mx2/=n; my2/=n; mxy/=n;
+            varx=mx2-mx*mx;
+            vary=my2-my*my;
+            cov=mxy-mx*my;
+            m= n<nmin ? 0 : cov/varx;
+            p= my - m*mx;
+            r2= n<nmin ? 0 : cov*cov / (varx*vary);
+            lp= .5*(varx+vary + sqrt(pow(varx+vary, 2) + 4*cov*cov));
+            corr= 1 - 4 * (varx*vary - cov*cov) / pow(varx+vary, 2);
         }
-        double varx() const { return mx2 - mx*mx; }
-        double vary() const { return my2 - my*my; }
-        double cov() const { return mxy - my*mx; }
-        double m() const { return n<nmin ? 0 : cov()/varx(); }
-        double p() const { return my - m()*mx; }
-        double r2() const { return n<nmin ? 0 : cov()*cov() / (varx()*vary()); }
         double projection(double x, double y) const {
-            return (x + m()*(y-p())) / (1 + m()*m());
+            return (x + m*(y-p)) / (1 + m*m);
+        }
+        double theta(int dirx) {
+            return atan2(dirx * abs(cov), dirx* abs(lp-vary));
         }
     };
 

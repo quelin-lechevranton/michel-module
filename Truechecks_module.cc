@@ -293,7 +293,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         if (side_reg[0].n < ana::LinearRegression::nmin || side_reg[1].n < ana::LinearRegression::nmin) continue;
         for (ana::LinearRegression& reg : side_reg)
             if (reg.n >= ana::LinearRegression::nmin)
-                reg.normalize();
+                reg.compute();
         for (int side=0; side<2; side++) {
             std::sort(
                 side_hit[side].begin(),
@@ -626,7 +626,7 @@ HitPtrVec ana::Truechecks::GetSortedHits(
     if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
 
     // compute average from sum
-    for (ana::LinearRegression& reg : side_reg) reg.normalize();
+    for (ana::LinearRegression& reg : side_reg) reg.compute();
 
     // find the track ends on each side of the cathode
     for (int side=0; side<2; side++) {
