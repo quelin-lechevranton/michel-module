@@ -93,7 +93,11 @@ private:
     float CutTrackLength;
     bool TagEndInWindow;
     bool TagEndInVolume;
+
     float CutdQdxMax;
+    enum BraggError { kNoError, kEndNotFound, kSmallBody };
+    BraggError TagBraggError;
+    ana::Hits BraggMuonHits;
 
     bool TrueTagDownward;
     int TrueTagPdg;
@@ -133,8 +137,8 @@ private:
         HitPtrVec const& vph_ev,
         art::FindOneP<recob::Track> const& fop_hit2trk,
         HitPtrVec *vph_sec_bragg = nullptr,
-        double *max_dQdx = nullptr,
-        std::string *error = nullptr
+        float *max_dQdx = nullptr,
+        BraggError *error = nullptr
     );
 };
 
@@ -275,6 +279,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     tMuon->Branch("TagEndInWindow", &TagEndInWindow);
     tMuon->Branch("TagEndInVolume", &TagEndInVolume);
     tMuon->Branch("CutdQdxMax", &CutdQdxMax);
+    tMuon->Branch("TagBraggError", &TagBraggError);
 
     tMuon->Branch("TrueTagPdg", &TrueTagPdg);
     tMuon->Branch("TrueTagDownward", &TrueTagDownward);
@@ -285,6 +290,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     MuonEndHit.SetBranches(tMuon, "End");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
     BraggEndHit.SetBranches(tMuon, "BraggEnd");
+    BraggMuonHits.SetBranches(tMuon, "BraggMuon");
 
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
@@ -385,25 +391,20 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         EventiMuon.push_back(iMuon);
         resetMuon();
 
-        HitPtrVec vph_sec_bragg;
-        double max_dQdx;
-        std::string error;
+        HitPtrVec vph_bragg;
         HitPtr ph_bragg = GetBraggEnd(
             vph_muon_sorted, 
             vph_muon_sorted.back(),
             p_trk,
             vp_hit,
             fop_hit2trk,
-            &vph_sec_bragg,
-            &max_dQdx,
-            &error
+            &vph_bragg,
+            &CutdQdxMax,
+            &TagBraggError
         );
-        if (!ph_bragg) {
-            std::cout << "\033[1;91m" "BraggEnd error: " "\033[0m" << error << std::endl;
-            continue;
-        }
-        BraggEndHit = GetHit(ph_bragg);
-        CutdQdxMax = max_dQdx;
+        BraggEndHit = ph_bragg ? GetHit(ph_bragg) : ana::Hit{};
+        for (HitPtr const& ph_bragg : vph_bragg)
+            BraggMuonHits.push_back(GetHit(ph_bragg));
 
         // getting all muon hits
         for (HitPtr const& p_hit_muon : vph_muon_sorted)
@@ -629,8 +630,8 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     HitPtrVec const& vph_ev,
     art::FindOneP<recob::Track> const& fop_hit2trk,
     HitPtrVec *vph_sec_bragg,
-    double *max_dQdx,
-    std::string *error
+    float *max_dQdx,
+    BraggError *error
 ) {
     HitPtrVec vph_sec_trk;
     for (HitPtr const& p_hit : vph_trk) {
@@ -638,7 +639,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         vph_sec_trk.push_back(p_hit);
     }
     if (vph_sec_trk.empty() || ph_trk_end != vph_sec_trk.back()) {
-        if (error) *error = "Track end hit not found in track hits";
+        if (error) *error = kEndNotFound;
         return HitPtr{};
     }
 
@@ -662,7 +663,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         }
     );
     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
-        if (error) *error = "Not enough hits in track body for regression";
+        if (error) *error = kSmallBody;
         return HitPtr{};
     }
 
@@ -761,11 +762,6 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         // theta = reg.theta(dirz);
     }
 
-    if (vph_sec.size() < fRegN) {
-        if (error) *error = "Not enough hits in Bragg section for regression";
-        return HitPtr{};
-    }
-
     unsigned const trailing_radius = 6;
     double max = std::numeric_limits<double>::lowest();
     HitPtr ph_max;
@@ -801,7 +797,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
         }
     }
     if (vph_sec_bragg) *vph_sec_bragg = vph_sec;
-    if (max_dQdx) *max_dQdx = max;
+    if (max_dQdx) *max_dQdx = float(max);
     return ph_max;
 }   
 
