@@ -95,8 +95,8 @@ private:
     bool TagEndInVolume;
 
     float CutdQdxMax;
-    enum BraggError { kNoError, kEndNotFound, kSmallBody };
-    BraggError TagBraggError;
+    enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
+    int TagBraggError;
     ana::Hits BraggMuonHits;
 
     bool TrueTagDownward;
@@ -138,7 +138,7 @@ private:
         art::FindOneP<recob::Track> const& fop_hit2trk,
         HitPtrVec *vph_sec_bragg = nullptr,
         float *max_dQdx = nullptr,
-        BraggError *error = nullptr
+        int *error = nullptr
     );
 };
 
@@ -480,7 +480,6 @@ void ana::Tagchecks::analyze(art::Event const& e) {
 void ana::Tagchecks::beginJob() {}
 void ana::Tagchecks::endJob() {}
 
-
 void ana::Tagchecks::resetEvent() {
     EventNMuon = 0;
     EventiMuon.clear();
@@ -492,6 +491,7 @@ void ana::Tagchecks::resetMuon() {
     MichelTrueEnergy = 0;
     MichelHits.clear();
     MichelHitEnergy = 0;
+    BraggMuonHits.clear();
 }
 
 
@@ -631,7 +631,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     art::FindOneP<recob::Track> const& fop_hit2trk,
     HitPtrVec *vph_sec_bragg,
     float *max_dQdx,
-    BraggError *error
+    int *error
 ) {
     HitPtrVec vph_sec_trk;
     for (HitPtr const& p_hit : vph_trk) {
