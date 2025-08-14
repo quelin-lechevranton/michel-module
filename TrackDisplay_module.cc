@@ -137,6 +137,11 @@ private:
         float *max_dQdx = nullptr,
         int *error = nullptr
     );
+
+    double dist2(HitPtr const& ph1, HitPtr const& ph2);
+    void drawMarker (TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms);
+    void drawGraph (TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={});
+    void drawGraph2D (TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={});
 };
 
 
@@ -308,64 +313,6 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
-    auto drawMarker = [&](TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) -> void {
-        TMarker *m = new TMarker();
-        setMarkerStyle(m, ms);
-        if (geoDet == kPDVD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            hc->cd(s+1);
-            m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
-        } else if (geoDet == kPDHD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) return;
-            hc->cd(s+1);
-            m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
-        }
-    };
-
-    auto drawGraph = [&](TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
-        unsigned static gn=0;
-        std::vector<TGraph*> gs(ana::n_sec[geoDet]);
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            gs[s] = new TGraph();
-            gs[s]->SetEditable(kFALSE);
-            gs[s]->SetName(Form("g%u_s%u", gn, s));
-            setMarkerStyle(gs[s], ms);
-            setLineStyle(gs[s], ls);
-        }
-        for (HitPtr p_hit : vp_hit) {
-            if (p_hit->View() != geo::kW) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (s == -1) continue;
-            if (geoDet == kPDVD)
-                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
-            else if (geoDet == kPDHD)
-                gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
-        }
-        for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-            if (!gs[s]->GetN()) continue;
-            hc->cd(s+1);
-            gs[s]->Draw(draw);
-        }
-        gn++;
-    };
-
-    auto drawGraph2D = [&](TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={}) -> void {
-        TGraph2D* g = new TGraph2D();
-        setMarkerStyle(g, ms);
-        setLineStyle(g, ls);
-        for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
-            if (!p_trk->HasValidPoint(it)) continue;
-            geo::Point_t pt = p_trk->LocationAtPoint(it);
-            if (geoDet == kPDVD)
-                g->AddPoint(pt.Y(), pt.Z(), pt.X());
-            else if (geoDet == kPDHD)
-                g->AddPoint(pt.Z(), pt.X(), pt.Y());
-        }
-        tc->cd();
-        g->Draw("same line");
-    };
-
     std::vector<char const*> cuts = {
         "None",
         Form("TrackLength >= %.0f cm", fTrackLengthCut),
@@ -444,6 +391,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
         auto drawFilter = [&](bool tag) -> bool {
+            LOG(tag);
             if (!tag) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
                 drawGraph(*ihc, vph_muon_sorted, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
@@ -839,6 +787,64 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
     if (error) *error = kNoError;
     return ph_max;
 }   
+
+void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) {
+    TMarker *m = new TMarker();
+    setMarkerStyle(m, ms);
+    if (geoDet == kPDVD) {
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        hc->cd(s+1);
+        m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+    } else if (geoDet == kPDHD) {
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) return;
+        hc->cd(s+1);
+        m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+    }
+}
+
+void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
+    unsigned static gn=0;
+    std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        gs[s] = new TGraph();
+        gs[s]->SetEditable(kFALSE);
+        gs[s]->SetName(Form("g%u_s%u", gn, s));
+        setMarkerStyle(gs[s], ms);
+        setLineStyle(gs[s], ls);
+    }
+    for (HitPtr p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        if (geoDet == kPDVD)
+            gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+        else if (geoDet == kPDHD)
+            gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+    }
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        if (!gs[s]->GetN()) continue;
+        hc->cd(s+1);
+        gs[s]->Draw(draw);
+    }
+    gn++;
+}
+
+void ana::TrackDisplay::drawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
+    TGraph2D* g = new TGraph2D();
+    setMarkerStyle(g, ms);
+    setLineStyle(g, ls);
+    for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
+        if (!p_trk->HasValidPoint(it)) continue;
+        geo::Point_t pt = p_trk->LocationAtPoint(it);
+        if (geoDet == kPDVD)
+            g->AddPoint(pt.Y(), pt.Z(), pt.X());
+        else if (geoDet == kPDHD)
+            g->AddPoint(pt.Z(), pt.X(), pt.Y());
+    }
+    tc->cd();
+    g->Draw("same line");
+}
 
 
 DEFINE_ART_MODULE(ana::TrackDisplay)

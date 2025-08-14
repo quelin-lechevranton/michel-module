@@ -32,9 +32,9 @@
 #include <cstdio>
 #include <algorithm>
 
-#define LOG(x) (fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
-#define ASSERT(x)  if (!(fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
-#define DEBUG(x) if ((fLog ? printf("\t" #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(1);
+#define LOG(x) (fLog ? printf("\tLOG    " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
+#define ASSERT(x)  if (!(fLog ? printf("\tASSERT " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
+#define DEBUG(x) if ((fLog ? printf("\tDEBUG  " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(1);
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };
