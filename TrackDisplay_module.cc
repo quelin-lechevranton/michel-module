@@ -625,10 +625,6 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
         return HitPtr{};
     }
 
-    auto dist2 = [&](HitPtr const& ph1, HitPtr const& ph2) -> double {
-        return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
-            + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
-    };
     std::sort(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
@@ -693,7 +689,7 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
         }
 
         // check if the hit is close enough
-        if (dist2(ph_ev, ph_trk_end) > fNearbyRadius) continue;
+        if (dist2(ph_ev, ph_trk_end) > fNearbyRadius * fNearbyRadius) continue;
 
         vph_near.push_back(ph_ev);
     }
@@ -786,6 +782,11 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
     if (error) *error = kNoError;
     return ph_max;
 }   
+
+double ana::TrackDisplay::dist2(HitPtr const& ph1, HitPtr const& ph2) {
+    return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
+        + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
+}
 
 void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) {
     TMarker *m = new TMarker();
