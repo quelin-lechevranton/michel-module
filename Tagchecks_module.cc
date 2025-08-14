@@ -129,7 +129,6 @@ private:
         std::vector<ana::LinearRegression> *p_side_reg = nullptr,
         geo::View_t view = geo::kW
     );
-    std::pair<double, double> LinRegPCA(HitPtrVec const& vp_hit);
     HitPtr GetBraggEnd(
         HitPtrVec const& vph_trk,
         HitPtr const& ph_trk_end,
@@ -798,6 +797,7 @@ HitPtr ana::Tagchecks::GetBraggEnd(
     }
     if (vph_sec_bragg) *vph_sec_bragg = vph_sec;
     if (max_dQdx) *max_dQdx = float(max);
+    if (error) *error = kNoError;
     return ph_max;
 }   
 
