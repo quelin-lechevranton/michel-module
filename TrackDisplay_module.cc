@@ -318,7 +318,8 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         Form("TrackLength >= %.0f cm", fTrackLengthCut),
         "EndInVolume (20 cm)",
         "CathodeCrossing",
-        "AnodeCrossing (20 cm)"
+        "AnodeCrossing (20 cm)",
+        "BraggEndAlogithm"
     };
 
     gStyle->SetPalette(pal);
@@ -391,7 +392,6 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
         auto drawFilter = [&](bool tag) -> bool {
-            LOG(tag);
             if (!tag) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
                 drawGraph(*ihc, vph_muon_sorted, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
@@ -443,12 +443,11 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
             );
 
         drawFilter(true);
-        if (!drawFilter(TagEndInVolume)) continue;
-        if (!drawFilter(TagTrackLength)) continue;
-        if (!drawFilter(TagCathodeCrossing)) continue;
-        if (!drawFilter(TagAnodeCrossing)) continue;
-        if (!drawFilter(TagBraggError == kNoError)) continue;
-        DEBUG(TagBraggError == kNoError && ph_bragg)
+        if (!drawFilter(LOG(TagEndInVolume))) continue;
+        if (!drawFilter(LOG(TagTrackLength))) continue;
+        if (!drawFilter(LOG(TagCathodeCrossing))) continue;
+        if (!drawFilter(LOG(TagAnodeCrossing))) continue;
+        if (!drawFilter(LOG(TagBraggError == kNoError))) continue;
         drawMarker(*(ihc-1), ph_bragg, ms_bragg);
     }
 
@@ -802,7 +801,6 @@ void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle
         m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
     }
 }
-
 void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
     unsigned static gn=0;
     std::vector<TGraph*> gs(ana::n_sec[geoDet]);
@@ -829,7 +827,6 @@ void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char con
     }
     gn++;
 }
-
 void ana::TrackDisplay::drawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
     TGraph2D* g = new TGraph2D();
     setMarkerStyle(g, ms);
