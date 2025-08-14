@@ -72,10 +72,6 @@ private:
     float fDriftVelocity; // cm/µs
     float fChannelPitch; // cm/channel
     float fCathodeGap; // cm
-    float fNearbyRadius; // cm
-    float fBodyDistance; // cm
-    unsigned fRegN;
-    float fBraggThreshold; // in MIP dE/dx
 
     bounds<float> wireWindow;
     // bounds3D<float> lower_bounds, upper_bounds;
@@ -94,6 +90,10 @@ private:
     // Input Parameters
     bool fLog;
     float fTrackLengthCut; // in cm
+    float fNearbyRadius; // cm
+    float fBodyDistance; // cm
+    unsigned fRegN;
+    float fBraggThreshold; // in MIP dE/dx
 
     unsigned ev=0;
 
@@ -500,6 +500,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         if (!drawFilter(TagCathodeCrossing)) continue;
         if (!drawFilter(TagAnodeCrossing)) continue;
         if (!drawFilter(TagBraggError == kNoError)) continue;
+        DEBUG(TagBraggError == kNoError && ph_bragg)
         drawMarker(*(ihc-1), ph_bragg, ms_bragg);
     }
 
@@ -795,13 +796,16 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
         // sigma = TMath::Pi() / 4 / reg.corr;
         // theta = reg.theta(dirz);
     }
+    DEBUG(vph_sec.empty())
 
     unsigned const trailing_radius = 6;
     double max = std::numeric_limits<double>::lowest();
     HitPtr ph_max;
     for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
-        HitPtrVec::iterator jph_sec = std::distance(iph_sec, vph_sec.end()) > trailing_radius
-            ? iph_sec+trailing_radius : vph_sec.end();
+        HitPtrVec::iterator jph_sec = 
+            std::distance(iph_sec, vph_sec.end()) > trailing_radius
+            ? iph_sec+trailing_radius
+            : vph_sec.end();
         unsigned l = std::distance(iph_sec, jph_sec);
 
         double dQ = std::accumulate(
@@ -811,7 +815,7 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
             }
         );
         dQ /= l;
-
+        
         double dx = iph_sec == vph_sec.begin()
             ? sqrt(dist2(*iph_sec, *(iph_sec+1)))
             : ( iph_sec == vph_sec.end()-1
