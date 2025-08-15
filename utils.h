@@ -39,6 +39,8 @@
 
 using PtrHit = art::Ptr<recob::Hit>;
 using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
+using PtrTrk = art::Ptr<recob::Track>;
+using VecPtrTrk = std::vector<art::Ptr<recob::Track>>;
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };
@@ -104,9 +106,6 @@ namespace ana {
             {0, 0}, {1, 1} 
         }
     };
-    std::map<int, int> side2dirx = {
-        { 0, -1 }, { 1, 1 }
-    };
 
     // y = m*x + p
     struct LinearRegression {
@@ -120,6 +119,7 @@ namespace ana {
             mx+=x; my+=y; mx2+=x*x; my2+=y*y; mxy+=x*y; n++;
         }
         void compute() {
+            if (n < nmin) return;
             mx/=n; my/=n; mx2/=n; my2/=n; mxy/=n;
             varx=mx2-mx*mx;
             vary=my2-my*my;
@@ -249,7 +249,7 @@ namespace ana {
         bool empty() const { return !N; }
         float energy() const {
             float e = 0;
-            for (unsigned i=0; i<N; i++) e += adc[i];
+            for (float a : adc) e+=a;
             return e;
         }
 
@@ -287,9 +287,9 @@ namespace ana {
         float x, y, z;
         Point() : x(0), y(0), z(0) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
-        Point(double x, double y, double z) : x(x), y(y), z(z) {}
-        Point(geo::Point_t const& p) : x(p.x()), y(p.y()), z(p.z()) {}
-        Point(TVector3 const& v) : x(v.x()), y(v.y()), z(v.z()) {}
+        Point(double x, double y, double z) : x(float(x)), y(float(y)), z(float(z)) {}
+        Point(geo::Point_t const& p) : x(float(p.x())), y(float(p.y())), z(float(p.z())) {}
+        Point(TVector3 const& v) : x(float(v.X())), y(float(v.Y())), z(float(v.Z())) {}
         float r2() const { return x*x + y*y + z*z; }
 
         Point operator+(Point const& p) const { return Point{x+p.x, y+p.y, z+p.z}; }
@@ -364,9 +364,10 @@ namespace ana {
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
-    simb::MCParticle const* trk2mcp(art::Ptr<recob::Track> const& p_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
+    simb::MCParticle const* trk2mcp(
+        PtrTrk const& p_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
         std::unordered_map<int, float> map_tid_ene;
-        for (art::Ptr<recob::Hit> const& p_hit : fmp_trk2hit.at(p_trk.key()))
+        for (PtrHit const& p_hit : fmp_trk2hit.at(p_trk.key()))
             for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
                 map_tid_ene[ide.trackID] += ide.energy;
 
@@ -378,35 +379,52 @@ namespace ana {
         return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
     }
 
-    art::Ptr<recob::Track> mcp2trk(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
-        std::unordered_map<art::Ptr<recob::Track>, unsigned> map_trk_nhit;
-        for (art::Ptr<recob::Track> p_trk : vp_trk)
+    PtrTrk mcp2trk(
+        simb::MCParticle const* mcp, 
+        VecPtrTrk const& vp_trk,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_trk2hit
+    ) {
+        std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
+        for (PtrTrk p_trk : vp_trk)
             map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_trk2hit.at(p_trk.key())).size();
 
         unsigned max = 0;
-        art::Ptr<recob::Track> p_trk_from_mcp;
-        for (std::pair<art::Ptr<recob::Track>, unsigned> p : map_trk_nhit)
+        PtrTrk p_trk_from_mcp;
+        for (std::pair<PtrTrk, unsigned> p : map_trk_nhit)
             if (p.second > max)
                 max = p.second, p_trk_from_mcp = p.first;
         return p_trk_from_mcp;
     }
-
-    std::vector<art::Ptr<recob::Track>> mcp2trks(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Track>> const& vp_trk, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
-        std::vector<art::Ptr<recob::Track>> vp_trk_from_mcp;
-        for (art::Ptr<recob::Track> p_trk : vp_trk) {
+    VecPtrTrk mcp2trks(
+        simb::MCParticle const* mcp,
+        VecPtrTrk const& vp_trk,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_trk2hit
+    ) {
+        VecPtrTrk vp_trk_from_mcp;
+        for (PtrTrk p_trk : vp_trk) {
             simb::MCParticle const* mcp_from_trk = trk2mcp(p_trk, clockData, fmp_trk2hit);
             if (mcp_from_trk && mcp_from_trk->TrackId() == mcp->TrackId())
                 vp_trk_from_mcp.push_back(p_trk);
         }
         return vp_trk_from_mcp;
     }
-
-    std::vector<art::Ptr<recob::Hit>> mcp2hits(simb::MCParticle const* mcp, std::vector<art::Ptr<recob::Hit>> const& vp_hit, detinfo::DetectorClocksData const& clockData, bool use_eve) {
-        std::vector<art::Ptr<recob::Hit>> vp_hit_from_mcp;
-        for (art::Ptr<recob::Hit> p_hit : vp_hit)
-            for (sim::TrackIDE ide : (use_eve ? bt_serv->HitToEveTrackIDEs(clockData, p_hit) : bt_serv->HitToTrackIDEs(clockData, p_hit)))
+    VecPtrHit mcp2hits(
+        simb::MCParticle const* mcp,
+        VecPtrHit const& vp_hit,
+        detinfo::DetectorClocksData const& clockData,
+        bool use_eve
+    ) {
+        VecPtrHit vp_hit_from_mcp;
+        for (PtrHit p_hit : vp_hit)
+            for (sim::TrackIDE ide : (use_eve
+                ? bt_serv->HitToEveTrackIDEs(clockData, p_hit)
+                : bt_serv->HitToTrackIDEs(clockData, p_hit))
+            ) {
                 if (ide.trackID == mcp->TrackId())
                     vp_hit_from_mcp.push_back(p_hit);
+            }
         return vp_hit_from_mcp;
     }
 
@@ -476,7 +494,6 @@ namespace ana {
             }
         }
     };
-
     class MichelAnalyzer {
     public:
         // Utilities
@@ -496,7 +513,7 @@ namespace ana {
 
         axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
-        Hit GetHit(art::Ptr<recob::Hit> const&) const;
+        Hit GetHit(PtrHit const&) const;
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
             geo::View_t view = geo::kW
@@ -513,7 +530,7 @@ namespace ana {
     double MichelAnalyzer::GetSpace(geo::WireID wid) const {
         return GetAxis(wid).space(asWire->Wire(wid));
     }
-    Hit MichelAnalyzer::GetHit(art::Ptr<recob::Hit> const& ph) const {
+    Hit MichelAnalyzer::GetHit(PtrHit const& ph) const {
         geo::WireID wid = ph->WireID();
         return {
             wid.TPC,
@@ -547,6 +564,8 @@ namespace ana {
         ns[0] = sh.i_cathode_crossing;
         ns[1] = sh.vph.size() - sh.i_cathode_crossing;
         if ((
+            sh.vph.empty()
+        ) || (
             0 < ns[0] && ns[0] <= LinearRegression::nmin
         ) || (
             0 < ns[1] && ns[1] <= LinearRegression::nmin

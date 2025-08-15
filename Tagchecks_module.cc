@@ -50,7 +50,7 @@ private:
     float fDriftVelocity; // cm/µs
     float fCathodeGap; // cm
 
-    geo::BoxBoundedGeo geoHighX, geoLowX;
+    bounds3D<float> geoHighX, geoLowX;
     bounds<float> wireWindow;
     std::map<geo::PlaneID, ana::axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
@@ -59,7 +59,7 @@ private:
     std::vector<std::vector<std::string>> vvsProducts;
     art::InputTag tag_mcp, tag_sed, tag_wir,
         tag_hit, tag_clu, tag_trk,
-        tag_spt, tag_pfp, tag_r3d;
+        tag_shw, tag_spt, tag_pfp;
 
     // Input Parameters
     bool fLog;
@@ -104,7 +104,7 @@ private:
     std::string TrueTagEndProcess;
 
     int TrueTagHasMichel;
-    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside };
+    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
 
     ana::Hits MuonHits;
     ana::Hit MuonEndHit;
@@ -122,7 +122,7 @@ private:
     double GetSpace(geo::WireID);
     ana::Hit GetHit(HitPtr const p_hit);
     HitPtrVec GetSortedHits(
-        HitPtrVec const& vp_hit,
+        HitPtrVec const& vph_ev,
         int dirz,
         HitPtrPair *pp_cathode_crossing = nullptr,
         HitPtrVec *vp_tpc_crossing = nullptr,
@@ -175,6 +175,7 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         else if (type == "recob::Wire")             tag_wir = tag;
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
@@ -198,28 +199,28 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
-            geoLowX = geo::BoxBoundedGeo{
+            geoLowX = bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 0}).Min(), 
                 asGeo->TPC(geo::TPCID{0, 7}).Max()
             };
-            geoHighX = geo::BoxBoundedGeo{
+            geoHighX = bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 8}).Min(),
                 asGeo->TPC(geo::TPCID{0, 15}).Max()
             };
             break;
         case kPDHD:
-            geoLowX = geo::BoxBoundedGeo{
+            geoLowX = bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 1}).Min(),
                 asGeo->TPC(geo::TPCID{0, 5}).Max()
             };
-            geoHighX = geo::BoxBoundedGeo{
+            geoHighX = bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 2}).Min(),
                 asGeo->TPC(geo::TPCID{0, 6}).Max()
             };
             break;
         default: break;
     }
-    fCathodeGap = geoHighX.MinX() - geoLowX.MaxX();
+    fCathodeGap = geoHighX.x.min - geoLowX.x.max;
 
     for (unsigned t=0; t<asGeo->NTPC(); t++) {
         for (unsigned p=0; p<asWire->Nplanes(); p++) {
@@ -243,8 +244,8 @@ ana::Tagchecks::Tagchecks(fhicl::ParameterSet const& p)
         << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
         << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
         << "  Tick Window: " << wireWindow << std::endl
-        << "  HighX Bounds: " << geoHighX.Min() << " -> " << geoHighX.Max() << std::endl
-        << "  LowX Bounds: " << geoLowX.Min() << " -> " << geoLowX.Max() << std::endl;
+        << "  HighX Bounds: " << geoHighX << std::endl
+        << "  LowX Bounds: " << geoLowX << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelRadius << " cm";
@@ -307,22 +308,18 @@ void ana::Tagchecks::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    HitPtrVec vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
+    HitPtrVec vph_ev;
+    art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
     std::vector<art::Ptr<recob::Track>> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
-    auto const & vh_pfp = e.getHandle<std::vector<recob::PFParticle>>(tag_pfp);
-    if (!vh_pfp.isValid()) return;
-
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
-    art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
-    art::FindManyP<recob::SpacePoint> fmp_pfp2spt(vh_pfp, e, tag_pfp);
+    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
 
@@ -331,7 +328,7 @@ void ana::Tagchecks::analyze(art::Event const& e) {
     evEvent = e.event();
     EventIsReal = e.isRealData();
 
-    for (HitPtr p_hit : vp_hit)
+    for (HitPtr p_hit : vph_ev)
         if (p_hit->View() == geo::kW)
             EventHits.push_back(GetHit(p_hit));
 
@@ -348,29 +345,21 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         geo::Point_t Start = TagIsUpright ? p_trk->Start() : p_trk->End();
         geo::Point_t End = TagIsUpright ? p_trk->End() : p_trk->Start();
 
-        TagEndInVolume = geoHighX.InFiducialY(End.Y(), 20.)
-            && geoHighX.InFiducialZ(End.Z(), 20.);
+        TagEndInVolume = geoHighX.isInsideYZ(End, 20.F);
 
         TagCathodeCrossing = (
-            geoLowX.ContainsPosition(Start) 
-            && geoHighX.ContainsPosition(End)
+            geoLowX.isInside(Start)
+            && geoHighX.isInside(End)
         ) || (
-            geoHighX.ContainsPosition(Start)
-            && geoLowX.ContainsPosition(End)
+            geoHighX.isInside(Start)
+            && geoLowX.isInside(End)
         );
 
         // Anode Crossing: SUPPOSITION: Muon is downward
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.InFiducialY(Start.Y(), 20.)
-                && geoHighX.InFiducialZ(Start.Z(), 20.);
+            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.);
         else if (geoDet == kPDHD)
-            TagAnodeCrossing = (
-                geoHighX.InFiducialY(Start.Y(), 20.)
-                && geoHighX.InFiducialZ(Start.Z(), 20.)
-            ) || (
-                geoLowX.InFiducialY(Start.Y(), 20.)
-                && geoLowX.InFiducialZ(Start.Z(), 20.)
-            );
+            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
 
         // Last Hit: SUPPOSITION: Muon is downward
         HitPtrVec vph_muon_sorted = GetSortedHits(
@@ -390,25 +379,67 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         EventiMuon.push_back(iMuon);
         resetMuon();
 
-        HitPtrVec vph_bragg;
+        HitPtrVec vph_bragg_muon;
         HitPtr ph_bragg = GetBraggEnd(
             vph_muon_sorted, 
             vph_muon_sorted.back(),
             p_trk,
-            vp_hit,
+            vph_ev,
             fop_hit2trk,
-            &vph_bragg,
+            &vph_bragg_muon,
             &CutdQdxMax,
             &TagBraggError
         );
         BraggEndHit = ph_bragg ? GetHit(ph_bragg) : ana::Hit{};
-        for (HitPtr const& ph_bragg : vph_bragg)
-            BraggMuonHits.push_back(GetHit(ph_bragg));
+        for (HitPtr const& ph_bragg_muon : vph_bragg_muon)
+            BraggMuonHits.push_back(GetHit(ph_bragg_muon));
 
         // getting all muon hits
-        for (HitPtr const& p_hit_muon : vph_muon_sorted)
-            if (p_hit_muon->View() == geo::kW)
-                MuonHits.push_back(GetHit(p_hit_muon));
+        for (HitPtr const& vph_muon : vph_muon_sorted)
+            if (vph_muon->View() == geo::kW)
+                MuonHits.push_back(GetHit(vph_muon));
+
+        for (HitPtr const& ph_ev : vph_ev) {
+            if (ph_ev->View() != geo::kW) continue;
+            if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
+                != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
+            ana::Hit hit = GetHit(ph_ev);
+
+            float dz = (hit.space - MuonEndHit.space);
+            float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
+            float dr2 = dz*dz + dt*dt;
+
+            if (dr2 > fMichelRadius * fMichelRadius) continue;
+
+            // check if the hit is in an other track
+            art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
+            if (pt_hit
+                && pt_hit.key() != p_trk.key()
+                && pt_hit->Length() > fTrackLengthCut
+            ) continue;
+
+            // ??????????????????????
+            art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
+
+            if (std::find_if(
+                vph_bragg_muon.begin(), 
+                vph_bragg_muon.end(),
+                [&](HitPtr const& h) -> bool {
+                    return h.key() == ph_ev.key();
+                }) == vph_bragg_muon.end()
+            ) {
+                // Bragg Sphere Energy
+            }
+
+            if (!pt_hit) {
+                // Pandora Sphere Energy
+            }
+        }
+        
+
+
+
+        // Truth Information
 
         TrueTagPdg = mcp->PdgCode();
         TrueTagEndProcess = mcp->EndProcess();
@@ -418,25 +449,29 @@ void ana::Tagchecks::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-        HitPtrVec vp_hit_mcp_muon;
+        HitPtrVec vph_ev_mcp_muon;
         MuonTrueEndHit = ana::Hit{};
         if (mcp) {
-            vp_hit_mcp_muon = ana::mcp2hits(mcp, vp_hit, clockData, false);
-            vp_hit_mcp_muon = GetSortedHits(
-                vp_hit_mcp_muon, 
+            vph_ev_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            vph_ev_mcp_muon = GetSortedHits(
+                vph_ev_mcp_muon, 
                 mcp->EndZ() > mcp->Vz() ? 1 : -1
             );
-            if (vp_hit_mcp_muon.size())
-                MuonTrueEndHit = GetHit(vp_hit_mcp_muon.back());
+            if (vph_ev_mcp_muon.size())
+                MuonTrueEndHit = GetHit(vph_ev_mcp_muon.back());
         }
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
-        HitPtrVec vp_hit_mcp_michel;
+        HitPtrVec vph_ev_mcp_michel;
         if (mcp && mcp->NumberDaughters() >= 3) {
             bool has_numu = false, has_nue = false;
-            for (int i_dau=mcp->NumberDaughters()-3; i_dau<mcp->NumberDaughters(); i_dau++) {
-                simb::MCParticle const * mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
+            for (
+                int i_dau=mcp->NumberDaughters()-3;
+                i_dau<mcp->NumberDaughters();
+                i_dau++
+            ) {
+                simb::MCParticle const* mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
                 if (!mcp_dau) continue;
                 switch (abs(mcp_dau->PdgCode())) {
                     case 14: has_numu = true; break;
@@ -448,17 +483,21 @@ void ana::Tagchecks::analyze(art::Event const& e) {
 
             if (mcp_michel and has_numu and has_nue) {
                 TrueTagHasMichel = (
-                    geoHighX.ContainsPosition(mcp_michel->Position().Vect())
-                    || geoLowX.ContainsPosition(mcp_michel->Position().Vect())
-                )   ? kHasMichelInside
-                    : kHasMichelOutside;
+                    geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
+                    || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+                ) ? kHasMichelFiducial : (
+                    geoHighX.isInside(mcp_michel->Position().Vect())
+                    || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                    ? kHasMichelInside
+                    : kHasMichelOutside
+                );
 
                 art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
                 MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-                vp_hit_mcp_michel = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
-                for (HitPtr p_hit_michel : vp_hit_mcp_michel)
+                vph_ev_mcp_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
+                for (HitPtr p_hit_michel : vph_ev_mcp_michel)
                     if (p_hit_michel->View() == geo::kW)
                         MichelHits.push_back(GetHit(p_hit_michel));
                 MichelHitEnergy = MichelHits.energy();
@@ -524,7 +563,7 @@ bool ana::Tagchecks::IsUpright(recob::Track const& T) {
 }
 
 HitPtrVec ana::Tagchecks::GetSortedHits(
-    HitPtrVec const& vp_hit,
+    HitPtrVec const& vph_ev,
     int dirz,
     HitPtrPair *pp_cathode_crossing,
     HitPtrVec *vp_tpc_crossing,
@@ -533,7 +572,7 @@ HitPtrVec ana::Tagchecks::GetSortedHits(
 ) {
     std::vector<ana::LinearRegression> side_reg(2);
     std::vector<HitPtrVec> side_hit(2);
-    for (HitPtr const& p_hit : vp_hit) {
+    for (HitPtr const& p_hit : vph_ev) {
         if (p_hit->View() != view) continue;
         int side = ana::tpc2side[geoDet][p_hit->WireID().TPC];
         if (side == -1) continue;

@@ -91,7 +91,9 @@ private:
 
     ana::Hits MuonHits;
     ana::Hit MuonEndHit;
+    ana::Point MuonEndPoint;
     ana::Hit MuonTrueEndHit;
+    ana::Point MuonTrueEndPoint;
     ana::Hit BraggEndHit;
 
     float MichelTrackLength;
@@ -107,7 +109,7 @@ private:
     PtrHit GetBraggEnd(
         VecPtrHit const& vph_trk,
         PtrHit const& ph_trk_end,
-        art::Ptr<recob::Track> const& p_trk,
+        PtrTrk const& p_trk,
         VecPtrHit const& vph_ev,
         art::FindOneP<recob::Track> const& fop_hit2trk,
         VecPtrHit *vph_sec_bragg = nullptr,
@@ -244,7 +246,9 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 
     MuonHits.SetBranches(tMuon);
     MuonEndHit.SetBranches(tMuon, "End");
+    MuonEndPoint.SetBranches(tMuon, "End");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
+    MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
     BraggEndHit.SetBranches(tMuon, "BraggEnd");
     BraggMuonHits.SetBranches(tMuon, "BraggMuon");
 
@@ -269,7 +273,7 @@ void ana::TagAna::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    std::vector<art::Ptr<recob::Track>> vp_trk;
+    std::vector<PtrTrk> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
@@ -289,7 +293,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             EventHits.push_back(GetHit(p_hit));
 
     // loop over tracks to find muons
-    for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
+    for (PtrTrk const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
 
         VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
@@ -320,11 +324,12 @@ void ana::TagAna::analyze(art::Event const& e) {
         ana::SortedHits sh_muon = GetSortedHits(vph_muon);
 
         ASSERT(sh_muon)
-        bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
+        // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
 
         // Last Hit: SUPPOSITION: Muon is downward
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         MuonEndHit = GetHit(sh_muon.lastHit(dirz));
+        MuonEndPoint = ana::Point(End);
 
         TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
@@ -356,6 +361,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             if (vph_muon->View() == geo::kW)
                 MuonHits.push_back(GetHit(vph_muon));
 
+        // integrate charges around muon endpoint
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
             if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
@@ -369,7 +375,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             if (dr2 > fMichelRadius * fMichelRadius) continue;
 
             // check if the hit is in an other track
-            art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
+            PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
             if (pt_hit
                 && pt_hit.key() != p_trk.key()
                 && pt_hit->Length() > fTrackLengthCut
@@ -405,7 +411,6 @@ void ana::TagAna::analyze(art::Event const& e) {
             TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
         VecPtrHit vph_ev_mcp_muon;
-        MuonTrueEndHit = ana::Hit{};
         if (mcp) {
             vph_ev_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
             // vph_ev_mcp_muon = GetSortedHits(
@@ -415,6 +420,8 @@ void ana::TagAna::analyze(art::Event const& e) {
             ana::SortedHits sh_mcp = GetSortedHits(vph_ev_mcp_muon);
             if (sh_mcp) 
                 MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
+            
+            MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
         }
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
@@ -448,7 +455,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                     : kHasMichelOutside
                 );
 
-                art::Ptr<recob::Track> trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
+                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
                 MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
@@ -457,11 +464,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                     if (p_hit_michel->View() == geo::kW)
                         MichelHits.push_back(GetHit(p_hit_michel));
                 MichelHitEnergy = MichelHits.energy();
-            } else TrueTagHasMichel = kNoMichel;
-        } else {
-            TrueTagHasMichel = -1;
-            MichelTrackLength = -1;
-            MichelHitEnergy = -1;
+            }
         }
         tMuon->Fill();
         iMuon++;
@@ -481,11 +484,17 @@ void ana::TagAna::resetEvent() {
 }
 void ana::TagAna::resetMuon() {
     MuonHits.clear();
+    MuonTrueEndHit = ana::Hit{};
+    MuonTrueEndPoint = ana::Point{};
     MichelTrackLength = 0;
     MichelTrueEnergy = 0;
     MichelHits.clear();
     MichelHitEnergy = 0;
     BraggMuonHits.clear();
+
+    TrueTagHasMichel = kNoMichel;
+    MichelTrackLength = -1;
+    MichelHitEnergy = -1;
 }
 
 bool ana::TagAna::IsUpright(recob::Track const& T) {
@@ -499,7 +508,7 @@ bool ana::TagAna::IsUpright(recob::Track const& T) {
 PtrHit ana::TagAna::GetBraggEnd(
     VecPtrHit const& vph_trk,
     PtrHit const& ph_trk_end,
-    art::Ptr<recob::Track> const& p_trk,
+    PtrTrk const& p_trk,
     VecPtrHit const& vph_ev,
     art::FindOneP<recob::Track> const& fop_hit2trk,
     VecPtrHit *vph_sec_bragg,
@@ -572,7 +581,7 @@ PtrHit ana::TagAna::GetBraggEnd(
             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
 
         // check if the hit is in a track
-        art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
+        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
         if (pt_hit) {
             // check if the hit is on the body of the track
             if (pt_hit.key() == p_trk.key()

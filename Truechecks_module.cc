@@ -86,6 +86,7 @@ private:
 
     int RegDirZ;
     double RegM, RegP, RegR2;
+    ana::LinearRegression MuonReg;
 
     float MichelTrueEnergy;
     ana::Hits MichelHits;
@@ -114,12 +115,15 @@ private:
     //     geo::View_t = geo::kW // view to consider
     // );
     HitPtrVec GetSortedHits(
-        HitPtrVec const&,
-        int dir_z = 1,
-        geo::View_t = geo::kW
+        HitPtrVec const& vph_ev,
+        int dirz,
+        HitPtrPair *pp_cathode_crossing=nullptr,
+        HitPtrVec *vp_tpc_crossing=nullptr,
+        std::vector<ana::LinearRegression> *p_side_reg=nullptr,
+        std::pair<int, int> *pp_side=nullptr,
+        geo::View_t view=geo::kW
     );
 };
-
 
 
 ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
@@ -215,9 +219,10 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     EndPoint.SetBranches(tMuon, "End");
 
     tMuon->Branch("RegDirZ", &RegDirZ);
-    tMuon->Branch("RegM", &RegM);
-    tMuon->Branch("RegP", &RegP);
-    tMuon->Branch("RegR2", &RegR2);
+    MuonReg.SetBranches(tMuon, "Reg");
+    // tMuon->Branch("RegM", &RegM);
+    // tMuon->Branch("RegP", &RegP);
+    // tMuon->Branch("RegR2", &RegR2);
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
     MichelHits.SetBranches(tMuon, "Michel");
@@ -269,71 +274,30 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         if (!fKeepTransportation && EndProcess == "Transportation") continue;
 
-        HitPtrVec vp_mcp_hit = ana::mcp2hits(&mcp, vp_hit, clockData, false);
-        if (vp_mcp_hit.empty()) continue;
+        HitPtrVec vph_mcp = ana::mcp2hits(&mcp, vp_hit, clockData, false);
+        if (vph_mcp.empty()) continue;
 
-        // HitPtrVec vp_mcp_sorted_hit = GetSortedHits(vp_mcp_hit, (mcp.EndZ() > mcp.Vz() ? 1 : -1));
+        // HitPtrVec vp_mcp_sorted_hit = GetSortedHits(vph_mcp, (mcp.EndZ() > mcp.Vz() ? 1 : -1));
         // if (vp_mcp_sorted_hit.empty()) continue;
 
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
         std::vector<ana::LinearRegression> side_reg(2);
-        std::vector<HitPtrVec> side_hit(2);
-        for (HitPtr const& p_hit : vp_mcp_hit) {
-            if (p_hit->View() != geo::kW) continue;
-            int side = ana::tpc2side[geoDet][p_hit->WireID().TPC];
-            if (side == -1) continue;
-            double z = GetSpace(p_hit->WireID());
-            double t = p_hit->PeakTime() * fTick2cm;
-            side_reg[side].add(z, t);
-            side_hit[side].push_back(p_hit);
-        }
-
-
-        // CATHODE CROSSING ???
-        if (side_reg[0].n < ana::LinearRegression::nmin || side_reg[1].n < ana::LinearRegression::nmin) continue;
-        for (ana::LinearRegression& reg : side_reg)
-            if (reg.n >= ana::LinearRegression::nmin)
-                reg.compute();
-        for (int side=0; side<2; side++) {
-            std::sort(
-                side_hit[side].begin(),
-                side_hit[side].end(),
-                [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
-                ) -> bool {
-                    double const s1 = reg.projection(
-                        GetSpace(h1->WireID()),
-                        h1->PeakTime() * fTick2cm
-                    );
-                    double const s2 = reg.projection(
-                        GetSpace(h2->WireID()),
-                        h2->PeakTime() * fTick2cm
-                    );
-                    return (s2 - s1) * RegDirZ > 0;
-                    // return s2 > s1;
-                }
-            );
-        }
-        HitPtrVec vp_mcp_sorted_hit;
-        std::pair<unsigned, unsigned> side_pair = (side_reg[1].mx - side_reg[0].mx) * RegDirZ > 0
-            ? std::make_pair(0, 1) : std::make_pair(1, 0);
-        vp_mcp_sorted_hit.insert(
-            vp_mcp_sorted_hit.end(),
-            side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
+        std::pair<int, int> side_pair;
+        HitPtrVec vph_mcp_sorted = GetSortedHits(
+            vph_mcp,
+            RegDirZ,
+            nullptr,
+            nullptr,
+            &side_reg,
+            &side_pair
         );
-        vp_mcp_sorted_hit.insert(
-            vp_mcp_sorted_hit.end(),
-            side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
-        );
-        RegM = side_reg[side_pair.second].m;
-        RegP = side_reg[side_pair.second].p;
-        RegR2 = side_reg[side_pair.second].r2;
+        MuonReg = side_reg[side_pair.second];
 
-        EndHit = GetHit(vp_mcp_sorted_hit.back());
+        EndHit = GetHit(vph_mcp_sorted.back());
 
         Hits.clear();
         HitProjection.clear();
-        for (HitPtr const& p_hit : vp_mcp_sorted_hit) {
+        for (HitPtr const& p_hit : vph_mcp_sorted) {
             ana::Hit hit = GetHit(p_hit);
             Hits.push_back(hit);
             HitProjection.push_back(
@@ -416,10 +380,10 @@ void ana::Truechecks::analyze(art::Event const& e)
 
             // also from the mother muon
             if (std::find_if(
-                vp_mcp_hit.begin(),
-                vp_mcp_hit.end(),
+                vph_mcp.begin(),
+                vph_mcp.end(),
                 [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-            ) != vp_mcp_hit.end()) {
+            ) != vph_mcp.end()) {
                 // shared_hits.push_back(p_hit);
                 // shared_e += p_hit->Integral() * fADC2MeV;
                 // SharedEnergy += p_hit->Integral();
@@ -486,10 +450,10 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         //     // not from the mother muon
         //     if (std::find_if(
-        //         vp_mcp_hit.begin(),
-        //         vp_mcp_hit.end(),
+        //         vph_mcp.begin(),
+        //         vph_mcp.end(),
         //         [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-        //     ) != vp_mcp_hit.end()) continue;
+        //     ) != vph_mcp.end()) continue;
 
         //     for (int i=radii.size()-1; i>=0; i--) {
         //         float r2 = pow(radii[i], 2);
@@ -514,10 +478,10 @@ void ana::Truechecks::analyze(art::Event const& e)
 
             // not from the mother muon
             if (std::find_if(
-                vp_mcp_hit.begin(),
-                vp_mcp_hit.end(),
+                vph_mcp.begin(),
+                vph_mcp.end(),
                 [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
-            ) != vp_mcp_hit.end()) continue;
+            ) != vph_mcp.end()) continue;
 
             // not from other muons?
             std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, p_hit);
@@ -604,75 +568,104 @@ ana::Hit ana::Truechecks::GetHit(HitPtr const p_hit) {
 }
 
 HitPtrVec ana::Truechecks::GetSortedHits(
-    HitPtrVec const& vp_hit,
-    int dir_z,
+    HitPtrVec const& vph_ev,
+    int dirz,
+    HitPtrPair *pp_cathode_crossing,
+    HitPtrVec *vp_tpc_crossing,
+    std::vector<ana::LinearRegression> *p_side_reg,
+    std::pair<int ,int> *pp_side,
     geo::View_t view
 ) {
-    unsigned const static nmin = ana::LinearRegression::nmin;
-
     std::vector<ana::LinearRegression> side_reg(2);
     std::vector<HitPtrVec> side_hit(2);
-    for (HitPtr const& p_hit : vp_hit) {
+    for (HitPtr const& p_hit : vph_ev) {
         if (p_hit->View() != view) continue;
         int side = ana::tpc2side[geoDet][p_hit->WireID().TPC];
-        if (side == -1) continue; // skip hits on the other side of the anodes
+        if (side == -1) continue;
         double z = GetSpace(p_hit->WireID());
         double t = p_hit->PeakTime() * fTick2cm;
         side_reg[side].add(z, t);
         side_hit[side].push_back(p_hit);
     }
-
-    // if not enough hits on both sides, return empty pair
-    if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
-
-    // compute average from sum
-    for (ana::LinearRegression& reg : side_reg) reg.compute();
-
-    // find the track ends on each side of the cathode
-    for (int side=0; side<2; side++) {
-        std::sort(
-            side_hit[side].begin(),
-            side_hit[side].end(),
-            [&, &reg=side_reg[side]](
-                HitPtr const& h1, HitPtr const& h2
-            ) -> bool {
-                double const s1 = reg.projection(
-                    GetSpace(h1->WireID()),
-                    h1->PeakTime() * fTick2cm
-                );
-                double const s2 = reg.projection(
-                    GetSpace(h2->WireID()),
-                    h2->PeakTime() * fTick2cm
-                );
-                // return (s2 - s1) * dir_z > 0;
-                return s2 > s1;
-            }
-        );
+    if (
+        side_reg[0].n < ana::LinearRegression::nmin 
+        && side_reg[1].n < ana::LinearRegression::nmin
+    ) return HitPtrVec{};
+    for (ana::LinearRegression& reg : side_reg)
+        if (reg.n >= ana::LinearRegression::nmin)
+            reg.compute();
+    if (p_side_reg) *p_side_reg = side_reg;
+    for (int side=0; side<2; side++)
+        if (side_reg[side].n >= ana::LinearRegression::nmin)
+            std::sort(
+                side_hit[side].begin(),
+                side_hit[side].end(),
+                [&, &reg=side_reg[side]](
+                    HitPtr const& ph1, HitPtr const& ph2
+                ) -> bool {
+                    double const s1 = reg.projection(
+                        GetSpace(ph1->WireID()),
+                        ph1->PeakTime() * fTick2cm
+                    );
+                    double const s2 = reg.projection(
+                        GetSpace(ph2->WireID()),
+                        ph2->PeakTime() * fTick2cm
+                    );
+                    return (s2 - s1) * dirz > 0;
+                }
+            );
+    if (side_reg[0].n < ana::LinearRegression::nmin)
+        return side_hit[1];
+    if (side_reg[1].n < ana::LinearRegression::nmin)
+        return side_hit[0];
+   
+    std::pair<unsigned, unsigned> side_pair = 
+        (side_reg[1].mx - side_reg[0].mx) * dirz > 0
+        ? std::make_pair(0, 1) : std::make_pair(1, 0);
+    
+    if (pp_side) *pp_side = side_pair;
+    if (pp_cathode_crossing) {
+        pp_cathode_crossing->first = side_hit[side_pair.first].back();
+        pp_cathode_crossing->second = side_hit[side_pair.second].front();
     }
-
-    HitPtrVec sorted_hit;
-    // std::pair<unsigned, unsigned> side_pair = (side_reg[1].mz - side_reg[0].mz) * dir_z > 0
-    //     ? std::make_pair(0, 1)
-    //     : std::make_pair(1, 0);
-
-    // sorted_hit.insert(
-    //     sorted_hit.end(),
-    //     side_hit[side_pair.first].begin(), side_hit[side_pair.first].end()
-    // );
-    // sorted_hit.insert(
-    //     sorted_hit.end(),
-    //     side_hit[side_pair.second].begin(), side_hit[side_pair.second].end()
-    // );
-    sorted_hit.insert(
-        sorted_hit.end(),
-        side_hit[0].begin(), side_hit[0].end()
+    HitPtrVec vp_sorted_hit;
+    if (vp_tpc_crossing) {
+        vp_tpc_crossing->clear();
+        HitPtr& prev_hit = side_hit[side_pair.first].front();
+        unsigned prev_tpc = prev_hit->WireID().TPC;
+        for (HitPtr const& p_hit : side_hit[side_pair.first]) {
+            vp_sorted_hit.push_back(p_hit);
+            if (p_hit->WireID().TPC != prev_tpc) {
+                vp_tpc_crossing->push_back(prev_hit);
+                vp_tpc_crossing->push_back(p_hit);
+                prev_tpc = p_hit->WireID().TPC;
+            }
+            prev_hit = p_hit;
+        }
+        prev_hit = side_hit[side_pair.second].front();
+        prev_tpc = prev_hit->WireID().TPC;
+        for (HitPtr const& p_hit : side_hit[side_pair.second]) {
+            vp_sorted_hit.push_back(p_hit);
+            if (p_hit->WireID().TPC != prev_tpc) {
+                vp_tpc_crossing->push_back(prev_hit);
+                vp_tpc_crossing->push_back(p_hit);
+                prev_tpc = p_hit->WireID().TPC;
+            }
+            prev_hit = p_hit;
+        }
+        return vp_sorted_hit;
+    }
+    vp_sorted_hit.insert(
+        vp_sorted_hit.end(),
+        side_hit[side_pair.first].begin(),
+        side_hit[side_pair.first].end()
     );
-    sorted_hit.insert(
-        sorted_hit.end(),
-        side_hit[1].begin(), side_hit[1].end()
+    vp_sorted_hit.insert(
+        vp_sorted_hit.end(),
+        side_hit[side_pair.second].begin(),
+        side_hit[side_pair.second].end()
     );
-
-    return sorted_hit;
+    return vp_sorted_hit;
 }
 
 DEFINE_ART_MODULE(ana::Truechecks)

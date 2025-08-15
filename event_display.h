@@ -15,7 +15,7 @@
 #include <TGraph2D.h>
 
 namespace ana {
-    inline void drawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
+    inline void DrawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
         Style_t const font = 43;
         unsigned n_sec=0;
         Style_t font_size=0;
@@ -103,5 +103,88 @@ namespace ana {
                 );
             }
         }
+    }
+
+    struct MarkerStyle {
+        Color_t c = kBlack;
+        Style_t m = kFullCircle;
+        Size_t s = 1.;
+    };
+    struct LineStyle {
+        Color_t c = kBlack;
+        Style_t l = kSolid;
+        Width_t w = 1;
+    };
+    void inline SetMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
+        m->SetMarkerColor(ms.c);
+        m->SetMarkerStyle(ms.m);
+        m->SetMarkerSize(ms.s);
+    };
+    void inline SetLineStyle(TAttLine* l, LineStyle const& ls) {
+        l->SetLineColor(ls.c);
+        l->SetLineStyle(ls.l);
+        l->SetLineWidth(ls.w);
+    };
+    class MichelDisplayer : public MichelAnalyzer {
+    public:
+        void DrawMarker(TCanvas* c, PtrHit const& ph, MarkerStyle const& ms) const;
+        void DrawGraph(TCanvas* c, VecPtrHit const& vph, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) const;
+        void DrawGraph2D(TCanvas* c, PtrTrk const& pt, MarkerStyle const& ms={}, LineStyle const& ls={}) const; 
+    };
+
+    void MichelDisplayer::DrawMarker(TCanvas* c, PtrHit const& ph, MarkerStyle const& ms) const {
+        TMarker *m = new TMarker();
+        SetMarkerStyle(m, ms);
+        if (geoDet == kPDVD) {
+            int s = tpc2sec[geoDet][ph->WireID().TPC];
+            c->cd(s+1);
+            m->DrawMarker(GetSpace(ph->WireID()), ph->PeakTime() * fTick2cm);
+        } else if (geoDet == kPDHD) {
+            int s = tpc2sec[geoDet][ph->WireID().TPC];
+            if (s == -1) return;
+            c->cd(s+1);
+            m->DrawMarker(ph->PeakTime() * fTick2cm, GetSpace(ph->WireID()));
+        }
+    }
+    void MichelDisplayer::DrawGraph(TCanvas* c, VecPtrHit const& vph, char const* draw, MarkerStyle const& ms, LineStyle const& ls) const {
+        unsigned static gn=0;
+        std::vector<TGraph*> gs(n_sec[geoDet]);
+        for (unsigned s=0; s<n_sec[geoDet]; s++) {
+            gs[s] = new TGraph();
+            gs[s]->SetEditable(kFALSE);
+            gs[s]->SetName(Form("g%u_s%u", gn, s));
+            SetMarkerStyle(gs[s], ms);
+            SetLineStyle(gs[s], ls);
+        }
+        for (HitPtr p_hit : vph) {
+            if (p_hit->View() != geo::kW) continue;
+            int s = tpc2sec[geoDet][p_hit->WireID().TPC];
+            if (s == -1) continue;
+            if (geoDet == kPDVD)
+                gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+            else if (geoDet == kPDHD)
+                gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+        }
+        for (unsigned s=0; s<n_sec[geoDet]; s++) {
+            if (!gs[s]->GetN()) continue;
+            c->cd(s+1);
+            gs[s]->Draw(draw);
+        }
+        gn++;
+    }
+    void MichelDisplayer::DrawGraph2D(TCanvas* c, PtrTrk const& pt, MarkerStyle const& ms, LineStyle const& ls) const {
+        TGraph2D* g = new TGraph2D();
+        SetMarkerStyle(g, ms);
+        SetLineStyle(g, ls);
+        for (unsigned it=0; it<pt->NumberTrajectoryPoints(); it++) {
+            if (!pt->HasValidPoint(it)) continue;
+            geo::Point_t p = pt->LocationAtPoint(it);
+            if (geoDet == kPDVD)
+                g->AddPoint(p.Y(), p.Z(), p.X());
+            else if (geoDet == kPDHD)
+                g->AddPoint(p.Z(), p.X(), p.Y());
+        }
+        c->cd();
+        g->Draw("same line");
     }
 }

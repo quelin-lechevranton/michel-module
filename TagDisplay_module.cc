@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////
-// Class:       TrackDisplay
+// Class:       TagDisplay
 // Plugin Type: analyzer (Unknown Unknown)
-// File:        TrackDisplay_module.cc
+// File:        TagDisplay_module.cc
 //
 // Generated at Fri Feb 21 03:35:05 2025 by Jeremy Quelin Lechevranton using cetskelgen
 // from cetlib version 3.18.02.
@@ -9,41 +9,17 @@
 
 #include "event_display.h"
 
-using HitPtr = art::Ptr<recob::Hit>;
-using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-
 namespace ana {
-    class TrackDisplay;
-    struct MarkerStyle {
-        Color_t c = kBlack;
-        Style_t m = kFullCircle;
-        Size_t s = 1.;
-    };
-    struct LineStyle {
-        Color_t c = kBlack;
-        Style_t l = kSolid;
-        Width_t w = 1;
-    };
-    void inline setMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
-        m->SetMarkerColor(ms.c);
-        m->SetMarkerStyle(ms.m);
-        m->SetMarkerSize(ms.s);
-    };
-    void inline setLineStyle(TAttLine* l, LineStyle const& ls) {
-        l->SetLineColor(ls.c);
-        l->SetLineStyle(ls.l);
-        l->SetLineWidth(ls.w);
-    };
+    class TagDisplay;
 }
 
-class ana::TrackDisplay : public art::EDAnalyzer {
+class ana::TagDisplay : public art::EDAnalyzer, private MichelDisplayer {
 public:
-    explicit TrackDisplay(fhicl::ParameterSet const& p);
-    TrackDisplay(TrackDisplay const&) = delete;
-    TrackDisplay(TrackDisplay&&) = delete;
-    TrackDisplay& operator=(TrackDisplay const&) = delete;
-    TrackDisplay& operator=(TrackDisplay&&) = delete;
+    explicit TagDisplay(fhicl::ParameterSet const& p);
+    TagDisplay(TagDisplay const&) = delete;
+    TagDisplay(TagDisplay&&) = delete;
+    TagDisplay& operator=(TagDisplay const&) = delete;
+    TagDisplay& operator=(TagDisplay&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -116,36 +92,26 @@ private:
         ls_back = {kGray, kSolid, 1};
 
     bool IsUpright(recob::Track const& T);
-    double GetSpace(geo::WireID);
-    ana::Hit GetHit(HitPtr const p_hit);
-    HitPtrVec GetSortedHits(
-        HitPtrVec const& vp_hit,
-        int dirz,
-        HitPtrPair *pp_cathode_crossing = nullptr,
-        HitPtrVec *vp_section_crossing = nullptr,
-        std::vector<ana::LinearRegression> *p_side_reg = nullptr,
-        geo::View_t view = geo::kW
-    );
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
-    HitPtr GetBraggEnd(
-        HitPtrVec const& vph_trk,
-        HitPtr const& ph_trk_end,
-        art::Ptr<recob::Track> const& p_trk,
-        HitPtrVec const& vph_ev,
+    PtrHit GetBraggEnd(
+        VecPtrHit const& vph_trk,
+        PtrHit const& ph_trk_end,
+        PtrTrk const& p_trk,
+        VecPtrHit const& vph_ev,
         art::FindOneP<recob::Track> const& fop_hit2trk,
-        HitPtrVec *vph_sec_bragg = nullptr,
+        VecPtrHit *vph_sec_bragg = nullptr,
         float *max_dQdx = nullptr,
         int *error = nullptr
     );
 
-    double dist2(HitPtr const& ph1, HitPtr const& ph2);
-    void drawMarker (TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms);
-    void drawGraph (TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={});
-    void drawGraph2D (TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={});
+    double dist2(PtrHit const& ph1, PtrHit const& ph2);
+    void drawMarker (TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms);
+    void drawGraph (TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={});
+    void drawGraph2D (TCanvas* tc, PtrTrk const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={});
 };
 
 
-ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
+ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p},
     vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log", false)),
@@ -254,7 +220,7 @@ ana::TrackDisplay::TrackDisplay(fhicl::ParameterSet const& p)
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl;
 }
 
-void ana::TrackDisplay::beginJob() {
+void ana::TagDisplay::beginJob() {
     // TCanvas *c = asFile->make<TCanvas>(
     //     "legend", "legend",
     //     1300, 800
@@ -285,7 +251,7 @@ void ana::TrackDisplay::beginJob() {
     // c->Write();
 }
 
-void ana::TrackDisplay::analyze(art::Event const& e) {
+void ana::TagDisplay::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
@@ -294,12 +260,12 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    HitPtrVec vp_hit;
+    VecPtrHit vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    std::vector<art::Ptr<recob::Track>> vp_trk;
+    std::vector<PtrTrk> vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
@@ -332,7 +298,7 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
             1300,800
         );
         ana::DrawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
-        drawGraph(hc, vp_hit, "p", ms_ev);
+        DrawGraph(hc, vp_hit, "p", ms_ev);
         hcs.push_back(hc);
     }
 
@@ -357,32 +323,26 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     }
         
     unsigned im=0;
-    for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
-        HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
-        ASSERT(vp_hit_muon.size())
+    for (PtrTrk const& p_trk : vp_trk) {
+        VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
+        ASSERT(vph_muon.size())
 
         bool isUpright =  IsUpright(*p_trk);
         geo::Point_t Start = isUpright ? p_trk->Start() : p_trk->End();
         geo::Point_t End = isUpright ? p_trk->End() : p_trk->Start();
-        HitPtrPair cathode_crossing;
-        HitPtrVec section_crossing;
-        HitPtrVec vph_muon_sorted = GetSortedHits(
-            vp_hit_muon, 
-            End.Z() > Start.Z() ? 1 : -1,
-            &cathode_crossing,
-            &section_crossing
-        );
-        ASSERT(vph_muon_sorted.size())
+        SortedHits sh_muon = GetSortedHits(vph_muon);
+        ASSERT(sh_muon)
 
         int TagBraggError = -1;
         float CutdQdxMax = 0.F;
-        HitPtr ph_bragg = GetBraggEnd(
-            vph_muon_sorted, 
-            vph_muon_sorted.back(),
+        VecPtrHit vph_bragg_muon;
+        PtrHit ph_bragg = GetBraggEnd(
+            sh_muon.vph, 
+            sh_muon.lastHit(End.Z() > Start.Z() ? 1 : -1),
             p_trk,
             vp_hit,
             fop_hit2trk,
-            nullptr,
+            &vph_bragg_muon,
             &CutdQdxMax,
             &TagBraggError
         );
@@ -391,27 +351,27 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
 
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
-        auto drawFilter = [&](bool tag) -> bool {
+        auto DrawFilter = [&](bool tag) -> bool {
             if (!tag) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
-                drawGraph(*ihc, vph_muon_sorted, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
-                drawGraph2D(*itc, p_trk, {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
+                DrawGraph(*ihc, sh_muon.vph, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
+                DrawGraph2D(*itc, p_trk, {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
                 for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
-                    drawGraph(*jhc, vph_muon_sorted, "l", {}, ls_back);
+                    DrawGraph(*jhc, sh_muon.vph, "l", {}, ls_back);
                 for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
-                    drawGraph2D(*jtc, p_trk, ms_back);
+                    DrawGraph2D(*jtc, p_trk, ms_back);
                 return false;
             }
             Color_t c_pass = vc_pass[im%vc_pass.size()];
-            drawGraph(*ihc, vph_muon_sorted, "l", {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
-            drawGraph2D(*itc, p_trk, {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
-            for (HitPtr const& p_hit_sc : section_crossing)
-                drawMarker(*ihc, p_hit_sc, ms_sc);
-            drawMarker(*ihc, vph_muon_sorted.front(), ms_end);
-            drawMarker(*ihc, vph_muon_sorted.back(), ms_end);
-            if (cathode_crossing.first) {
-                drawMarker(*ihc, cathode_crossing.first, ms_cc);
-                drawMarker(*ihc, cathode_crossing.second, ms_cc);
+            DrawGraph(*ihc, sh_muon.vph, "l", {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
+            DrawGraph2D(*itc, p_trk, {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
+            for (unsigned i_sc : sh_muon.vi_section_crossing)
+                DrawMarker(*ihc, sh_muon.vph[i_sc], ms_sc);
+            DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
+            DrawMarker(*ihc, sh_muon.vph.back(), ms_end);
+            if (sh_muon.isCathodeCrossing()) {
+                DrawMarker(*ihc, sh_muon.vph[sh_muon.i_cathode_crossing-1], ms_cc);
+                DrawMarker(*ihc, sh_muon.vph[sh_muon.i_cathode_crossing], ms_cc);
             }
             ihc++;
             itc++;
@@ -434,13 +394,13 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
 
-        drawFilter(true);
-        if (!drawFilter(LOG(TagEndInVolume))) continue;
-        if (!drawFilter(LOG(TagTrackLength))) continue;
-        if (!drawFilter(LOG(TagCathodeCrossing))) continue;
-        if (!drawFilter(LOG(TagAnodeCrossing))) continue;
-        if (!drawFilter(LOG(TagBraggError == kNoError))) continue;
-        drawMarker(*(ihc-1), ph_bragg, ms_bragg);
+        DrawFilter(true);
+        if (!DrawFilter(LOG(TagEndInVolume))) continue;
+        if (!DrawFilter(LOG(TagTrackLength))) continue;
+        if (!DrawFilter(LOG(TagCathodeCrossing))) continue;
+        if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
+        if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
+        DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
     }
 
     for (TCanvas* hc : hcs)
@@ -451,9 +411,9 @@ void ana::TrackDisplay::analyze(art::Event const& e) {
     ev++;
 }
 
-void ana::TrackDisplay::endJob() {}
+void ana::TagDisplay::endJob() {}
 
-bool ana::TrackDisplay::IsUpright(recob::Track const& T) {
+bool ana::TagDisplay::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
     if (geoDet == kPDHD)
@@ -461,186 +421,50 @@ bool ana::TrackDisplay::IsUpright(recob::Track const& T) {
     return false;
 }
 
-double ana::TrackDisplay::GetSpace(geo::WireID wid) {
-    return plane2axis[wid].space(asWire->Wire(wid));
-}
-
-ana::Hit ana::TrackDisplay::GetHit(HitPtr const p_hit) {
-    geo::WireID wid = p_hit->WireID();
-    // if (geoDet == kPDHD)
-    //     for (int t : (int[]){0, 4, 3, 7})
-    //         if (wireid.TPC == t)
-    //             return ana::Hit{};
-    
-    return ana::Hit{
-        wid.TPC,
-        ana::tpc2sec[geoDet][wid.TPC],
-        float(GetSpace(wid)),
-        p_hit->Channel(),
-        p_hit->PeakTime(),
-        p_hit->Integral()
-    };
-}
-
-HitPtrVec ana::TrackDisplay::GetSortedHits(
-    HitPtrVec const& vp_hit,
-    int dirz,
-    HitPtrPair *pp_cathode_crossing,
-    HitPtrVec *vp_section_crossing,
-    std::vector<ana::LinearRegression> *p_side_reg,
-    geo::View_t view
-) {
-    std::vector<ana::LinearRegression> side_reg(2);
-    std::vector<HitPtrVec> side_hit(2);
-    for (HitPtr const& p_hit : vp_hit) {
-        if (p_hit->View() != view) continue;
-        int side = ana::tpc2side[geoDet][p_hit->WireID().TPC];
-        if (side == -1) continue;
-        double z = GetSpace(p_hit->WireID());
-        double t = p_hit->PeakTime() * fTick2cm;
-        side_reg[side].add(z, t);
-        side_hit[side].push_back(p_hit);
-    }
-    if (
-        side_reg[0].n < ana::LinearRegression::nmin 
-        && side_reg[1].n < ana::LinearRegression::nmin
-    ) return HitPtrVec{};
-    for (ana::LinearRegression& reg : side_reg)
-        if (reg.n >= ana::LinearRegression::nmin)
-            reg.compute();
-    for (int side=0; side<2; side++)
-        if (side_reg[side].n >= ana::LinearRegression::nmin)
-            std::sort(
-                side_hit[side].begin(),
-                side_hit[side].end(),
-                [&, &reg=side_reg[side]](
-                    HitPtr const& h1, HitPtr const& h2
-                ) -> bool {
-                    double const s1 = reg.projection(
-                        GetSpace(h1->WireID()),
-                        h1->PeakTime() * fTick2cm
-                    );
-                    double const s2 = reg.projection(
-                        GetSpace(h2->WireID()),
-                        h2->PeakTime() * fTick2cm
-                    );
-                    return (s2 - s1) * dirz > 0;
-                }
-            );
-    if (side_reg[0].n < ana::LinearRegression::nmin)
-        return side_hit[1];
-    if (side_reg[1].n < ana::LinearRegression::nmin)
-        return side_hit[0];
-   
-    std::pair<unsigned, unsigned> side_pair = 
-        (side_reg[1].mx - side_reg[0].mx) * dirz > 0
-        ? std::make_pair(0, 1) : std::make_pair(1, 0);
-    
-    if (pp_cathode_crossing) {
-        pp_cathode_crossing->first = side_hit[side_pair.first].back();
-        pp_cathode_crossing->second = side_hit[side_pair.second].front();
-    }
-    if (vp_section_crossing) {
-        vp_section_crossing->clear();
-        std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
-        for (HitPtr const& p_hit : side_hit[side_pair.first]) {
-            int sec = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (sec == -1) continue;
-            vp_sec_hit[sec].push_back(p_hit);
-        }
-        for (HitPtr const& p_hit : side_hit[side_pair.second]) {
-            int sec = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-            if (sec == -1) continue;
-            vp_sec_hit[sec].push_back(p_hit);
-        }
-        for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
-            if (vp_sec_hit[sec].empty()) continue;
-            if (vp_sec_hit[sec].front() != side_hit[ana::sec2side[geoDet][sec]].front())
-                vp_section_crossing->push_back(vp_sec_hit[sec].front());
-            if (vp_sec_hit[sec].back() != side_hit[ana::sec2side[geoDet][sec]].back())
-                vp_section_crossing->push_back(vp_sec_hit[sec].back());
-        }
-        // vp_section_crossing->clear();
-        // HitPtr& prev_hit = side_hit[side_pair.first].front();
-        // for (HitPtr const& p_hit : side_hit[side_pair.first]) {
-        //     vp_sorted_hit.push_back(p_hit);
-        //     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
-        //         vp_section_crossing->push_back(prev_hit);
-        //         vp_section_crossing->push_back(p_hit);
-        //     }
-        //     prev_hit = p_hit;
-        // }
-        // prev_hit = side_hit[side_pair.second].front();
-        // for (HitPtr const& p_hit : side_hit[side_pair.second]) {
-        //     vp_sorted_hit.push_back(p_hit);
-        //     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][prev_hit->WireID().TPC]) {
-        //         vp_section_crossing->push_back(prev_hit);
-        //         vp_section_crossing->push_back(p_hit);
-        //     }
-        //     prev_hit = p_hit;
-        // }
-        // return vp_sorted_hit;
-    }
-    if (p_side_reg) p_side_reg = &side_reg;
-
-    HitPtrVec vp_sorted_hit;
-    vp_sorted_hit.insert(
-        vp_sorted_hit.end(),
-        side_hit[side_pair.first].begin(),
-        side_hit[side_pair.first].end()
-    );
-    vp_sorted_hit.insert(
-        vp_sorted_hit.end(),
-        side_hit[side_pair.second].begin(),
-        side_hit[side_pair.second].end()
-    );
-    return vp_sorted_hit;
-}
-
-HitPtr ana::TrackDisplay::GetBraggEnd(
-    HitPtrVec const& vph_trk,
-    HitPtr const& ph_trk_end,
-    art::Ptr<recob::Track> const& p_trk,
-    HitPtrVec const& vph_ev,
+PtrHit ana::TagDisplay::GetBraggEnd(
+    VecPtrHit const& vph_trk,
+    PtrHit const& ph_trk_end,
+    PtrTrk const& p_trk,
+    VecPtrHit const& vph_ev,
     art::FindOneP<recob::Track> const& fop_hit2trk,
-    HitPtrVec *vph_sec_bragg,
+    VecPtrHit *vph_sec_bragg,
     float *max_dQdx,
     int *error
 ) {
-    HitPtrVec vph_sec_trk;
-    for (HitPtr const& p_hit : vph_trk) {
+    VecPtrHit vph_sec_trk;
+    for (PtrHit const& p_hit : vph_trk) {
         if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
         vph_sec_trk.push_back(p_hit);
     }
     if (vph_sec_trk.empty() || ph_trk_end != vph_sec_trk.back()) {
         if (error) *error = kEndNotFound;
-        return HitPtr{};
+        return PtrHit{};
     }
 
     std::sort(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
-        [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
+        [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
             return dist2(ph2, ph_trk_end) > dist2(ph1, ph_trk_end);
         }
     );
 
-    HitPtrVec::iterator iph_body = std::find_if(
+    VecPtrHit::iterator iph_body = std::find_if(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
-        [&](HitPtr const& h) -> bool {
+        [&](PtrHit const& h) -> bool {
             return dist2(h, ph_trk_end) > fBodyDistance * fBodyDistance;
         }
     );
     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
         if (error) *error = kSmallBody;
-        return HitPtr{};
+        return PtrHit{};
     }
 
-    HitPtrVec vph_reg{iph_body, iph_body+fRegN};
-    auto orientation = [&](HitPtrVec const& vph) -> std::pair<double, double> {
+    VecPtrHit vph_reg{iph_body, iph_body+fRegN};
+    auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
         LinearRegression reg;
-        for (HitPtr const& ph : vph) {
+        for (PtrHit const& ph : vph) {
             double z = GetSpace(ph->WireID());
             double t = ph->PeakTime() * fTick2cm;
             reg.add(z, t);
@@ -656,19 +480,19 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
     };
     std::pair<double, double> reg = orientation(vph_reg);
 
-    HitPtrVec vph_near;
-    for (HitPtr const& ph_ev : vph_ev) {
+    VecPtrHit vph_near;
+    for (PtrHit const& ph_ev : vph_ev) {
         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
 
         // check if the hit is in a track
-        art::Ptr<recob::Track> pt_hit = fop_hit2trk.at(ph_ev.key());
+        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
         if (pt_hit) {
             // check if the hit is on the body of the track
             if (pt_hit.key() == p_trk.key()
                 && std::find_if(
                     iph_body, vph_sec_trk.end(),
-                    [&](HitPtr const& ph) -> bool {
+                    [&](PtrHit const& ph) -> bool {
                         return ph.key() == ph_ev.key();
                     }
                 ) != vph_sec_trk.end()
@@ -687,7 +511,7 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
     }
     DEBUG(vph_near.empty())
 
-    auto score = [&](HitPtr const& ph1, HitPtr const& ph2, double theta, double sigma) -> double {
+    auto score = [&](PtrHit const& ph1, PtrHit const& ph2, double theta, double sigma) -> double {
         double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
         double dt = (ph2->PeakTime() - ph1->PeakTime()) * fTick2cm;
         double da = atan2(dt, dz) - theta;
@@ -697,13 +521,13 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
         return TMath::Gaus(da, 0, sigma) / r;
     };
 
-    HitPtrVec vph_sec{vph_reg.begin(), vph_reg.end()};
+    VecPtrHit vph_sec{vph_reg.begin(), vph_reg.end()};
     std::reverse(vph_sec.begin(), vph_sec.end());
-    HitPtr ph_prev = ph_trk_end;
+    PtrHit ph_prev = ph_trk_end;
     while (vph_near.size()) {
-        HitPtrVec::iterator iph_max = std::max_element(
+        VecPtrHit::iterator iph_max = std::max_element(
             vph_near.begin(), vph_near.end(),
-            [&](HitPtr const& ph1, HitPtr const& ph2) -> bool {
+            [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
                 return score(ph_prev, ph1, reg.first, reg.second)
                     < score(ph_prev, ph2, reg.first, reg.second);
             }
@@ -721,9 +545,9 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
 
     unsigned const trailing_radius = 6;
     double max = std::numeric_limits<double>::lowest();
-    HitPtr ph_max;
+    PtrHit ph_max;
     for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
-        HitPtrVec::iterator jph_sec = 
+        VecPtrHit::iterator jph_sec = 
             std::distance(iph_sec, vph_sec.end()) > trailing_radius
             ? iph_sec+trailing_radius
             : vph_sec.end();
@@ -731,7 +555,7 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
 
         double dQ = std::accumulate(
             iph_sec, jph_sec, 0.,
-            [](double sum, HitPtr const& ph) {
+            [](double sum, PtrHit const& ph) {
                 return sum+ph->Integral();
             }
         );
@@ -761,14 +585,14 @@ HitPtr ana::TrackDisplay::GetBraggEnd(
     return ph_max;
 }   
 
-double ana::TrackDisplay::dist2(HitPtr const& ph1, HitPtr const& ph2) {
+double ana::TagDisplay::dist2(PtrHit const& ph1, PtrHit const& ph2) {
     return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
         + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
 }
 
-void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) {
+void ana::TagDisplay::drawMarker(TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms) {
     TMarker *m = new TMarker();
-    setMarkerStyle(m, ms);
+    SetMarkerStyle(m, ms);
     if (geoDet == kPDVD) {
         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
         hc->cd(s+1);
@@ -780,17 +604,17 @@ void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle
         m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
     }
 }
-void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
+void ana::TagDisplay::drawGraph(TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
     unsigned static gn=0;
     std::vector<TGraph*> gs(ana::n_sec[geoDet]);
     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
         gs[s] = new TGraph();
         gs[s]->SetEditable(kFALSE);
         gs[s]->SetName(Form("g%u_s%u", gn, s));
-        setMarkerStyle(gs[s], ms);
-        setLineStyle(gs[s], ls);
+        SetMarkerStyle(gs[s], ms);
+        SetLineStyle(gs[s], ls);
     }
-    for (HitPtr p_hit : vp_hit) {
+    for (PtrHit p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
         if (s == -1) continue;
@@ -806,10 +630,10 @@ void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char con
     }
     gn++;
 }
-void ana::TrackDisplay::drawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
+void ana::TagDisplay::drawGraph2D(TCanvas* tc, PtrTrk const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
     TGraph2D* g = new TGraph2D();
-    setMarkerStyle(g, ms);
-    setLineStyle(g, ls);
+    SetMarkerStyle(g, ms);
+    SetLineStyle(g, ls);
     for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
         if (!p_trk->HasValidPoint(it)) continue;
         geo::Point_t pt = p_trk->LocationAtPoint(it);
@@ -823,4 +647,4 @@ void ana::TrackDisplay::drawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p
 }
 
 
-DEFINE_ART_MODULE(ana::TrackDisplay)
+DEFINE_ART_MODULE(ana::TagDisplay)
