@@ -166,9 +166,7 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
     // fADC2MeV = (geoDet == kPDVD ? 200 : ) * 23.6 * 1e-6 / 0.7;
-    fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    fDriftVelocity = detProp.DriftVelocity();
-    fTick2cm = fDriftVelocity * fSamplingRate;
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
@@ -262,9 +260,7 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 void ana::TagAna::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
-    fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    fDriftVelocity = detProp.DriftVelocity();
-    fTick2cm = fDriftVelocity * fSamplingRate;
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
@@ -518,8 +514,8 @@ PtrHit ana::TagAna::GetBraggEnd(
     if (vph_sec_trk.empty()
         || std::find_if(
             vph_sec_trk.begin(), vph_sec_trk.end(),
-            [](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-                return ph1.key() == ph2.key();
+            [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
+                return ph.key() == key;
             }
         ) == vph_sec_trk.end()
     ) {
@@ -582,8 +578,8 @@ PtrHit ana::TagAna::GetBraggEnd(
             if (pt_hit.key() == p_trk.key()
                 && std::find_if(
                     iph_body, vph_sec_trk.end(),
-                    [&](PtrHit const& ph) -> bool {
-                        return ph.key() == ph_ev.key();
+                    [key=ph_ev.key()](PtrHit const& ph) -> bool {
+                        return ph.key() == key;
                     }
                 ) != vph_sec_trk.end()
             ) continue;

@@ -161,7 +161,7 @@ namespace ana {
         bounds<T> x, y, z;
         bounds3D() : x(), y(), z() {}
         bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
-            x{min.x(), max.x()}, y{min.y(), max.y()}, z{min.z(), max.z()} {}
+            x{T(min.x()), T(max.x())}, y{T(min.y()), T(max.y())}, z{T(min.z()), T(max.z())} {}
         // bounds3D(geo::BoxBoundedGeo const& bb) :
         //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
         bool isInside(geo::Point_t const& p, float r=0) const {
@@ -572,7 +572,7 @@ namespace ana {
                 return comp(sh.regs[1], ph1, ph2);
             }
         );
-        unsigned prev_sec = tpc2sec[geoDet][sh.vph.front()->WireID().TPC];
+        int prev_sec = tpc2sec[geoDet][sh.vph.front()->WireID().TPC];
         for (unsigned i=1; i<sh.vph.size(); i++) {
             int sec = tpc2sec[geoDet][(sh.vph[i])->WireID().TPC];
             if (sec != prev_sec) {
@@ -581,5 +581,6 @@ namespace ana {
                 prev_sec = sec;
             }
         }
+        return sh;
     }
 }
