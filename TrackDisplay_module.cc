@@ -15,26 +15,6 @@ using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 namespace ana {
     class TrackDisplay;
-    struct MarkerStyle {
-        Color_t c = kBlack;
-        Style_t m = kFullCircle;
-        Size_t s = 1.;
-    };
-    struct LineStyle {
-        Color_t c = kBlack;
-        Style_t l = kSolid;
-        Width_t w = 1;
-    };
-    void inline setMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
-        m->SetMarkerColor(ms.c);
-        m->SetMarkerStyle(ms.m);
-        m->SetMarkerSize(ms.s);
-    };
-    void inline setLineStyle(TAttLine* l, LineStyle const& ls) {
-        l->SetLineColor(ls.c);
-        l->SetLineStyle(ls.l);
-        l->SetLineWidth(ls.w);
-    };
 }
 
 class ana::TrackDisplay : public art::EDAnalyzer {
@@ -768,7 +748,7 @@ double ana::TrackDisplay::dist2(HitPtr const& ph1, HitPtr const& ph2) {
 
 void ana::TrackDisplay::drawMarker(TCanvas* hc, HitPtr const& p_hit, MarkerStyle const& ms) {
     TMarker *m = new TMarker();
-    setMarkerStyle(m, ms);
+    SetMarkerStyle(m, ms);
     if (geoDet == kPDVD) {
         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
         hc->cd(s+1);
@@ -787,8 +767,8 @@ void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char con
         gs[s] = new TGraph();
         gs[s]->SetEditable(kFALSE);
         gs[s]->SetName(Form("g%u_s%u", gn, s));
-        setMarkerStyle(gs[s], ms);
-        setLineStyle(gs[s], ls);
+        SetMarkerStyle(gs[s], ms);
+        SetLineStyle(gs[s], ls);
     }
     for (HitPtr p_hit : vp_hit) {
         if (p_hit->View() != geo::kW) continue;
@@ -808,8 +788,8 @@ void ana::TrackDisplay::drawGraph(TCanvas* hc, HitPtrVec const& vp_hit, char con
 }
 void ana::TrackDisplay::drawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
     TGraph2D* g = new TGraph2D();
-    setMarkerStyle(g, ms);
-    setLineStyle(g, ls);
+    SetMarkerStyle(g, ms);
+    SetLineStyle(g, ls);
     for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
         if (!p_trk->HasValidPoint(it)) continue;
         geo::Point_t pt = p_trk->LocationAtPoint(it);

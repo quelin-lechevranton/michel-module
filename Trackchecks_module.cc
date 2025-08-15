@@ -15,26 +15,6 @@ using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 namespace ana {
     class Trackchecks;
-    struct MarkerStyle {
-        Color_t c = kBlack;
-        Style_t m = kFullCircle;
-        Size_t s = 1.;
-    };
-    struct LineStyle {
-        Color_t c = kBlack;
-        Style_t l = kSolid;
-        Width_t w = 1;
-    };
-    void inline setMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
-        m->SetMarkerColor(ms.c);
-        m->SetMarkerStyle(ms.m);
-        m->SetMarkerSize(ms.s);
-    };
-    void inline setLineStyle(TAttLine* l, LineStyle const& ls) {
-        l->SetLineColor(ls.c);
-        l->SetLineStyle(ls.l);
-        l->SetLineWidth(ls.w);
-    };
 }
 
 class ana::Trackchecks : public art::EDAnalyzer {
@@ -270,54 +250,54 @@ void ana::Trackchecks::beginJob() {
     title->DrawText(title_indent, 1 - top_margin, "Event Markers");
 
     TMarker* m_ev = new TMarker();
-    setMarkerStyle(m_ev, ms_ev);
+    SetMarkerStyle(m_ev, ms_ev);
     m_ev->DrawMarker(indent, 1 - top_margin - line_height);
     label->DrawText(label_indent, 1 - top_margin - line_height, "Event Hits");
 
     TMarker* m_mcp_mu = new TMarker();
-    setMarkerStyle(m_mcp_mu, ms_mcp_mu);
+    SetMarkerStyle(m_mcp_mu, ms_mcp_mu);
     m_mcp_mu->DrawMarker(indent, 1 - top_margin - 2 * line_height);
     label->DrawText(label_indent, 1 - top_margin - 2 * line_height, "MCParticle Muon End Hit");
 
     TMarker* m_mcp_me = new TMarker();
-    setMarkerStyle(m_mcp_me, ms_mcp_me);
+    SetMarkerStyle(m_mcp_me, ms_mcp_me);
     m_mcp_me->DrawMarker(indent, 1 - top_margin - 3 * line_height);
     label->DrawText(label_indent, 1 - top_margin - 3 * line_height, "MCParticle Michel Hits");
 
     title->DrawText(1/ncol + title_indent, 1 - top_margin, "Tracks");
 
     TLine* l_small = new TLine();
-    setLineStyle(l_small, ls_small);
+    SetLineStyle(l_small, ls_small);
     l_small->DrawLine(1/ncol + indent, 1 - top_margin - line_height,
                       1/ncol + indent + line_length, 1 - top_margin - line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - line_height, "Small Tracks");
 
     TLine* l_broken = new TLine();
-    setLineStyle(l_broken, ls_broken);
+    SetLineStyle(l_broken, ls_broken);
     l_broken->DrawLine(1/ncol + indent, 1 - top_margin - 2 * line_height,
                        1/ncol + indent + line_length, 1 - top_margin - 2 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 2 * line_height, "Broken Tracks");
 
     TLine* l_no_end = new TLine();
-    setLineStyle(l_no_end, ls_no_end);
+    SetLineStyle(l_no_end, ls_no_end);
     l_no_end->DrawLine(1/ncol + indent, 1 - top_margin - 3 * line_height,
                        1/ncol + indent + line_length, 1 - top_margin - 3 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 3 * line_height, "End Algorithm failed");
 
     TLine* l_mu = new TLine();
-    setLineStyle(l_mu, ls_mu);
+    SetLineStyle(l_mu, ls_mu);
     l_mu->DrawLine(1/ncol + indent, 1 - top_margin - 4 * line_height,
                    1/ncol + indent + line_length, 1 - top_margin - 4 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 4 * line_height, "Tracks");
 
     TLine* l_reg_good = new TLine();
-    setLineStyle(l_reg_good, ls_reg_good);
+    SetLineStyle(l_reg_good, ls_reg_good);
     l_reg_good->DrawLine(1/ncol + indent, 1 - top_margin - 5 * line_height,
                          1/ncol + indent + line_length, 1 - top_margin - 5 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 5 * line_height, "Regression Good");
 
     TLine* l_reg_bad = new TLine();
-    setLineStyle(l_reg_bad, ls_reg_bad);
+    SetLineStyle(l_reg_bad, ls_reg_bad);
     l_reg_bad->DrawLine(1/ncol + indent, 1 - top_margin - 6 * line_height,
                          1/ncol + indent + line_length, 1 - top_margin - 6 * line_height);
     label->DrawText(1/ncol + label_indent, 1 - top_margin - 6 * line_height, "Regression Bad");
@@ -325,32 +305,32 @@ void ana::Trackchecks::beginJob() {
     title->DrawText(2/ncol + title_indent, 1 - top_margin, "Track Ends Markers");
 
     TMarker* m_mu_in = new TMarker();
-    setMarkerStyle(m_mu_in, ms_mu_in);
+    SetMarkerStyle(m_mu_in, ms_mu_in);
     m_mu_in->DrawMarker(2/ncol + indent, 1 - top_margin - line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - line_height, "Muon Track In");
 
     TMarker* m_mu_out = new TMarker();
-    setMarkerStyle(m_mu_out, ms_mu_out);
+    SetMarkerStyle(m_mu_out, ms_mu_out);
     m_mu_out->DrawMarker(2/ncol + indent, 1 - top_margin - 2 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 2 * line_height, "Muon Track Out");
 
     TMarker* m_mu_cc_in = new TMarker();
-    setMarkerStyle(m_mu_cc_in, ms_cc_in);
+    SetMarkerStyle(m_mu_cc_in, ms_cc_in);
     m_mu_cc_in->DrawMarker(2/ncol + indent, 1 - top_margin - 3 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 3 * line_height, "Cathode Crossing Muon In");
 
     TMarker* m_mu_cc_out = new TMarker();
-    setMarkerStyle(m_mu_cc_out, ms_cc_out);
+    SetMarkerStyle(m_mu_cc_out, ms_cc_out);
     m_mu_cc_out->DrawMarker(2/ncol + indent, 1 - top_margin - 4 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 4 * line_height, "Cathode Crossing Muon Out");
 
     TMarker* m_sc = new TMarker();
-    setMarkerStyle(m_sc, ms_sc);
+    SetMarkerStyle(m_sc, ms_sc);
     m_sc->DrawMarker(2/ncol + indent, 1 - top_margin - 5 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 5 * line_height, "Section Crossing");
 
     TMarker* m_shw = new TMarker();
-    setMarkerStyle(m_shw, ms_shw);
+    SetMarkerStyle(m_shw, ms_shw);
     m_shw->DrawMarker(2/ncol + indent, 1 - top_margin - 6 * line_height);
     label->DrawText(2/ncol + label_indent, 1 - top_margin - 6 * line_height, "Shower Hits");
 
@@ -390,11 +370,11 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         Form("run:%u, subrun:%u, event:%u", e.run(), e.subRun(), e.event()),
         1300,800
     );
-    ana::drawFrame(c, int(geoDet), "", Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
+    ana::DrawFrame(c, int(geoDet), "", Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
 
     auto drawMarker = [&](HitPtr const& p_hit, MarkerStyle const& ms) -> void {
         TMarker *m = new TMarker();
-        setMarkerStyle(m, ms);
+        SetMarkerStyle(m, ms);
         if (geoDet == kPDVD) {
             int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
             c->cd(s+1);
@@ -413,8 +393,8 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             gs[s] = new TGraph();
             gs[s]->SetEditable(kFALSE);
             gs[s]->SetName(Form("g%u_s%u", gn++, s));
-            setMarkerStyle(gs[s], ms);
-            setLineStyle(gs[s], ls);
+            SetMarkerStyle(gs[s], ms);
+            SetLineStyle(gs[s], ls);
         }
         for (HitPtr p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
@@ -575,7 +555,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
                 gs[s] = new TGraph();
                 gs[s]->SetName(Form("g%u_%u", p_trk->ID(), s));
                 gs[s]->SetTitle(Form("track %u, section %u", p_trk->ID(), s));
-                setLineStyle(gs[s], ls_no_end);
+                SetLineStyle(gs[s], ls_no_end);
             }
             continue;
         }
@@ -692,7 +672,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             }
             f->SetParameter(0, reg.m);
             f->SetParameter(1, reg.m);
-            setLineStyle(f, reg.r2 > 0.5 ? ls_reg_good : ls_reg_bad);
+            SetLineStyle(f, reg.r2 > 0.5 ? ls_reg_good : ls_reg_bad);
 
             c->cd(s+1);
             f->Draw("same");

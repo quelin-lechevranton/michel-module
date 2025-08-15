@@ -419,7 +419,7 @@ void ana::Tagchecks::analyze(art::Event const& e) {
             ) continue;
 
             // ??????????????????????
-            art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
+            // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
 
             if (std::find_if(
                 vph_bragg_muon.begin(), 

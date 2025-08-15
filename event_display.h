@@ -156,7 +156,7 @@ namespace ana {
             SetMarkerStyle(gs[s], ms);
             SetLineStyle(gs[s], ls);
         }
-        for (HitPtr p_hit : vph) {
+        for (PtrHit p_hit : vph) {
             if (p_hit->View() != geo::kW) continue;
             int s = tpc2sec[geoDet][p_hit->WireID().TPC];
             if (s == -1) continue;
