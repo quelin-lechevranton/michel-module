@@ -76,7 +76,7 @@ private:
     Int_t pal = kCividis;
     std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+2, kAzure-2, kAzure+2, kAzure+7};
     std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
-    MarkerStyle
+    ana::MarkerStyle
         ms_ev = {kBlack, kPlus, 0.5},
         ms_end = {kViolet+6, kFullSquare},
         ms_cc = {kViolet+6, kFullTriangleUp},
@@ -86,7 +86,7 @@ private:
         ms_back = {kGray, kFullCircle, 0.5},
         ms_bragg = {kAzure+10, kFourSquaresPlus};
 
-    LineStyle
+    ana::LineStyle
         ls_pass = {vc_pass.front(), kSolid, 2},
         ls_fail = {vc_fail.front(), kSolid, 2},
         ls_back = {kGray, kSolid, 1};
@@ -103,11 +103,7 @@ private:
         float *max_dQdx = nullptr,
         int *error = nullptr
     );
-
     double dist2(PtrHit const& ph1, PtrHit const& ph2);
-    void drawMarker (TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms);
-    void drawGraph (TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={});
-    void drawGraph2D (TCanvas* tc, PtrTrk const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={});
 };
 
 
@@ -354,8 +350,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         auto DrawFilter = [&](bool tag) -> bool {
             if (!tag) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
-                DrawGraph(*ihc, sh_muon.vph, "l", {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
-                DrawGraph2D(*itc, p_trk, {}, LineStyle{c_fail, ls_fail.l, ls_fail.w});
+                DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_fail, ls_fail.l, ls_fail.w});
+                DrawGraph2D(*itc, p_trk, {}, {c_fail, ls_fail.l, ls_fail.w});
                 for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
                     DrawGraph(*jhc, sh_muon.vph, "l", {}, ls_back);
                 for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
@@ -363,8 +359,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
                 return false;
             }
             Color_t c_pass = vc_pass[im%vc_pass.size()];
-            DrawGraph(*ihc, sh_muon.vph, "l", {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
-            DrawGraph2D(*itc, p_trk, {}, LineStyle{c_pass, ls_pass.l, ls_pass.w});
+            DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
+            DrawGraph2D(*itc, p_trk, {}, {c_pass, ls_pass.l, ls_pass.w});
             for (unsigned i_sc : sh_muon.vi_section_crossing)
                 DrawMarker(*ihc, sh_muon.vph[i_sc], ms_sc);
             DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
@@ -589,62 +585,5 @@ double ana::TagDisplay::dist2(PtrHit const& ph1, PtrHit const& ph2) {
     return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
         + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
 }
-
-void ana::TagDisplay::drawMarker(TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms) {
-    TMarker *m = new TMarker();
-    SetMarkerStyle(m, ms);
-    if (geoDet == kPDVD) {
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        hc->cd(s+1);
-        m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
-    } else if (geoDet == kPDHD) {
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        if (s == -1) return;
-        hc->cd(s+1);
-        m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
-    }
-}
-void ana::TagDisplay::drawGraph(TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
-    unsigned static gn=0;
-    std::vector<TGraph*> gs(ana::n_sec[geoDet]);
-    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        gs[s] = new TGraph();
-        gs[s]->SetEditable(kFALSE);
-        gs[s]->SetName(Form("g%u_s%u", gn, s));
-        SetMarkerStyle(gs[s], ms);
-        SetLineStyle(gs[s], ls);
-    }
-    for (PtrHit p_hit : vp_hit) {
-        if (p_hit->View() != geo::kW) continue;
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
-        if (s == -1) continue;
-        if (geoDet == kPDVD)
-            gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
-        else if (geoDet == kPDHD)
-            gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
-    }
-    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
-        if (!gs[s]->GetN()) continue;
-        hc->cd(s+1);
-        gs[s]->Draw(draw);
-    }
-    gn++;
-}
-void ana::TagDisplay::drawGraph2D(TCanvas* tc, PtrTrk const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
-    TGraph2D* g = new TGraph2D();
-    SetMarkerStyle(g, ms);
-    SetLineStyle(g, ls);
-    for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
-        if (!p_trk->HasValidPoint(it)) continue;
-        geo::Point_t pt = p_trk->LocationAtPoint(it);
-        if (geoDet == kPDVD)
-            g->AddPoint(pt.Y(), pt.Z(), pt.X());
-        else if (geoDet == kPDHD)
-            g->AddPoint(pt.Z(), pt.X(), pt.Y());
-    }
-    tc->cd();
-    g->Draw("same line");
-}
-
 
 DEFINE_ART_MODULE(ana::TagDisplay)
