@@ -36,6 +36,10 @@
 #define ASSERT(x)  if (!(fLog ? printf("\tAST " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
 #define DEBUG(x) if ((fLog ? printf("\tDBG " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(1);
 
+
+using PtrHit = art::Ptr<recob::Hit>;
+using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
+
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };
     std::vector<unsigned> n_sec = {
@@ -150,6 +154,34 @@ namespace ana {
 
         friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
             return os << "[" << b.min << ", " << b.max << "]";
+        }
+    };
+    template<typename T>
+    struct bounds3D {
+        bounds<T> x, y, z;
+        bounds3D() : x(), y(), z() {}
+        bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
+            x{min.x(), max.x()}, y{min.y(), max.y()}, z{min.z(), max.z()} {}
+        // bounds3D(geo::BoxBoundedGeo const& bb) :
+        //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
+        bool isInside(geo::Point_t const& p, float r=0) const {
+            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        bool isInside(TVector3 const& p, float r=0) const {
+            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        bool isInsideYZ(geo::Point_t const& p, float r=0) const {
+            return y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        geo::Point_t min() const {
+            return geo::Point_t{x.min, y.min, z.min};
+        }
+        geo::Point_t max() const {
+            return geo::Point_t{x.max, y.max, z.max};
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
+            return os << b.min() << " -> " << b.max();
         }
     };
 
@@ -376,5 +408,178 @@ namespace ana {
                 if (ide.trackID == mcp->TrackId())
                     vp_hit_from_mcp.push_back(p_hit);
         return vp_hit_from_mcp;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    struct SortedHits {
+        VecPtrHit vph;
+        unsigned i_cathode_crossing;
+        std::vector<unsigned> vi_section_crossing;
+        std::vector<LinearRegression> regs;
+        SortedHits() : vph(), i_cathode_crossing(0), vi_section_crossing(), regs(2) {}
+        bool isCathodeCrossing() const {
+            return i_cathode_crossing != vph.size()
+                && i_cathode_crossing != 0;
+        }
+        operator bool() const {
+            return !vph.empty();
+        }
+        PtrHit lastHit(int dirz) const {
+            int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
+            if (isCathodeCrossing()) {
+                if (dirx > 0) {
+                    if (dirz > 0)
+                        return vph.back();
+                    else 
+                        return vph[i_cathode_crossing];
+                } else {
+                    if (dirz > 0)
+                        return vph[i_cathode_crossing-1];
+                    else
+                        return vph.front();
+                }
+            } else {
+                if (dirz > 0)
+                    return vph.back();
+                else
+                    return vph.front();
+            }
+        }
+    };
+
+    class MichelAnalyzer {
+    public:
+        // Utilities
+        art::ServiceHandle<art::TFileService> asFile;
+        art::ServiceHandle<cheat::ParticleInventoryService> asPartInv;
+        art::ServiceHandle<cheat::BackTrackerService> asBackTrack;
+
+        const geo::GeometryCore* asGeo;
+        const geo::WireReadoutGeom* asWire;
+        const detinfo::DetectorPropertiesService* asDetProp;
+        const detinfo::DetectorClocksService* asDetClocks;
+
+        int geoDet;
+        enum EnumDet { kPDVD, kPDHD };
+
+        float fTick2cm;
+
+        axis GetAxis(geo::PlaneID) const;
+        double GetSpace(geo::WireID) const;
+        Hit GetHit(art::Ptr<recob::Hit> const&) const;
+        SortedHits GetSortedHits(
+            VecPtrHit const& vph_unsorted,
+            geo::View_t view = geo::kW
+        ) const;
+    };
+
+    axis MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
+        geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
+        geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
+        int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
+        int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
+        return { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
+    }
+    double MichelAnalyzer::GetSpace(geo::WireID wid) const {
+        return GetAxis(wid).space(asWire->Wire(wid));
+    }
+    Hit MichelAnalyzer::GetHit(art::Ptr<recob::Hit> const& ph) const {
+        geo::WireID wid = ph->WireID();
+        return {
+            wid.TPC,
+            tpc2sec[geoDet][wid.TPC],
+            float(GetSpace(wid)),
+            ph->Channel(),
+            ph->PeakTime(),
+            ph->Integral()
+        };
+    }
+    SortedHits MichelAnalyzer::GetSortedHits(
+        VecPtrHit const& vph_unsorted,
+        geo::View_t view
+    ) const {
+        SortedHits sh;
+        for (PtrHit const& ph : vph_unsorted) {
+            if (ph->View() != view) continue;
+            int side = tpc2side[geoDet][ph->WireID().TPC];
+            if (side == -1) continue;
+            double z = GetSpace(ph->WireID());
+            double t = ph->PeakTime() * fTick2cm;
+            sh.regs[side].add(z, t);
+            if (side) // highX
+                sh.vph.push_back(ph);
+            else {  // lowX
+                sh.vph.insert(sh.vph.begin(), ph);
+                sh.i_cathode_crossing++; 
+            }
+        }
+        std::vector<unsigned> ns(2);
+        ns[0] = sh.i_cathode_crossing;
+        ns[1] = sh.vph.size() - sh.i_cathode_crossing;
+        if ((
+            0 < ns[0] && ns[0] <= LinearRegression::nmin
+        ) || (
+            0 < ns[1] && ns[1] <= LinearRegression::nmin
+        )) {
+            return SortedHits{};
+        }
+        sh.regs[0].compute();
+        sh.regs[1].compute();
+        auto comp = [&](LinearRegression const& reg, PtrHit const& ph1, PtrHit const& ph2) {
+            double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
+            double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
+            return s1 < s2; // z increasing
+        };
+        std::sort(
+            sh.vph.begin(), sh.vph.begin()+sh.i_cathode_crossing,
+            [&](PtrHit const& ph1, PtrHit const& ph2) {
+                return comp(sh.regs[0], ph1, ph2);
+            }
+        );
+        std::sort(
+            sh.vph.begin()+sh.i_cathode_crossing, sh.vph.end(),
+            [&](PtrHit const& ph1, PtrHit const& ph2) {
+                return comp(sh.regs[1], ph1, ph2);
+            }
+        );
+        unsigned prev_sec = tpc2sec[geoDet][sh.vph.front()->WireID().TPC];
+        for (unsigned i=1; i<sh.vph.size(); i++) {
+            int sec = tpc2sec[geoDet][(sh.vph[i])->WireID().TPC];
+            if (sec != prev_sec) {
+                sh.vi_section_crossing.push_back(i-1);
+                sh.vi_section_crossing.push_back(i);
+                prev_sec = sec;
+            }
+        }
     }
 }
