@@ -25,37 +25,9 @@ public:
     void beginJob() override;
     void endJob() override;
 private:
-
-    // Utilities
-    art::ServiceHandle<art::TFileService> asFile;
-
-    const geo::GeometryCore* asGeo;
-    const geo::WireReadoutGeom* asWire;
-    const detinfo::DetectorPropertiesService* asDetProp;
-    const detinfo::DetectorClocksService* asDetClocks;
-    // geo::BoxBoundedGeo geoHighX, geoLowX;
-
-    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
-
-    enum EnumDet { kPDVD, kPDHD };
-    EnumDet geoDet;
-
-    // Detector Properties
-    // float fADC2MeV;
-    float fTick2cm; // cm/tick
-    float fCathodeGap; // cm
-
     bounds<float> wireWindow;
     bounds3D<float> geoHighX, geoLowX;
-    // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
-    // std::map<int,float> map_ch_z;
-
-    // Data Products
-    std::vector<std::vector<std::string>> vvsProducts;
-    art::InputTag tag_mcp, tag_sed, tag_wir,
-        tag_hit, tag_clu, tag_trk, tag_shw,
-        tag_spt, tag_pfp;
+    float fCathodeGap; // cm
 
     // Input Parameters
     bool fLog;
@@ -104,8 +76,7 @@ private:
 };
 
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p},
-    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
@@ -116,41 +87,6 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
-
-    for (std::vector<std::string> prod : vvsProducts) {
-        std::string 
-            process  = prod[0],
-            label    = prod[1],
-            instance = prod[2],
-            type     = prod[3];
-
-        art::InputTag tag(label,instance);
-
-        if      (type == "simb::MCParticle")        tag_mcp = tag;
-        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
-        else if (type == "recob::Hit")              tag_hit = tag;
-        else if (type == "recob::Wire")             tag_wir = tag;
-        else if (type == "recob::Cluster")          tag_clu = tag;
-        else if (type == "recob::Track")            tag_trk = tag;
-        else if (type == "recob::Shower")           tag_shw = tag;
-        else if (type == "recob::SpacePoint")       tag_spt = tag;
-        else if (type == "recob::PFParticle")       tag_pfp = tag;
-    }
-    
-    asGeo = &*art::ServiceHandle<geo::Geometry>{};
-    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
-
-    if (asGeo->DetectorName().find("vd") != std::string::npos)
-        geoDet = kPDVD;
-    else if (asGeo->DetectorName().find("hd") != std::string::npos)
-        geoDet = kPDHD;
-    else {
-        std::cout << "\033[1;91m" "unknown geometry: "
-            << asGeo->DetectorName() << "\033[0m" << std::endl;
-        exit(1);
-    }
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
