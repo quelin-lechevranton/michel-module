@@ -696,23 +696,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         sec_mz[sec] += z;
     }
 
-    // if not enough hits on both sides, return empty pair
-    if ((
-        sh.regs[0].n == 0 && sh.regs[1].n == 0
-    ) || (
-        0 < sh.regs[0].n && sh.regs[0].n < ana::LinearRegression::nmin
-    ) || (
-        0 < sh.regs[1].n && sh.regs[1].n < ana::LinearRegression::nmin
-    )) return ana::SortedHits{};
-
-    sh.regs[0].compute();
-    sh.regs[1].compute();
-
-    // side order according to the direction in Z
-    // std::pair<int, int> sides; = 
-    //     (sh.regs[1].mx - sh.regs[0].mx) * dirz > 0
-    //     ? std::make_pair(0, 1) : std::make_pair(1, 0);
-    
     // sec order according to the direction in Z
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
         if (vph_sec[sec].size() < ana::LinearRegression::nmin) {
@@ -723,6 +706,27 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
             sh.secs.push_back(sec);
         }
     }
+
+    if (sh.secs.empty()) return ana::SortedHits{};
+
+    // if not enough hits on both sides, return empty pair
+    // if ((
+    //     sh.regs[0].n == 0 && sh.regs[1].n == 0
+    // ) || (
+    //     0 < sh.regs[0].n && sh.regs[0].n < ana::LinearRegression::nmin
+    // ) || (
+    //     0 < sh.regs[1].n && sh.regs[1].n < ana::LinearRegression::nmin
+    // )) return ana::SortedHits{};
+
+    sh.regs[0].compute();
+    sh.regs[1].compute();
+
+    // side order according to the direction in Z
+    // std::pair<int, int> sides; = 
+    //     (sh.regs[1].mx - sh.regs[0].mx) * dirz > 0
+    //     ? std::make_pair(0, 1) : std::make_pair(1, 0);
+    
+
     std::sort(
         sh.secs.begin(), sh.secs.end(),
         [&sec_mz, dirz](int sec1, int sec2) {
