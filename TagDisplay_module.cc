@@ -74,7 +74,7 @@ private:
 
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelDisplayer{p},
-    fLog(p.get<bool>("Log", false)),
+    fLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm

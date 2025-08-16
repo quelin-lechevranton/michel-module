@@ -34,7 +34,6 @@ private:
 
     // Input Parameters
     bool fLog;
-    bool fKeepOutside;
     float fTrackLengthCut; // in cm
     float fMichelRadius; // in cm
     float fNearbyRadius; // in cm
@@ -107,8 +106,7 @@ private:
 
 ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
-    fLog(p.get<bool>("Log", false)),
-    fKeepOutside(p.get<bool>("KeepOutside", false)),
+    fLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
     fMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
