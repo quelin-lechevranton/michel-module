@@ -235,7 +235,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         VecPtrHit vph_bragg_muon;
         PtrHit ph_bragg = GetBraggEnd(
             sh_muon.vph,
-            *sh_muon.end,
+            sh_muon.end,
             p_trk,
             vp_hit,
             fop_hit2trk,

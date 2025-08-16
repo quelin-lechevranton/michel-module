@@ -275,7 +275,7 @@ void ana::TagAna::analyze(art::Event const& e) {
 
         // Last Hit: SUPPOSITION: Muon is downward
         // MuonEndHit = GetHit(sh_muon.lastHit(dirz));
-        MuonEndHit = GetHit(*sh_muon.end);
+        MuonEndHit = GetHit(sh_muon.end);
         MuonEndPoint = ana::Point(End);
 
         TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
@@ -291,7 +291,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         VecPtrHit vph_bragg_muon;
         PtrHit ph_bragg = GetBraggEnd(
             sh_muon.vph,
-            *sh_muon.end,
+            sh_muon.end,
             // sh_muon.vph, 
             // sh_muon.lastHit(dirz),
             p_trk,
@@ -368,7 +368,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             // );
             ana::SortedHits sh_mcp = GetSortedHits(vph_ev_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
             if (sh_mcp) 
-                MuonTrueEndHit = GetHit(*sh_mcp.end);
+                MuonTrueEndHit = GetHit(sh_mcp.end);
                 // MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
             
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());

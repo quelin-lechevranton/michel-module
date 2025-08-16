@@ -509,9 +509,9 @@ namespace ana {
         std::vector<LinearRegression> regs; // regressions per side
 
         bool isCathodeCrossing;
-        VecPtrHit::iterator start, end;
-        std::pair<VecPtrHit::iterator, VecPtrHit::iterator> cc; // cathode crossing
-        std::vector<VecPtrHit::iterator> sc; // section crossing
+        PtrHit start, end;
+        std::pair<PtrHit, PtrHit> cc; // cathode crossing
+        std::vector<PtrHit> sc; // section crossing
 
         SortedHits() : vph(), secs(), regs(2), isCathodeCrossing(false) {}
         operator bool() const {
@@ -740,22 +740,22 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         );
 
         if (sec==sh.secs.front())
-            sh.start = vph_sec[sec].begin();
+            sh.start = vph_sec[sec].front();
         else {
             if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i-1]]) {
-                sh.cc.second = vph_sec[sec].begin(); 
+                sh.cc.second = vph_sec[sec].front(); 
                 sh.isCathodeCrossing = true;
             } else
-                sh.sc.push_back(vph_sec[sec].begin());
+                sh.sc.push_back(vph_sec[sec].front());
         } 
         if (sec==sh.secs.back())
-            sh.end = vph_sec[sec].end();
+            sh.end = vph_sec[sec].back();
         else {
             if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i+1]]) {
-                sh.cc.first = vph_sec[sec].end(); 
+                sh.cc.first = vph_sec[sec].back(); 
                 sh.isCathodeCrossing = true;
             } else
-                sh.sc.push_back(vph_sec[sec].end());
+                sh.sc.push_back(vph_sec[sec].back());
         }
     }
 

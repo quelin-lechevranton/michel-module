@@ -229,7 +229,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         ana::SortedHits sh_muon = GetSortedHits(vph_mcp, RegDirZ);
         ASSERT(sh_muon)
 
-        EndHit = GetHit(*sh_muon.end);
+        EndHit = GetHit(sh_muon.end);
         MuonReg = sh_muon.regs[ana::sec2side[geoDet][sh_muon.secs.back()]];
 
         Hits.clear();
