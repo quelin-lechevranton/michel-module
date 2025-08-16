@@ -13,7 +13,7 @@ namespace ana {
     class TagDisplay;
 }
 
-class ana::TagDisplay : public art::EDAnalyzer, private ana::MichelDisplayer {
+class ana::TagDisplay : public art::EDAnalyzer, private ana::MichelAnalyzer {
 public:
     explicit TagDisplay(fhicl::ParameterSet const& p);
     TagDisplay(TagDisplay const&) = delete;
@@ -104,10 +104,13 @@ private:
         int *error = nullptr
     );
     double dist2(PtrHit const& ph1, PtrHit const& ph2);
+    void DrawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms={}, LineStyle const& ls={});
+    void DrawGraph(TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={});
+    void DrawMarker(TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms);
 };
 
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p}, MichelDisplayer{p},
+    : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
@@ -542,5 +545,62 @@ double ana::TagDisplay::dist2(PtrHit const& ph1, PtrHit const& ph2) {
     return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
         + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
 }
+
+void ana::TagDisplay::DrawMarker(TCanvas* hc, PtrHit const& p_hit, MarkerStyle const& ms) {
+    TMarker *m = new TMarker();
+    SetMarkerStyle(m, ms);
+    if (geoDet == kPDVD) {
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        hc->cd(s+1);
+        m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+    } else if (geoDet == kPDHD) {
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) return;
+        hc->cd(s+1);
+        m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+    }
+}
+void ana::TagDisplay::DrawGraph(TCanvas* hc, VecPtrHit const& vp_hit, char const* draw, MarkerStyle const& ms, LineStyle const& ls) {
+    unsigned static gn=0;
+    std::vector<TGraph*> gs(ana::n_sec[geoDet]);
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        gs[s] = new TGraph();
+        gs[s]->SetEditable(kFALSE);
+        gs[s]->SetName(Form("g%u_s%u", gn, s));
+        SetMarkerStyle(gs[s], ms);
+        SetLineStyle(gs[s], ls);
+    }
+    for (PtrHit p_hit : vp_hit) {
+        if (p_hit->View() != geo::kW) continue;
+        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        if (s == -1) continue;
+        if (geoDet == kPDVD)
+            gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
+        else if (geoDet == kPDHD)
+            gs[s]->AddPoint(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
+    }
+    for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
+        if (!gs[s]->GetN()) continue;
+        hc->cd(s+1);
+        gs[s]->Draw(draw);
+    }
+    gn++;
+}
+void ana::TagDisplay::DrawGraph2D(TCanvas* tc, art::Ptr<recob::Track> const& p_trk, MarkerStyle const& ms, LineStyle const& ls) {
+    TGraph2D* g = new TGraph2D();
+    SetMarkerStyle(g, ms);
+    SetLineStyle(g, ls);
+    for (unsigned it=0; it<p_trk->NumberTrajectoryPoints(); it++) {
+        if (!p_trk->HasValidPoint(it)) continue;
+        geo::Point_t pt = p_trk->LocationAtPoint(it);
+        if (geoDet == kPDVD)
+            g->AddPoint(pt.Y(), pt.Z(), pt.X());
+        else if (geoDet == kPDHD)
+            g->AddPoint(pt.Z(), pt.X(), pt.Y());
+    }
+    tc->cd();
+    g->Draw("same line");
+}
+
 
 DEFINE_ART_MODULE(ana::TagDisplay)
