@@ -44,18 +44,12 @@ private:
     // Detector Properties
     // float fADC2MeV;
     float fTick2cm; // cm/tick
-    float fSamplingRate; // µs/tick
-    float fDriftVelocity; // cm/µs
-    float fChannelPitch; // cm/channel
     float fCathodeGap; // cm
 
     bounds<float> wireWindow;
     bounds3D<float> geoHighX, geoLowX;
     // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
-
-    std::map<geo::PlaneID, ana::axis> plane2axis;
-    std::map<geo::PlaneID, double> plane2pitch;
 
     // Data Products
     std::vector<std::vector<std::string>> vvsProducts;
@@ -110,7 +104,8 @@ private:
 };
 
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p}, MichelAnalyzer{p},
+    : EDAnalyzer{p},
+    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
@@ -121,6 +116,41 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+
+    for (std::vector<std::string> prod : vvsProducts) {
+        std::string 
+            process  = prod[0],
+            label    = prod[1],
+            instance = prod[2],
+            type     = prod[3];
+
+        art::InputTag tag(label,instance);
+
+        if      (type == "simb::MCParticle")        tag_mcp = tag;
+        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
+        else if (type == "recob::Hit")              tag_hit = tag;
+        else if (type == "recob::Wire")             tag_wir = tag;
+        else if (type == "recob::Cluster")          tag_clu = tag;
+        else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
+        else if (type == "recob::SpacePoint")       tag_spt = tag;
+        else if (type == "recob::PFParticle")       tag_pfp = tag;
+    }
+    
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
+
+    if (asGeo->DetectorName().find("vd") != std::string::npos)
+        geoDet = kPDVD;
+    else if (asGeo->DetectorName().find("hd") != std::string::npos)
+        geoDet = kPDHD;
+    else {
+        std::cout << "\033[1;91m" "unknown geometry: "
+            << asGeo->DetectorName() << "\033[0m" << std::endl;
+        exit(1);
+    }
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
@@ -148,27 +178,9 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     }
     fCathodeGap = geoHighX.x.min - geoLowX.x.max;
 
-    for (unsigned t=0; t<asGeo->NTPC(); t++) {
-        for (unsigned p=0; p<asWire->Nplanes(); p++) {
-            geo::PlaneID pid{0, t, p};
-            geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
-            geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
-
-            int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
-            int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
-
-            plane2axis[pid] = { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
-            plane2pitch[pid] = geo::WireGeo::WirePitch(w0, w1);
-        }
-    }
-
     std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Detector Geometry: " << asGeo->DetectorName()
         << "  (" << (!geoDet ? "PDVD" : "PDHD") << ")" << std::endl
-        << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
-        << "  Sampling Rate: " << fSamplingRate << " µs/tick" << std::endl
-        << "  Drift Velocity: " << fDriftVelocity << " cm/µs" << std::endl
-        << "  Channel Pitch: " << fChannelPitch << " cm" << std::endl
         << "  Tick Window: " << wireWindow << std::endl
         << "  HighX Bounds: " << geoHighX << std::endl
         << "  LowX Bounds: " << geoLowX << std::endl;
@@ -210,9 +222,7 @@ void ana::TagDisplay::beginJob() {
 void ana::TagDisplay::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
-    fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    fDriftVelocity = detProp.DriftVelocity();
-    fTick2cm = fDriftVelocity * fSamplingRate;
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;

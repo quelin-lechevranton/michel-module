@@ -119,7 +119,8 @@ private:
 };
 
 ana::TagAna::TagAna(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p}, MichelAnalyzer{p},
+    : EDAnalyzer{p},
+    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
     fLog(p.get<bool>("Log", false)),
     fKeepOutside(p.get<bool>("KeepOutside", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
@@ -131,10 +132,34 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
-
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    // fADC2MeV = (geoDet == kPDVD ? 200 : ) * 23.6 * 1e-6 / 0.7;
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+
+    for (std::vector<std::string> prod : vvsProducts) {
+        std::string 
+            process  = prod[0],
+            label    = prod[1],
+            instance = prod[2],
+            type     = prod[3];
+
+        art::InputTag tag(label,instance);
+
+        if      (type == "simb::MCParticle")        tag_mcp = tag;
+        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
+        else if (type == "recob::Hit")              tag_hit = tag;
+        else if (type == "recob::Wire")             tag_wir = tag;
+        else if (type == "recob::Cluster")          tag_clu = tag;
+        else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
+        else if (type == "recob::SpacePoint")       tag_spt = tag;
+        else if (type == "recob::PFParticle")       tag_pfp = tag;
+    }
+    
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
+
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
