@@ -715,7 +715,10 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     
     // sec order according to the direction in Z
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
-        if (!vph_sec[sec].empty()) {
+        if (vph_sec[sec].size() < ana::LinearRegression::nmin) {
+            vph_sec[sec].clear();
+            sec_mz[sec] = 0;
+        } else {
             sec_mz[sec] /= vph_sec[sec].size();
             sh.secs.push_back(sec);
         }

@@ -292,8 +292,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
 
         DrawFilter(true);
-        if (!DrawFilter(LOG(TagEndInVolume))) continue;
         if (!DrawFilter(LOG(TagTrackLength))) continue;
+        if (!DrawFilter(LOG(TagEndInVolume))) continue;
         if (!DrawFilter(LOG(TagCathodeCrossing))) continue;
         if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
         if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
