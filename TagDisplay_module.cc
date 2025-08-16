@@ -263,12 +263,12 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
             DrawGraph2D(*itc, p_trk, {}, {c_pass, ls_pass.l, ls_pass.w});
             for (auto sc : sh_muon.sc)
-                DrawMarker(*ihc, *sc, ms_sc);
+                DrawMarker(*ihc, sc, ms_sc);
             DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
             DrawMarker(*ihc, sh_muon.vph.back(), ms_end);
             if (sh_muon.isCathodeCrossing) {
-                DrawMarker(*ihc, *sh_muon.cc.first, ms_cc);
-                DrawMarker(*ihc, *sh_muon.cc.second, ms_cc);
+                DrawMarker(*ihc, sh_muon.cc.first, ms_cc);
+                DrawMarker(*ihc, sh_muon.cc.second, ms_cc);
             }
             ihc++;
             itc++;
