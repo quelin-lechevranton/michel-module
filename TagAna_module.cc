@@ -267,14 +267,15 @@ void ana::TagAna::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
 
-        ana::SortedHits sh_muon = GetSortedHits(vph_muon);
+        int dirz = End.Z() > Start.Z() ? 1 : -1;
+        ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
 
         ASSERT(sh_muon)
         // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
 
         // Last Hit: SUPPOSITION: Muon is downward
-        int dirz = End.Z() > Start.Z() ? 1 : -1;
-        MuonEndHit = GetHit(sh_muon.lastHit(dirz));
+        // MuonEndHit = GetHit(sh_muon.lastHit(dirz));
+        MuonEndHit = GetHit(*sh_muon.end);
         MuonEndPoint = ana::Point(End);
 
         TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
@@ -289,8 +290,10 @@ void ana::TagAna::analyze(art::Event const& e) {
 
         VecPtrHit vph_bragg_muon;
         PtrHit ph_bragg = GetBraggEnd(
-            sh_muon.vph, 
-            sh_muon.lastHit(dirz),
+            sh_muon.vph,
+            *sh_muon.end,
+            // sh_muon.vph, 
+            // sh_muon.lastHit(dirz),
             p_trk,
             vph_ev,
             fop_hit2trk,
@@ -363,9 +366,10 @@ void ana::TagAna::analyze(art::Event const& e) {
             //     vph_ev_mcp_muon, 
             //     mcp->EndZ() > mcp->Vz() ? 1 : -1
             // );
-            ana::SortedHits sh_mcp = GetSortedHits(vph_ev_mcp_muon);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_ev_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
             if (sh_mcp) 
-                MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
+                MuonTrueEndHit = GetHit(*sh_mcp.end);
+                // MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
             
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
         }
@@ -584,20 +588,6 @@ PtrHit ana::TagAna::GetBraggEnd(
         ph_prev = *iph_max;
 
         reg = orientation(vph_reg);
-
-        // reg = LinearRegression{};
-        // for (PtrHit const& ph : vph_reg) {
-        //     double z = GetSpace(ph->WireID());
-        //     double t = ph->PeakTime() * fTick2cm;
-        //     reg.add(z, t);
-        // }
-        // reg.compute();
-        // DEBUG(reg.corr == 0)
-        // dirz = GetSpace(vph_reg.back()->WireID())
-        //     > GetSpace(vph_reg.front()->WireID())
-        //     ? 1 : -1;
-        // sigma = TMath::Pi() / 4 / reg.corr;
-        // theta = reg.theta(dirz);
     }
 
     unsigned const trailing_radius = 6;

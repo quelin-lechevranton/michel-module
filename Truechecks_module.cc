@@ -29,6 +29,7 @@ public:
     void endJob() override;
 private:
     // Detector Properties
+    bool fLog;
     float fADC2el; // e-/ADC.tick
     float fADC2MeV; // MeV/ADC.tick
     float fTick2cm; // cm/tick
@@ -37,7 +38,6 @@ private:
     float fCathodeGap; // cm
 
     // Input
-    bool fLog;
     float fMichelRadius;
     bool fKeepTransportation;
 
@@ -482,7 +482,8 @@ std::string ana::Truechecks::GetParticleName(int pdg) {
         unsigned A = (pdg / 10) % 1000;
         unsigned Z = (pdg / 10000) % 1000;
         unsigned L = (pdg / 10000000);
-        if (L==100 && Z && Z < periodic_table.size()) return Form("%u%s%s", A, periodic_table[Z].c_str(), ex ? "*" : "");
+        if (L==100 && Z && Z < periodic_table.size())
+            return Form("%u%s%s", A, periodic_table[Z].c_str(), ex ? "*" : "");
     }
 
     return Form("%d", pdg);

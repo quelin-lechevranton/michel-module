@@ -39,6 +39,7 @@
 
 using PtrHit = art::Ptr<recob::Hit>;
 using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
+using PairPtrHit = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 using PtrTrk = art::Ptr<recob::Track>;
 using VecPtrTrk = std::vector<art::Ptr<recob::Track>>;
 
@@ -91,13 +92,13 @@ namespace ana {
             { 4, -1 }, { 5, 0 }, { 6, 1 }, { 7, -1 }
         }
     };
-    // std::vector<std::map<int, std::vector<int>>> side2sec = {
-    //     { // PDVD
-    //         { 0, {4, 5, 6, 7} }, { 1, {0, 1, 2, 3} }
-    //     }, { // PDHD
-    //         { 0, {0} }, { 1, {1} }
-    //     }
-    // };
+    std::vector<std::map<int, std::vector<int>>> side2secs = {
+        { // PDVD
+            { 0, {4, 5, 6, 7} }, { 1, {0, 1, 2, 3} }
+        }, { // PDHD
+            { 0, {0} }, { 1, {1} }
+        }
+    };
     std::vector<std::map<int, int>> sec2side = {
         { // PDVD
             {0, 1}, {1, 1}, {2, 1}, {3, 1},
@@ -412,20 +413,20 @@ namespace ana {
     }
     VecPtrHit mcp2hits(
         simb::MCParticle const* mcp,
-        VecPtrHit const& vp_hit,
+        VecPtrHit const& vph_unsorted,
         detinfo::DetectorClocksData const& clockData,
         bool use_eve
     ) {
-        VecPtrHit vp_hit_from_mcp;
-        for (PtrHit p_hit : vp_hit)
+        VecPtrHit vph_unsorted_from_mcp;
+        for (PtrHit p_hit : vph_unsorted)
             for (sim::TrackIDE ide : (use_eve
                 ? bt_serv->HitToEveTrackIDEs(clockData, p_hit)
                 : bt_serv->HitToTrackIDEs(clockData, p_hit))
             ) {
                 if (ide.trackID == mcp->TrackId())
-                    vp_hit_from_mcp.push_back(p_hit);
+                    vph_unsorted_from_mcp.push_back(p_hit);
             }
-        return vp_hit_from_mcp;
+        return vph_unsorted_from_mcp;
     }
 
 
@@ -456,52 +457,65 @@ namespace ana {
 
 
 
-
-
-
+    // struct SortedHits {
+    //     VecPtrHit vph;
+    //     unsigned i_cathode_crossing;
+    //     std::vector<unsigned> vi_section_crossing;
+    //     std::vector<LinearRegression> regs;
+    //     SortedHits() : vph(), i_cathode_crossing(0), vi_section_crossing(), regs(2) {}
+    //     bool isCathodeCrossing() const {
+    //         return i_cathode_crossing != vph.size()
+    //             && i_cathode_crossing != 0;
+    //     }
+    //     operator bool() const {
+    //         return !vph.empty();
+    //     }
+    //     unsigned lastSide(int dirz) const {
+    //         if (regs[0].n < LinearRegression::nmin)
+    //             return 1;
+    //         if (regs[1].n < LinearRegression::nmin)
+    //             return 0;
+    //         if ((regs[1].mx - regs[0].mx) * dirz > 0)
+    //             return 1;
+    //         else
+    //             return 0;
+    //     }
+    //     PtrHit lastHit(int dirz) const {
+    //         if (isCathodeCrossing()) {
+    //             int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
+    //             if (dirx > 0) {
+    //                 if (dirz > 0)
+    //                     return vph.back();
+    //                 else 
+    //                     return vph[i_cathode_crossing];
+    //             } else {
+    //                 if (dirz > 0)
+    //                     return vph[i_cathode_crossing-1];
+    //                 else
+    //                     return vph.front();
+    //             }
+    //         } else {
+    //             if (dirz > 0)
+    //                 return vph.back();
+    //             else
+    //                 return vph.front();
+    //         }
+    //     }
+    // };
     struct SortedHits {
-        VecPtrHit vph;
-        unsigned i_cathode_crossing;
-        std::vector<unsigned> vi_section_crossing;
-        std::vector<LinearRegression> regs;
-        SortedHits() : vph(), i_cathode_crossing(0), vi_section_crossing(), regs(2) {}
-        bool isCathodeCrossing() const {
-            return i_cathode_crossing != vph.size()
-                && i_cathode_crossing != 0;
-        }
+        // std::vector<VecPtrHit> vph_sec; // sorted hits per section
+        VecPtrHit vph; // sorted hits
+        std::vector<int> secs; // sorted sections
+        std::vector<LinearRegression> regs; // regressions per side
+
+        bool isCathodeCrossing;
+        VecPtrHit::iterator start, end;
+        std::pair<VecPtrHit::iterator, VecPtrHit::iterator> cc; // cathode crossing
+        std::vector<VecPtrHit::iterator> sc; // section crossing
+
+        SortedHits() : vph(), secs(), regs(2), isCathodeCrossing(false) {}
         operator bool() const {
-            return !vph.empty();
-        }
-        unsigned lastSide(int dirz) const {
-            if (regs[0].n < LinearRegression::nmin)
-                return 1;
-            if (regs[1].n < LinearRegression::nmin)
-                return 0;
-            if ((regs[1].mx - regs[0].mx) * dirz > 0)
-                return 1;
-            else
-                return 0;
-        }
-        PtrHit lastHit(int dirz) const {
-            if (isCathodeCrossing()) {
-                int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
-                if (dirx > 0) {
-                    if (dirz > 0)
-                        return vph.back();
-                    else 
-                        return vph[i_cathode_crossing];
-                } else {
-                    if (dirz > 0)
-                        return vph[i_cathode_crossing-1];
-                    else
-                        return vph.front();
-                }
-            } else {
-                if (dirz > 0)
-                    return vph.back();
-                else
-                    return vph.front();
-            }
+            return !(regs[0].n == 0 && regs[1].n == 0);
         }
     };
     class MichelAnalyzer {
@@ -529,6 +543,7 @@ namespace ana {
         Hit GetHit(PtrHit const&) const;
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
+            int dirz = 1,
             geo::View_t view = geo::kW
         ) const;
     };
@@ -579,84 +594,174 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
 }
 
 ana::axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
-    geo::WireGeo w0 = this->asWire->Wire(geo::WireID{pid, 0});
-    geo::WireGeo w1 = this->asWire->Wire(geo::WireID{pid, 1});
+    geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
+    geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
     int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
     int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
     return { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
 }
 double ana::MichelAnalyzer::GetSpace(geo::WireID wid) const {
-    return this->GetAxis(wid).space(asWire->Wire(wid));
+    return GetAxis(wid).space(asWire->Wire(wid));
 }
 ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
     geo::WireID wid = ph->WireID();
     return {
         wid.TPC,
-        ana::tpc2sec[this->geoDet][wid.TPC],
-        float(this->GetSpace(wid)),
+        ana::tpc2sec[geoDet][wid.TPC],
+        float(GetSpace(wid)),
         ph->Channel(),
         ph->PeakTime(),
         ph->Integral()
     };
 }
+// ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     VecPtrHit const& vph_unsorted,
+    int dirz,
     geo::View_t view
 ) const {
+//     ana::SortedHits sh;
+//     for (PtrHit const& ph : vph_unsorted) {
+//         if (ph->View() != view) continue;
+//         int side = ana::tpc2side[geoDet][ph->WireID().TPC];
+//         if (side == -1) continue;
+//         double z = GetSpace(ph->WireID());
+//         double t = ph->PeakTime() * fTick2cm;
+//         sh.regs[side].add(z, t);
+//         if (side) // highX
+//             sh.vph.push_back(ph);
+//         else {  // lowX
+//             sh.vph.insert(sh.vph.begin(), ph);
+//             sh.i_cathode_crossing++; 
+//         }
+//     }
+//     std::vector<unsigned> ns(2);
+//     ns[0] = sh.i_cathode_crossing;
+//     ns[1] = sh.vph.size() - sh.i_cathode_crossing;
+//     if ((
+//         sh.vph.empty()
+//     ) || (
+//         0 < ns[0] && ns[0] <= LinearRegression::nmin
+//     ) || (
+//         0 < ns[1] && ns[1] <= LinearRegression::nmin
+//     )) {
+//         return ana::SortedHits{};
+//     }
+//     sh.regs[0].compute();
+//     sh.regs[1].compute();
+//     auto comp = [&](ana::LinearRegression const& reg, PtrHit const& ph1, PtrHit const& ph2) {
+//         double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
+//         double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
+//         return s1 < s2; // z increasing
+//     };
+//     std::sort(
+//         sh.vph.begin(), sh.vph.begin()+sh.i_cathode_crossing,
+//         [&](PtrHit const& ph1, PtrHit const& ph2) {
+//             return comp(sh.regs[0], ph1, ph2);
+//         }
+//     );
+//     std::sort(
+//         sh.vph.begin()+sh.i_cathode_crossing, sh.vph.end(),
+//         [&](PtrHit const& ph1, PtrHit const& ph2) {
+//             return comp(sh.regs[1], ph1, ph2);
+//         }
+//     );
+//     int prev_sec = ana::tpc2sec[geoDet][sh.vph.front()->WireID().TPC];
+//     for (unsigned i=1; i<sh.vph.size(); i++) {
+//         int sec = ana::tpc2sec[geoDet][(sh.vph[i])->WireID().TPC];
+//         if (sec != prev_sec) {
+//             sh.vi_section_crossing.push_back(i-1);
+//             sh.vi_section_crossing.push_back(i);
+//             prev_sec = sec;
+//         }
+//     }
+//     return sh;
+
+
+
+
     ana::SortedHits sh;
+    // sh.vph_sec.resize(ana::n_sec[geoDet]);
+    std::vector<VecPtrHit> vph_sec(ana::n_sec[geoDet]);
+    std::vector<float> sec_mz(ana::n_sec[geoDet], 0);
     for (PtrHit const& ph : vph_unsorted) {
         if (ph->View() != view) continue;
-        int side = ana::tpc2side[this->geoDet][ph->WireID().TPC];
-        if (side == -1) continue;
-        double z = this->GetSpace(ph->WireID());
-        double t = ph->PeakTime() * this->fTick2cm;
+        int side = ana::tpc2side[geoDet][ph->WireID().TPC];
+        if (side == -1) continue; // skip hits on the other side of the anodes
+        double z = GetSpace(ph->WireID());
+        double t = ph->PeakTime() * fTick2cm;
         sh.regs[side].add(z, t);
-        if (side) // highX
-            sh.vph.push_back(ph);
-        else {  // lowX
-            sh.vph.insert(sh.vph.begin(), ph);
-            sh.i_cathode_crossing++; 
-        }
+        int sec = ana::tpc2sec[geoDet][ph->WireID().TPC];
+        vph_sec[sec].push_back(ph);
+        sec_mz[sec] += z;
     }
-    std::vector<unsigned> ns(2);
-    ns[0] = sh.i_cathode_crossing;
-    ns[1] = sh.vph.size() - sh.i_cathode_crossing;
+
+    // if not enough hits on both sides, return empty pair
     if ((
-        sh.vph.empty()
+        sh.regs[0].n == 0 && sh.regs[1].n == 0
     ) || (
-        0 < ns[0] && ns[0] <= LinearRegression::nmin
+        0 < sh.regs[0].n && sh.regs[0].n < ana::LinearRegression::nmin
     ) || (
-        0 < ns[1] && ns[1] <= LinearRegression::nmin
-    )) {
-        return ana::SortedHits{};
-    }
+        0 < sh.regs[1].n && sh.regs[1].n < ana::LinearRegression::nmin
+    )) return ana::SortedHits{};
+
     sh.regs[0].compute();
     sh.regs[1].compute();
-    auto comp = [&](ana::LinearRegression const& reg, PtrHit const& ph1, PtrHit const& ph2) {
-        double s1 = reg.projection(this->GetSpace(ph1->WireID()), ph1->PeakTime() * this->fTick2cm);
-        double s2 = reg.projection(this->GetSpace(ph2->WireID()), ph2->PeakTime() * this->fTick2cm);
-        return s1 < s2; // z increasing
-    };
-    std::sort(
-        sh.vph.begin(), sh.vph.begin()+sh.i_cathode_crossing,
-        [&](PtrHit const& ph1, PtrHit const& ph2) {
-            return comp(sh.regs[0], ph1, ph2);
-        }
-    );
-    std::sort(
-        sh.vph.begin()+sh.i_cathode_crossing, sh.vph.end(),
-        [&](PtrHit const& ph1, PtrHit const& ph2) {
-            return comp(sh.regs[1], ph1, ph2);
-        }
-    );
-    int prev_sec = ana::tpc2sec[this->geoDet][sh.vph.front()->WireID().TPC];
-    for (unsigned i=1; i<sh.vph.size(); i++) {
-        int sec = ana::tpc2sec[this->geoDet][(sh.vph[i])->WireID().TPC];
-        if (sec != prev_sec) {
-            sh.vi_section_crossing.push_back(i-1);
-            sh.vi_section_crossing.push_back(i);
-            prev_sec = sec;
+
+    // // side order according to the direction in Z
+    // std::pair<int, int> sides = 
+    //     (sh.regs[1].mx - sh.regs[0].mx) * dirz > 0
+    //     ? std::make_pair(0, 1) : std::make_pair(1, 0);
+    
+    // sec order according to the direction in Z
+    for (int sec=0; sec<ana::n_sec[geoDet]; sec++) {
+        if (!vph_sec[sec].empty()) {
+            sec_mz[sec] /= vph_sec[sec].size();
+            sh.secs.push_back(sec);
         }
     }
+    std::sort(
+        sh.secs.begin(), sh.secs.end(),
+        [&sec_mz, dirz](int sec1, int sec2) {
+            return (sec_mz[sec2] - sec_mz[sec1]) * dirz > 0;
+        }
+    );
+
+    for (unsigned i=0; i<sh.secs.size(); i++) {
+        int sec = sh.secs[i];
+        ana::LinearRegression &reg = sh.regs[ana::sec2side[geoDet][sec]];
+        std::sort(
+            vph_sec[sec].begin(), vph_sec[sec].end(),
+            [&](PtrHit const& ph1, PtrHit const& ph2) {
+                double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
+                double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
+                return (s2 - s1) * dirz > 0;
+            }
+        );
+
+        if (sec==sh.secs.front())
+            sh.start = vph_sec[sec].begin();
+        else {
+            if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i-1]]) {
+                sh.cc.second = vph_sec[sec].begin(); 
+                sh.isCathodeCrossing = true;
+            } else
+                sh.sc.push_back(vph_sec[sec].begin());
+        } 
+        if (sec==sh.secs.back())
+            sh.end = vph_sec[sec].end();
+        else {
+            if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i+1]]) {
+                sh.cc.first = vph_sec[sec].end(); 
+                sh.isCathodeCrossing = true;
+            } else
+                sh.sc.push_back(vph_sec[sec].end());
+        }
+    }
+
+    for (int sec : sh.secs)
+        for (PtrHit const& ph : vph_sec[sec])
+            sh.vph.push_back(ph);
+
     return sh;
 }

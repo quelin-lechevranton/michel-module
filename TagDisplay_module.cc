@@ -227,15 +227,15 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         bool isUpright =  IsUpright(*p_trk);
         geo::Point_t Start = isUpright ? p_trk->Start() : p_trk->End();
         geo::Point_t End = isUpright ? p_trk->End() : p_trk->Start();
-        SortedHits sh_muon = GetSortedHits(vph_muon);
+        ana::SortedHits sh_muon = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
         ASSERT(sh_muon)
 
         int TagBraggError = -1;
         float CutdQdxMax = 0.F;
         VecPtrHit vph_bragg_muon;
         PtrHit ph_bragg = GetBraggEnd(
-            sh_muon.vph, 
-            sh_muon.lastHit(End.Z() > Start.Z() ? 1 : -1),
+            sh_muon.vph,
+            *sh_muon.end,
             p_trk,
             vp_hit,
             fop_hit2trk,
@@ -262,13 +262,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             Color_t c_pass = vc_pass[im%vc_pass.size()];
             DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
             DrawGraph2D(*itc, p_trk, {}, {c_pass, ls_pass.l, ls_pass.w});
-            for (unsigned i_sc : sh_muon.vi_section_crossing)
-                DrawMarker(*ihc, sh_muon.vph[i_sc], ms_sc);
+            for (auto sc : sh_muon.sc)
+                DrawMarker(*ihc, *sc, ms_sc);
             DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
             DrawMarker(*ihc, sh_muon.vph.back(), ms_end);
-            if (sh_muon.isCathodeCrossing()) {
-                DrawMarker(*ihc, sh_muon.vph[sh_muon.i_cathode_crossing-1], ms_cc);
-                DrawMarker(*ihc, sh_muon.vph[sh_muon.i_cathode_crossing], ms_cc);
+            if (sh_muon.isCathodeCrossing) {
+                DrawMarker(*ihc, *sh_muon.cc.first, ms_cc);
+                DrawMarker(*ihc, *sh_muon.cc.second, ms_cc);
             }
             ihc++;
             itc++;
