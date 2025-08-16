@@ -472,9 +472,19 @@ namespace ana {
         operator bool() const {
             return !vph.empty();
         }
+        unsigned lastSide(int dirz) const {
+            if (regs[0].n < LinearRegression::nmin)
+                return 1;
+            if (regs[1].n < LinearRegression::nmin)
+                return 0;
+            if ((regs[1].mx - regs[0].mx) * dirz > 0)
+                return 1;
+            else
+                return 0;
+        }
         PtrHit lastHit(int dirz) const {
-            int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
             if (isCathodeCrossing()) {
+                int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
                 if (dirx > 0) {
                     if (dirz > 0)
                         return vph.back();

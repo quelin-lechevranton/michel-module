@@ -435,12 +435,15 @@ void ana::TagAna::resetMuon() {
     MichelTrackLength = 0;
     MichelTrueEnergy = 0;
     MichelHits.clear();
-    MichelHitEnergy = 0;
     BraggMuonHits.clear();
 
     TrueTagHasMichel = kNoMichel;
     MichelTrackLength = -1;
     MichelHitEnergy = -1;
+
+    MichelHitEnergy = 0;
+    BraggSphereEnergy = 0;
+    PandoraSphereEnergy = 0;
 }
 
 bool ana::TagAna::IsUpright(recob::Track const& T) {
