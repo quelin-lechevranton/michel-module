@@ -118,9 +118,6 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
-    // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
-
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:

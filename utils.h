@@ -527,6 +527,11 @@ namespace ana {
 ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
     asFile()
 {
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
+
     for (std::vector<std::string> prod : p.get<std::vector<std::vector<std::string>>>("Products")) {
         std::string 
             process  = prod[0],
@@ -538,8 +543,8 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
 
         if      (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
-        else if (type == "recob::Hit")              tag_hit = tag;
         else if (type == "recob::Wire")             tag_wir = tag;
+        else if (type == "recob::Hit")              tag_hit = tag;
         else if (type == "recob::Cluster")          tag_clu = tag;
         else if (type == "recob::Track")            tag_trk = tag;
         else if (type == "recob::Shower")           tag_shw = tag;
@@ -547,11 +552,6 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
         else if (type == "recob::PFParticle")       tag_pfp = tag;
     }
     
-    asGeo = &*art::ServiceHandle<geo::Geometry>{};
-    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
-
     if (asGeo->DetectorName().find("vd") != std::string::npos)
         geoDet = kPDVD;
     else if (asGeo->DetectorName().find("hd") != std::string::npos)
@@ -561,6 +561,11 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
             << asGeo->DetectorName() << "\033[0m" << std::endl;
         exit(1);
     }
+
+    auto const clockData = asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(clockData);
+    // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 }
 
 ana::axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
