@@ -708,13 +708,13 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     sh.regs[0].compute();
     sh.regs[1].compute();
 
-    // // side order according to the direction in Z
-    // std::pair<int, int> sides = 
+    // side order according to the direction in Z
+    // std::pair<int, int> sides; = 
     //     (sh.regs[1].mx - sh.regs[0].mx) * dirz > 0
     //     ? std::make_pair(0, 1) : std::make_pair(1, 0);
     
     // sec order according to the direction in Z
-    for (int sec=0; sec<ana::n_sec[geoDet]; sec++) {
+    for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
         if (!vph_sec[sec].empty()) {
             sec_mz[sec] /= vph_sec[sec].size();
             sh.secs.push_back(sec);

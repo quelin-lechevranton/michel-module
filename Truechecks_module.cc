@@ -226,11 +226,11 @@ void ana::Truechecks::analyze(art::Event const& e)
         //     &side_pair
         // );
         // MuonReg = side_reg[side_pair.second];
-        ana::SortedHits sh_muon = GetSortedHits(vph_mcp);
+        ana::SortedHits sh_muon = GetSortedHits(vph_mcp, RegDirZ);
         ASSERT(sh_muon)
 
-        EndHit = GetHit(sh_muon.lastHit(RegDirZ));
-        MuonReg = sh_muon.regs[sh_muon.lastSide(RegDirZ)];
+        EndHit = GetHit(*sh_muon.end);
+        MuonReg = sh_muon.regs[ana::sec2side[geoDet][sh_muon.secs.back()]];
 
         Hits.clear();
         HitProjection.clear();
