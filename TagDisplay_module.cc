@@ -13,7 +13,7 @@ namespace ana {
     class TagDisplay;
 }
 
-class ana::TagDisplay : public art::EDAnalyzer, private MichelDisplayer {
+class ana::TagDisplay : public art::EDAnalyzer, private ana::MichelDisplayer {
 public:
     explicit TagDisplay(fhicl::ParameterSet const& p);
     TagDisplay(TagDisplay const&) = delete;
@@ -106,10 +106,8 @@ private:
     double dist2(PtrHit const& ph1, PtrHit const& ph2);
 };
 
-
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p},
-    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    : EDAnalyzer{p}, MichelDisplayer{p},
     fLog(p.get<bool>("Log", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
@@ -117,50 +115,9 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
     fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
-    asGeo = &*art::ServiceHandle<geo::Geometry>{};
-    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
-
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
-
-    for (std::vector<std::string> prod : vvsProducts) {
-        const std::string   process     = prod[0],
-                            label       = prod[1],
-                            instance    = prod[2],
-                            type        = prod[3];
-
-        const art::InputTag tag = art::InputTag{label,instance};
-
-        if      (type == "simb::MCParticle")        tag_mcp = tag;
-        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
-        else if (type == "recob::Hit")              tag_hit = tag;
-        else if (type == "recob::Wire")             tag_wir = tag;
-        else if (type == "recob::Cluster")          tag_clu = tag;
-        else if (type == "recob::Track")            tag_trk = tag;
-        else if (type == "recob::Shower")           tag_shw = tag;
-        else if (type == "recob::SpacePoint")       tag_spt = tag;
-        else if (type == "recob::PFParticle")       tag_pfp = tag;
-    }
-
-    if (asGeo->DetectorName().find("vd") != std::string::npos)
-        geoDet = kPDVD;
-    else if (asGeo->DetectorName().find("hd") != std::string::npos)
-        geoDet = kPDHD;
-    else {
-        std::cout << "\033[1;91m" "unknown geometry: "
-            << asGeo->DetectorName() << "\033[0m" << std::endl;
-        exit(1);
-    }
-
-    fChannelPitch = geo::WireGeo::WirePitch(
-        asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 0}),
-        asWire->Wire(geo::WireID{geo::PlaneID{geo::TPCID{0, 0}, geo::kW}, 1})
-    );
-    fSamplingRate = detinfo::sampling_rate(clockData) * 1e-3;
-    fDriftVelocity = detProp.DriftVelocity();
-    fTick2cm = fDriftVelocity * fSamplingRate;
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {

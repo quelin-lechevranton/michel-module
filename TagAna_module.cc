@@ -16,7 +16,7 @@ namespace ana {
 using PtrHit = art::Ptr<recob::Hit>;
 using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
 
-class ana::TagAna : public art::EDAnalyzer, private MichelAnalyzer {
+class ana::TagAna : public art::EDAnalyzer, private ana::MichelAnalyzer {
 public:
     explicit TagAna(fhicl::ParameterSet const& p);
     TagAna(TagAna const&) = delete;
@@ -119,8 +119,7 @@ private:
 };
 
 ana::TagAna::TagAna(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p},
-    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products")),
+    : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
     fKeepOutside(p.get<bool>("KeepOutside", false)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
@@ -130,41 +129,8 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
-    asGeo = &*art::ServiceHandle<geo::Geometry>{};
-    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
-    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
-    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
-
-    for (std::vector<std::string> prod : vvsProducts) {
-        const std::string process  = prod[0],
-                          label    = prod[1],
-                          instance = prod[2],
-                          type     = prod[3];
-
-        const art::InputTag tag = art::InputTag{label,instance};
-
-        if      (type == "simb::MCParticle")        tag_mcp = tag;
-        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
-        else if (type == "recob::Hit")              tag_hit = tag;
-        else if (type == "recob::Wire")             tag_wir = tag;
-        else if (type == "recob::Cluster")          tag_clu = tag;
-        else if (type == "recob::Track")            tag_trk = tag;
-        else if (type == "recob::Shower")           tag_shw = tag;
-        else if (type == "recob::SpacePoint")       tag_spt = tag;
-        else if (type == "recob::PFParticle")       tag_pfp = tag;
-    }
-
-    if (asGeo->DetectorName().find("vd") != std::string::npos)
-        geoDet = kPDVD;
-    else if (asGeo->DetectorName().find("hd") != std::string::npos)
-        geoDet = kPDHD;
-    else {
-        std::cout << "\033[1;91m" "unknown geometry: "
-            << asGeo->DetectorName() << "\033[0m" << std::endl;
-        exit(1);
-    }
 
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
     // fADC2MeV = (geoDet == kPDVD ? 200 : ) * 23.6 * 1e-6 / 0.7;

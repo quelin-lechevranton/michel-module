@@ -496,6 +496,12 @@ namespace ana {
     };
     class MichelAnalyzer {
     public:
+        explicit MichelAnalyzer(fhicl::ParameterSet const& p);
+        MichelAnalyzer(MichelAnalyzer const&) = delete;
+        MichelAnalyzer(MichelAnalyzer&&) = delete;
+        MichelAnalyzer& operator=(MichelAnalyzer const&) = delete;
+        MichelAnalyzer& operator=(MichelAnalyzer&&) = delete;
+
         // Utilities
         art::ServiceHandle<art::TFileService> asFile;
         art::ServiceHandle<cheat::ParticleInventoryService> asPartInv;
@@ -506,10 +512,16 @@ namespace ana {
         const detinfo::DetectorPropertiesService* asDetProp;
         const detinfo::DetectorClocksService* asDetClocks;
 
+        std::vector<std::vector<std::string>> vvsProducts;
+        art::InputTag tag_mcp, tag_sed, tag_wir,
+            tag_hit, tag_clu, tag_trk,
+            tag_shw, tag_spt, tag_pfp;
+
         int geoDet;
         enum EnumDet { kPDVD, kPDHD };
 
         float fTick2cm;
+
 
         axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
@@ -520,6 +532,46 @@ namespace ana {
         ) const;
     };
 }
+
+ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
+    vvsProducts(p.get<std::vector<std::vector<std::string>>>("Products"))
+{
+    for (std::vector<std::string> prod : vvsProducts) {
+        std::string 
+            process  = prod[0],
+            label    = prod[1],
+            instance = prod[2],
+            type     = prod[3];
+
+        art::InputTag tag(label,instance);
+
+        if      (type == "simb::MCParticle")        tag_mcp = tag;
+        else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
+        else if (type == "recob::Hit")              tag_hit = tag;
+        else if (type == "recob::Wire")             tag_wir = tag;
+        else if (type == "recob::Cluster")          tag_clu = tag;
+        else if (type == "recob::Track")            tag_trk = tag;
+        else if (type == "recob::Shower")           tag_shw = tag;
+        else if (type == "recob::SpacePoint")       tag_spt = tag;
+        else if (type == "recob::PFParticle")       tag_pfp = tag;
+    }
+    
+    asGeo = &*art::ServiceHandle<geo::Geometry>{};
+    asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
+    asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
+    asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
+
+    if (asGeo->DetectorName().find("vd") != std::string::npos)
+        geoDet = kPDVD;
+    else if (asGeo->DetectorName().find("hd") != std::string::npos)
+        geoDet = kPDHD;
+    else {
+        std::cout << "\033[1;91m" "unknown geometry: "
+            << asGeo->DetectorName() << "\033[0m" << std::endl;
+        exit(1);
+    }
+}
+
 ana::axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
     geo::WireGeo w0 = this->asWire->Wire(geo::WireID{pid, 0});
     geo::WireGeo w1 = this->asWire->Wire(geo::WireID{pid, 1});

@@ -124,6 +124,12 @@ namespace ana {
     };
     class MichelDisplayer : public MichelAnalyzer {
     public:
+        explicit MichelDisplayer(fhicl::ParameterSet const& p) : MichelAnalyzer(p) {}
+        MichelDisplayer(MichelDisplayer const&) = delete;
+        MichelDisplayer(MichelDisplayer&&) = delete;
+        MichelDisplayer& operator=(MichelDisplayer const&) = delete;
+        MichelDisplayer& operator=(MichelDisplayer&&) = delete;
+
         void DrawMarker(TCanvas* c, PtrHit const& ph, MarkerStyle const& ms) const;
         void DrawGraph(TCanvas* c, VecPtrHit const& vph, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) const;
         void DrawGraph2D(TCanvas* c, PtrTrk const& pt, MarkerStyle const& ms={}, LineStyle const& ls={}) const; 
