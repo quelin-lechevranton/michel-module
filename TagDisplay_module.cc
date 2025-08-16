@@ -43,7 +43,7 @@ private:
     std::vector<Color_t> vc_pass = {kBlue, kBlue-3, kBlue+2, kAzure-2, kAzure+2, kAzure+7};
     std::vector<Color_t> vc_fail = {kRed, kRed-3, kRed+3, kPink-2, kPink-8, kPink+7};
     ana::MarkerStyle
-        ms_ev = {kBlack, kPlus, 0.5},
+        ms_ev = {kGray, kPlus, 0.5},
         ms_end = {kViolet+6, kFullSquare},
         ms_cc = {kViolet+6, kFullTriangleUp},
         ms_sc = {kViolet+6, kFullCircle},

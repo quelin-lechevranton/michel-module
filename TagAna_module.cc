@@ -109,7 +109,7 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
     fKeepOutside(p.get<bool>("KeepOutside", false)),
-    fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
+    fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
     fMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
@@ -317,35 +317,37 @@ void ana::TagAna::analyze(art::Event const& e) {
                 != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
             ana::Hit hit = GetHit(ph_ev);
 
+            PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+
+            // ??????????????????????
+            // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
+            // if (ps_hit) continue;
+
             float dz = (hit.space - MuonEndHit.space);
             float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
             float dr2 = dz*dz + dt*dt;
-
-            if (dr2 > fMichelRadius * fMichelRadius) continue;
-
-            // check if the hit is in an other track
-            PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-            if (pt_hit
-                && pt_hit.key() != p_trk.key()
-                && pt_hit->Length() > fTrackLengthCut
-            ) continue;
-
-            // ??????????????????????
-            art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
-            if (ps_hit) continue;
-
-            if (std::find_if(
-                vph_bragg_muon.begin(), 
-                vph_bragg_muon.end(),
-                [&](PtrHit const& h) -> bool {
-                    return h.key() == ph_ev.key();
-                }) == vph_bragg_muon.end()
-            ) {
-                BraggSphereEnergy += hit.adc;
-            }
-
-            if (!pt_hit) {
+            if ((
+                dr2 <= fMichelRadius * fMichelRadius
+            ) && (
+                !pt_hit || pt_hit->Length() < fTrackLengthCut
+            )) {
                 PandoraSphereEnergy += hit.adc;
+            } 
+
+            dz = (hit.space - BraggEndHit.space);
+            dt = (hit.tick - BraggEndHit.tick) * fTick2cm;
+            dr2 = dz*dz + dt*dt;
+            if ((
+                dr2 <= fMichelRadius * fMichelRadius
+            ) && (
+                !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
+            ) && (
+                std::find_if(
+                    vph_bragg_muon.begin(), vph_bragg_muon.end(),
+                    [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+                ) == vph_bragg_muon.end()
+            )) {
+                BraggSphereEnergy += hit.adc;
             }
         }
         
@@ -359,14 +361,14 @@ void ana::TagAna::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-        VecPtrHit vph_ev_mcp_muon;
+        VecPtrHit vph_mcp_muon;
         if (mcp) {
-            vph_ev_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            // vph_ev_mcp_muon = GetSortedHits(
-            //     vph_ev_mcp_muon, 
+            vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            // vph_mcp_muon = GetSortedHits(
+            //     vph_mcp_muon, 
             //     mcp->EndZ() > mcp->Vz() ? 1 : -1
             // );
-            ana::SortedHits sh_mcp = GetSortedHits(vph_ev_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
             if (sh_mcp) 
                 MuonTrueEndHit = GetHit(sh_mcp.end);
                 // MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
@@ -376,7 +378,7 @@ void ana::TagAna::analyze(art::Event const& e) {
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
         simb::MCParticle const* mcp_michel = nullptr;
-        VecPtrHit vph_ev_mcp_michel;
+        VecPtrHit vph_mcp_michel;
         if (mcp && mcp->NumberDaughters() >= 3) {
             bool has_numu = false, has_nue = false;
             for (
@@ -409,10 +411,10 @@ void ana::TagAna::analyze(art::Event const& e) {
                 MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-                vph_ev_mcp_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
-                for (PtrHit p_hit_michel : vph_ev_mcp_michel)
-                    if (p_hit_michel->View() == geo::kW)
-                        MichelHits.push_back(GetHit(p_hit_michel));
+                VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
+                for (PtrHit const& ph_michel : vph_michel)
+                    if (ph_michel->View() == geo::kW)
+                        MichelHits.push_back(GetHit(ph_michel));
                 MichelHitEnergy = MichelHits.energy();
             }
         }
