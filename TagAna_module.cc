@@ -249,7 +249,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         geo::Point_t Start = TagIsUpright ? p_trk->Start() : p_trk->End();
         geo::Point_t End = TagIsUpright ? p_trk->End() : p_trk->Start();
 
-        TagEndInVolume = geoHighX.isInsideYZ(End, 20.F);
+        TagEndInVolume = geoHighX.isInsideYZ(End, fMichelRadius);
 
         TagCathodeCrossing = (
             geoLowX.isInside(Start)
@@ -261,9 +261,9 @@ void ana::TagAna::analyze(art::Event const& e) {
 
         // Anode Crossing: SUPPOSITION: Muon is downward
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.);
+            TagAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius);
         else if (geoDet == kPDHD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
+            TagAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
 
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
@@ -313,7 +313,6 @@ void ana::TagAna::analyze(art::Event const& e) {
             if (ph_ev->View() != geo::kW) continue;
             if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
                 != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
-            ana::Hit hit = GetHit(ph_ev);
 
             PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
 
@@ -321,22 +320,18 @@ void ana::TagAna::analyze(art::Event const& e) {
             // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
             // if (ps_hit) continue;
 
-            float dz = (hit.space - MuonEndHit.space);
-            float dt = (hit.tick - MuonEndHit.tick) * fTick2cm;
-            float dr2 = dz*dz + dt*dt;
             if ((
-                dr2 <= fMichelRadius * fMichelRadius
+                GetDistance(ph_ev, sh_muon.end) <= fMichelRadius
             ) && (
                 !pt_hit || pt_hit->Length() < fTrackLengthCut
             )) {
-                PandoraSphereEnergy += hit.adc;
+                PandoraSphereEnergy += ph_ev->Integral();
             } 
 
-            dz = (hit.space - BraggEndHit.space);
-            dt = (hit.tick - BraggEndHit.tick) * fTick2cm;
-            dr2 = dz*dz + dt*dt;
             if ((
-                dr2 <= fMichelRadius * fMichelRadius
+                TagBraggError == kNoError
+            ) && (
+                GetDistance(ph_ev, ph_bragg) <= fMichelRadius
             ) && (
                 !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
             ) && (
@@ -345,7 +340,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                     [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                 ) == vph_bragg_muon.end()
             )) {
-                BraggSphereEnergy += hit.adc;
+                BraggSphereEnergy += ph_ev->Integral();
             }
         }
         
@@ -362,14 +357,9 @@ void ana::TagAna::analyze(art::Event const& e) {
         VecPtrHit vph_mcp_muon;
         if (mcp) {
             vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            // vph_mcp_muon = GetSortedHits(
-            //     vph_mcp_muon, 
-            //     mcp->EndZ() > mcp->Vz() ? 1 : -1
-            // );
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
             if (sh_mcp) 
                 MuonTrueEndHit = GetHit(sh_mcp.end);
-                // MuonTrueEndHit = GetHit(sh_mcp.lastHit(mcp->EndZ() > mcp->Vz() ? 1 : -1));
             
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
         }
@@ -485,15 +475,11 @@ PtrHit ana::TagAna::GetBraggEnd(
         return PtrHit{};
     }
 
-    auto dist2 = [&](PtrHit const& ph1, PtrHit const& ph2) -> double {
-        return pow((ph1->PeakTime() - ph2->PeakTime()) * fTick2cm, 2)
-            + pow(GetSpace(ph1->WireID()) - GetSpace(ph2->WireID()), 2);
-    };
     std::sort(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-            return dist2(ph2, ph_trk_end) > dist2(ph1, ph_trk_end);
+            return GetDistance(ph2, ph_trk_end) > GetDistance(ph1, ph_trk_end);
         }
     );
 
@@ -501,7 +487,7 @@ PtrHit ana::TagAna::GetBraggEnd(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& h) -> bool {
-            return dist2(h, ph_trk_end) > fBodyDistance * fBodyDistance;
+            return GetDistance(h, ph_trk_end) > fBodyDistance;
         }
     );
     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
@@ -553,7 +539,7 @@ PtrHit ana::TagAna::GetBraggEnd(
         }
 
         // check if the hit is close enough
-        if (dist2(ph_ev, ph_trk_end) > fNearbyRadius) continue;
+        if (GetDistance(ph_ev, ph_trk_end) > fNearbyRadius) continue;
 
         vph_near.push_back(ph_ev);
     }
@@ -607,15 +593,15 @@ PtrHit ana::TagAna::GetBraggEnd(
         dQ /= l;
 
         double dx = iph_sec == vph_sec.begin()
-            ? sqrt(dist2(*iph_sec, *(iph_sec+1)))
+            ? GetDistance(*iph_sec, *(iph_sec+1))
             : ( iph_sec == vph_sec.end()-1
-                ? sqrt(dist2(*(iph_sec-1), *iph_sec))
-                : .5*sqrt(dist2(*(iph_sec-1), *(iph_sec+1)))
+                ? GetDistance(*(iph_sec-1), *iph_sec)
+                : .5*GetDistance(*(iph_sec-1), *(iph_sec+1))
             );
         for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
             dx += iph == vph_sec.end()-1
-                ? sqrt(dist2(*(iph-1), *iph))
-                : .5*sqrt(dist2(*(iph-1), *(iph+1)));
+                ? GetDistance(*(iph-1), *iph)
+                : .5*GetDistance(*(iph-1), *(iph+1));
         dx /= l;
 
         double dQdx = dQ / dx;
@@ -629,7 +615,5 @@ PtrHit ana::TagAna::GetBraggEnd(
     if (error) *error = kNoError;
     return ph_max;
 }   
-
-
 
 DEFINE_ART_MODULE(ana::TagAna)

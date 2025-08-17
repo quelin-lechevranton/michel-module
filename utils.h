@@ -457,51 +457,6 @@ namespace ana {
 
 
 
-    // struct SortedHits {
-    //     VecPtrHit vph;
-    //     unsigned i_cathode_crossing;
-    //     std::vector<unsigned> vi_section_crossing;
-    //     std::vector<LinearRegression> regs;
-    //     SortedHits() : vph(), i_cathode_crossing(0), vi_section_crossing(), regs(2) {}
-    //     bool isCathodeCrossing() const {
-    //         return i_cathode_crossing != vph.size()
-    //             && i_cathode_crossing != 0;
-    //     }
-    //     operator bool() const {
-    //         return !vph.empty();
-    //     }
-    //     unsigned lastSide(int dirz) const {
-    //         if (regs[0].n < LinearRegression::nmin)
-    //             return 1;
-    //         if (regs[1].n < LinearRegression::nmin)
-    //             return 0;
-    //         if ((regs[1].mx - regs[0].mx) * dirz > 0)
-    //             return 1;
-    //         else
-    //             return 0;
-    //     }
-    //     PtrHit lastHit(int dirz) const {
-    //         if (isCathodeCrossing()) {
-    //             int dirx = (regs[1].mx - regs[0].mx) * dirz > 0 ? 1 : -1;
-    //             if (dirx > 0) {
-    //                 if (dirz > 0)
-    //                     return vph.back();
-    //                 else 
-    //                     return vph[i_cathode_crossing];
-    //             } else {
-    //                 if (dirz > 0)
-    //                     return vph[i_cathode_crossing-1];
-    //                 else
-    //                     return vph.front();
-    //             }
-    //         } else {
-    //             if (dirz > 0)
-    //                 return vph.back();
-    //             else
-    //                 return vph.front();
-    //         }
-    //     }
-    // };
     struct SortedHits {
         // std::vector<VecPtrHit> vph_sec; // sorted hits per section
         VecPtrHit vph; // sorted hits
@@ -513,11 +468,22 @@ namespace ana {
         std::pair<PtrHit, PtrHit> cc; // cathode crossing
         std::vector<PtrHit> sc; // section crossing
 
-        SortedHits() : vph(), secs(), regs(2), isCathodeCrossing(false) {}
+        SortedHits() : vph(0), secs(0), regs(2), isCathodeCrossing(false) {}
         operator bool() const {
             return !(regs[0].n == 0 && regs[1].n == 0);
         }
     };
+
+    // struct Bragg {
+    //     VecPtrHit vph_muon; 
+    //     float max_dQdx;
+
+    //     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
+    //     int error;
+    // };
+
+
+
     class MichelAnalyzer {
     public:
         MichelAnalyzer(fhicl::ParameterSet const& p);
@@ -541,11 +507,23 @@ namespace ana {
         axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
         Hit GetHit(PtrHit const&) const;
+        double GetDistance(PtrHit const&, PtrHit const&) const;
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
             int dirz = 1,
             geo::View_t view = geo::kW
         ) const;
+        // Bragg GetBragg(
+        //     VecPtrHit const& vph_trk,
+        //     PtrHit const& ph_trk_end,
+        //     PtrTrk const& pt,
+        //     VecPtrHit const& vph_ev,
+        //     art::FindOneP<recob::Track> const& fop_hit2trk,
+        //     float body_dist,
+        //     unsigned reg_n,
+        //     float track_length_cut,
+        //     float nearby_radius
+        // ) const;
     };
 }
 
@@ -614,72 +592,19 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
         ph->Integral()
     };
 }
+double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2) const {
+    double z1 = GetSpace(ph1->WireID());
+    double t1 = ph1->PeakTime() * fTick2cm;
+    double z2 = GetSpace(ph2->WireID());
+    double t2 = ph2->PeakTime() * fTick2cm;
+    return sqrt(pow(z2-z1, 2) + pow(t2-t1, 2));
+}
 // ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     VecPtrHit const& vph_unsorted,
     int dirz,
     geo::View_t view
 ) const {
-//     ana::SortedHits sh;
-//     for (PtrHit const& ph : vph_unsorted) {
-//         if (ph->View() != view) continue;
-//         int side = ana::tpc2side[geoDet][ph->WireID().TPC];
-//         if (side == -1) continue;
-//         double z = GetSpace(ph->WireID());
-//         double t = ph->PeakTime() * fTick2cm;
-//         sh.regs[side].add(z, t);
-//         if (side) // highX
-//             sh.vph.push_back(ph);
-//         else {  // lowX
-//             sh.vph.insert(sh.vph.begin(), ph);
-//             sh.i_cathode_crossing++; 
-//         }
-//     }
-//     std::vector<unsigned> ns(2);
-//     ns[0] = sh.i_cathode_crossing;
-//     ns[1] = sh.vph.size() - sh.i_cathode_crossing;
-//     if ((
-//         sh.vph.empty()
-//     ) || (
-//         0 < ns[0] && ns[0] <= LinearRegression::nmin
-//     ) || (
-//         0 < ns[1] && ns[1] <= LinearRegression::nmin
-//     )) {
-//         return ana::SortedHits{};
-//     }
-//     sh.regs[0].compute();
-//     sh.regs[1].compute();
-//     auto comp = [&](ana::LinearRegression const& reg, PtrHit const& ph1, PtrHit const& ph2) {
-//         double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
-//         double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
-//         return s1 < s2; // z increasing
-//     };
-//     std::sort(
-//         sh.vph.begin(), sh.vph.begin()+sh.i_cathode_crossing,
-//         [&](PtrHit const& ph1, PtrHit const& ph2) {
-//             return comp(sh.regs[0], ph1, ph2);
-//         }
-//     );
-//     std::sort(
-//         sh.vph.begin()+sh.i_cathode_crossing, sh.vph.end(),
-//         [&](PtrHit const& ph1, PtrHit const& ph2) {
-//             return comp(sh.regs[1], ph1, ph2);
-//         }
-//     );
-//     int prev_sec = ana::tpc2sec[geoDet][sh.vph.front()->WireID().TPC];
-//     for (unsigned i=1; i<sh.vph.size(); i++) {
-//         int sec = ana::tpc2sec[geoDet][(sh.vph[i])->WireID().TPC];
-//         if (sec != prev_sec) {
-//             sh.vi_section_crossing.push_back(i-1);
-//             sh.vi_section_crossing.push_back(i);
-//             prev_sec = sec;
-//         }
-//     }
-//     return sh;
-
-
-
-
     ana::SortedHits sh;
     // sh.vph_sec.resize(ana::n_sec[geoDet]);
     std::vector<VecPtrHit> vph_sec(ana::n_sec[geoDet]);
@@ -695,6 +620,8 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         vph_sec[sec].push_back(ph);
         sec_mz[sec] += z;
     }
+    sh.regs[0].compute();
+    sh.regs[1].compute();
 
     // sec order according to the direction in Z
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
@@ -706,8 +633,14 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
             sh.secs.push_back(sec);
         }
     }
-
     if (sh.secs.empty()) return ana::SortedHits{};
+
+    std::sort(
+        sh.secs.begin(), sh.secs.end(),
+        [&sec_mz, dirz](int sec1, int sec2) {
+            return (sec_mz[sec2] - sec_mz[sec1]) * dirz > 0;
+        }
+    );
 
     // if not enough hits on both sides, return empty pair
     // if ((
@@ -717,22 +650,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     // ) || (
     //     0 < sh.regs[1].n && sh.regs[1].n < ana::LinearRegression::nmin
     // )) return ana::SortedHits{};
-
-    sh.regs[0].compute();
-    sh.regs[1].compute();
-
-    // side order according to the direction in Z
-    // std::pair<int, int> sides; = 
-    //     (sh.regs[1].mx - sh.regs[0].mx) * dirz > 0
-    //     ? std::make_pair(0, 1) : std::make_pair(1, 0);
-    
-
-    std::sort(
-        sh.secs.begin(), sh.secs.end(),
-        [&sec_mz, dirz](int sec1, int sec2) {
-            return (sec_mz[sec2] - sec_mz[sec1]) * dirz > 0;
-        }
-    );
 
     for (unsigned i=0; i<sh.secs.size(); i++) {
         int sec = sh.secs[i];
@@ -772,3 +689,98 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
     return sh;
 }
+// ana::Bragg ana::MichelAnalyzer::GetBragg(
+//     VecPtrHit const& vph_trk,
+//     PtrHit const& ph_trk_end,
+//     PtrTrk const& pt,
+//     VecPtrHit const& vph_ev,
+//     art::FindOneP<recob::Track> const& fop_hit2trk,
+//     float body_dist,
+//     unsigned reg_n,
+//     float track_length_cut,
+//     float nearby_radius
+// ) const {
+//     ana::Bragg bragg;
+
+//     VecPtrHit vph_trk_sec;
+//     for (PtrHit const& ph : vph_trk)
+//         if (ana::tpc2sec[geoDet][ph->WireID().TPC]
+//             == ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC])
+//             vph_trk_sec.push_back(ph);
+//     if (vph_trk_sec.empty()
+//         || std::find_if(
+//             vph_trk_sec.begin(), vph_trk_sec.end(),
+//             [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
+//                 return ph.key() == key;
+//             }
+//         ) == vph_trk_sec.end()
+//     ) return ana::Bragg{ .error = ana::Bragg::kEndNotFound };
+
+//     std::sort(
+//         vph_trk_sec.begin(),
+//         vph_trk_sec.end(),
+//         [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
+//             return GetDistance(ph2, ph_trk_end) > GetDistance(ph1, ph_trk_end);
+//         }
+//     );
+
+//     VecPtrHit::iterator iph_body = std::find_if(
+//         vph_trk_sec.begin(),
+//         vph_trk_sec.end(),
+//         [&](PtrHit const& h) -> bool {
+//             return GetDistance(h, ph_trk_end) > body_dist;
+//         }
+//     );
+//     if (std::distance(iph_body, vph_trk_sec.end()) < reg_n)
+//         return Bragg{ .error = ana::Bragg::kSmallBody };
+
+//     VecPtrHit vph_reg{iph_body, iph_body+reg_n};
+//     auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
+//         LinearRegression reg;
+//         for (PtrHit const& ph : vph) {
+//             double z = GetSpace(ph->WireID());
+//             double t = ph->PeakTime() * fTick2cm;
+//             reg.add(z, t);
+//         }
+//         reg.compute();
+//         // DEBUG(reg.corr == 0)
+//         int dirz = GetSpace(vph.back()->WireID())
+//             > GetSpace(vph.front()->WireID())
+//             ? 1 : -1;
+//         double sigma = TMath::Pi() / 4 / reg.corr;
+//         double theta = reg.theta(dirz);
+//         return std::make_pair(theta, sigma);
+//     };
+//     std::pair<double, double> reg = orientation(vph_reg);
+
+//     VecPtrHit vph_near;
+//     for (PtrHit const& ph_ev : vph_ev) {
+//         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
+//             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
+
+//         // check if the hit is in a track
+//         PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+//         if (pt_hit) {
+//             // check if the hit is on the body of the track
+//             if (pt_hit.key() == pt.key()
+//                 && std::find_if(
+//                     iph_body, vph_trk_sec.end(),
+//                     [key=ph_ev.key()](PtrHit const& ph) -> bool {
+//                         return ph.key() == key;
+//                     }
+//                 ) != vph_trk_sec.end()
+//             ) continue;
+//             // check if the hit is on a long track
+//             if (
+//                 pt_hit.key() != pt.key()
+//                 && pt_hit->Length() > track_length_cut
+//             ) continue;
+//         }
+
+//         // check if the hit is close enough
+//         if (GetDistance(ph_ev, ph_trk_end) > nearby_radius) continue;
+
+//         vph_near.push_back(ph_ev);
+//     }
+
+// }
