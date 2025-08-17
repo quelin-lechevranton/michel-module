@@ -206,6 +206,10 @@ namespace ana {
         Hit(unsigned T, int S, float s, unsigned c, float t, float a) :
             tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
 
+        // double operator-(Hit const& h) const {
+        //     if (section != h.section) return std::numeric_limits<double>::max();
+        //     return sqrt(pow(space - h.space, 2) + pow(tick - h.tick, 2));
+        // }
         // unsigned slice() { return 2*(tpc/4) + tpc%2; }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
@@ -524,6 +528,7 @@ namespace ana {
         //     float track_length_cut,
         //     float nearby_radius
         // ) const;
+        simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
     };
 }
 
@@ -784,3 +789,29 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 //     }
 
 // }
+
+simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
+    simb::MCParticle const* muon
+) const {
+    if (!muon) return nullptr;
+    if (muon->NumberDaughters() < 3) return nullptr;
+
+    simb::MCParticle const* michel = nullptr;
+    bool has_numu = false, has_nue = false;
+    for (
+        int i_dau=muon->NumberDaughters()-3;
+        i_dau<muon->NumberDaughters();
+        i_dau++
+    ) {
+        simb::MCParticle const* dau = pi_serv->TrackIdToParticle_P(muon->Daughter(i_dau));    
+        if (!dau) continue;
+        switch (abs(dau->PdgCode())) {
+            case 14: has_numu = true; break;
+            case 12: has_nue = true; break;
+            case 11: michel = dau; break;
+            default: break;
+        }
+    }
+    if (has_numu && has_nue && michel) return michel;
+    return nullptr;
+}

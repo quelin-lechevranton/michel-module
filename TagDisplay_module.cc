@@ -67,6 +67,7 @@ private:
         art::FindOneP<recob::Track> const& fop_hit2trk,
         VecPtrHit *vph_sec_bragg = nullptr,
         float *max_dQdx = nullptr,
+        float *mip_dQdx = nullptr,
         int *error = nullptr
     );
     double dist2(PtrHit const& ph1, PtrHit const& ph2);
@@ -182,7 +183,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         "EndInVolume (20 cm)",
         "CathodeCrossing",
         "AnodeCrossing (20 cm)",
-        "BraggEndAlogithm"
+        "BraggEndAlogithm",
+        Form("BraggThreshold %.1f MIP", fBraggThreshold)
     };
 
     gStyle->SetPalette(pal);
@@ -232,6 +234,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
 
         int TagBraggError = -1;
         float CutdQdxMax = 0.F;
+        float MIPdQdx = 0.F;
         VecPtrHit vph_bragg_muon;
         PtrHit ph_bragg = GetBraggEnd(
             sh_muon.vph,
@@ -241,6 +244,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             fop_hit2trk,
             &vph_bragg_muon,
             &CutdQdxMax,
+            &MIPdQdx,
             &TagBraggError
         );
 
@@ -298,8 +302,10 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
         if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
         DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
-        DrawGraph((*ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-        // if (!DrawFilter(LOG(CutdQdxMax >= fBraggThreshold))) continue;
+        DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        if (!DrawFilter(LOG(CutdQdxMax >= fBraggThreshold * MIPdQdx))) continue;
+        DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
+        DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
     }
 
     for (TCanvas* hc : hcs)
@@ -328,6 +334,7 @@ PtrHit ana::TagDisplay::GetBraggEnd(
     art::FindOneP<recob::Track> const& fop_hit2trk,
     VecPtrHit *vph_sec_bragg,
     float *max_dQdx,
+    float *mip_dQdx,
     int *error
 ) {
     VecPtrHit vph_sec_trk;
@@ -363,6 +370,29 @@ PtrHit ana::TagDisplay::GetBraggEnd(
             return GetDistance(h, ph_trk_end) > fBodyDistance;
         }
     );
+
+    if (mip_dQdx) {
+        VecPtrHit::iterator jph_body = std::find_if(
+            vph_sec_trk.begin(),
+            vph_sec_trk.end(),
+            [&](PtrHit const& h) -> bool {
+                return GetDistance(h, ph_trk_end) > 2*fBodyDistance;
+            }
+        );
+        float mean_dQ = 0;
+        float mean_dx = 0;
+        for (auto iph=iph_body; iph!=jph_body; iph++) {
+            mean_dQ += (*iph)->Integral();
+            mean_dx += iph==vph_sec_trk.begin()
+                ? GetDistance(*iph, *(iph+1))
+                : ( iph==vph_sec_trk.end()-1
+                    ? GetDistance(*(iph-1), *iph)
+                    : .5*GetDistance(*(iph-1), *(iph+1))
+                );
+        }
+        *mip_dQdx = mean_dQ / mean_dx;
+    }
+
     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
         if (error) *error = kSmallBody;
         return PtrHit{};

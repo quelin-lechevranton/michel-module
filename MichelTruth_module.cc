@@ -1,47 +1,39 @@
 ////////////////////////////////////////////////////////////////////////
-// Class:       Truechecks
+// Class:       MichelTruth
 // Plugin Type: analyzer
-// File:        Truechecks_module.cc
+// File:        MichelTruth_module.cc
 //
 // Generated at Tue Feb 4 15:23:48 2025 by Jeremy Quelin Lechevranton
 ////////////////////////////////////////////////////////////////////////
 
 #include "utils.h"
 
-using HitPtr = art::Ptr<recob::Hit>;
-using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-
 namespace ana {
-    class Truechecks;
+    class MichelTruth;
 }
 
-class ana::Truechecks : public art::EDAnalyzer, public ana::MichelAnalyzer {
+class ana::MichelTruth : public art::EDAnalyzer, public ana::MichelAnalyzer {
 public:
-    explicit Truechecks(fhicl::ParameterSet const& p);
-    Truechecks(Truechecks const&) = delete;
-    Truechecks(Truechecks&&) = delete;
-    Truechecks& operator=(Truechecks const&) = delete;
-    Truechecks& operator=(Truechecks&&) = delete;
+    explicit MichelTruth(fhicl::ParameterSet const& p);
+    MichelTruth(MichelTruth const&) = delete;
+    MichelTruth(MichelTruth&&) = delete;
+    MichelTruth& operator=(MichelTruth const&) = delete;
+    MichelTruth& operator=(MichelTruth&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
     void endJob() override;
 private:
-    // Detector Properties
-    bool fLog;
-    float fADC2el; // e-/ADC.tick
-    float fADC2MeV; // MeV/ADC.tick
-    float fTick2cm; // cm/tick
     bounds3D<float> geoHighX, geoLowX;
     bounds<float> wireWindow;
     float fCathodeGap; // cm
 
-    // Input
+    // Input Parameters
+    bool fLog;
     float fMichelRadius;
     bool fKeepTransportation;
 
-    // Output
+    // Output Variables
     unsigned evRun, evSubRun, evEvent;
 
     TTree* tEvent;
@@ -56,6 +48,7 @@ private:
     bool IsAnti;
     std::string EndProcess;
     int HasMichel;
+    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
     ana::Hits Hits;
     std::vector<float> HitProjection;
     ana::Hit EndHit;
@@ -84,18 +77,16 @@ private:
     std::string GetParticleName(int pdg);
 };
 
-ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
+ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
-    fADC2el(p.get<float>("ADC2el", 0.F)), // e-/ADC.tick
     fMichelRadius(p.get<float>("MichelRadius", 20.F)),
     fKeepTransportation(p.get<bool>("KeepTransportation", true))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    fADC2MeV = fADC2el * 23.6 * 1e-6 / 0.7;
-
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
@@ -174,7 +165,7 @@ ana::Truechecks::Truechecks(fhicl::ParameterSet const& p)
     NearbyHits.SetBranches(tMuon, "Nearby");
 }
 
-void ana::Truechecks::analyze(art::Event const& e)
+void ana::MichelTruth::analyze(art::Event const& e)
 {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
@@ -183,6 +174,7 @@ void ana::Truechecks::analyze(art::Event const& e)
     auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
 
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
+    if (!vh_hit.isValid()) return;
     std::vector<art::Ptr<recob::Hit>> vp_hit;
     art::fill_ptr_vector(vp_hit, vh_hit);
 
@@ -196,7 +188,7 @@ void ana::Truechecks::analyze(art::Event const& e)
     evEvent = e.event();
 
     EventHits.clear();
-    for (HitPtr p_hit : vp_hit)
+    for (PtrHit p_hit : vp_hit)
         if (p_hit->View() == geo::kW)
             EventHits.push_back(GetHit(p_hit));
 
@@ -208,24 +200,10 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         if (!fKeepTransportation && EndProcess == "Transportation") continue;
 
-        HitPtrVec vph_mcp = ana::mcp2hits(&mcp, vp_hit, clockData, false);
+        VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vp_hit, clockData, false);
         if (vph_mcp.empty()) continue;
 
-        // HitPtrVec vp_mcp_sorted_hit = GetSortedHits(vph_mcp, (mcp.EndZ() > mcp.Vz() ? 1 : -1));
-        // if (vp_mcp_sorted_hit.empty()) continue;
-
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
-        // std::vector<ana::LinearRegression> side_reg(2);
-        // std::pair<int, int> side_pair;
-        // HitPtrVec vph_mcp_sorted = GetSortedHits(
-        //     vph_mcp,
-        //     RegDirZ,
-        //     nullptr,
-        //     nullptr,
-        //     &side_reg,
-        //     &side_pair
-        // );
-        // MuonReg = side_reg[side_pair.second];
         ana::SortedHits sh_muon = GetSortedHits(vph_mcp, RegDirZ);
         ASSERT(sh_muon)
 
@@ -234,7 +212,7 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         Hits.clear();
         HitProjection.clear();
-        for (HitPtr const& p_hit : sh_muon.vph) {
+        for (PtrHit const& p_hit : sh_muon.vph) {
             ana::Hit hit = GetHit(p_hit);
             Hits.push_back(hit);
             HitProjection.push_back(
@@ -246,33 +224,19 @@ void ana::Truechecks::analyze(art::Event const& e)
 
         EndPoint = ana::Point(mcp.EndPosition().Vect());
 
-        simb::MCParticle const* mcp_michel = nullptr;
-        if (mcp.NumberDaughters() >= 3) {
-            bool has_numu = false, has_nue = false;
-            for (int i_dau=mcp.NumberDaughters()-3; i_dau<mcp.NumberDaughters(); i_dau++) {
-                simb::MCParticle const* mcp_dau = pi_serv->TrackIdToParticle_P(mcp.Daughter(i_dau));    
-                if (!mcp_dau) continue;
-                switch (abs(mcp_dau->PdgCode())) {
-                    case 14: has_numu = true; break;
-                    case 12: has_nue = true; break;
-                    case 11: mcp_michel = mcp_dau; break;
-                    default: break;
-                }
-            }
-            if (has_numu && has_nue && mcp_michel) {
-                bool isin = false;
-                for (unsigned t=0; t<asGeo->NTPC(); t++) {
-                    isin = asGeo->TPC(geo::TPCID{0, t}).ContainsPosition(mcp_michel->Position().Vect());
-                    if (isin) break;
-                }
-                if (isin)
-                    HasMichel = 2;
-                else
-                    HasMichel = 1;
-            } else {
-                mcp_michel = nullptr;
-                HasMichel = 0;
-            }
+        simb::MCParticle const* mcp_michel = GetMichelMCP(&mcp);
+        if (mcp_michel) {
+            HasMichel = (
+                geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
+                || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+            ) ? kHasMichelFiducial : (
+                geoHighX.isInside(mcp_michel->Position().Vect())
+                || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                ? kHasMichelInside
+                : kHasMichelOutside
+            );
+        } else {
+            HasMichel = 0;
         }
 
         EventiMuon.push_back(iMuon);
@@ -300,7 +264,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         // MichelHitEveTIDEEnergy = 0.F;
         // MichelHitSimIDEEnergy = 0.F;
 
-        HitPtrVec vp_michel_hit = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+        VecPtrHit vp_michel_hit = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
 
         // float Oz = EndHit.space;
         // float Ot = EndHit.tick * fTick2cm;
@@ -309,9 +273,9 @@ void ana::Truechecks::analyze(art::Event const& e)
         // float r2_max = pow(radii.back(), 2);
         float r2_max = pow(60, 2);
 
-        // HitPtrVec shared_hits;
+        // VecPtrHit shared_hits;
         // float shared_e = 0.F;
-        for (HitPtr const& p_hit : vp_michel_hit) {
+        for (PtrHit const& p_hit : vp_michel_hit) {
             // collection hits
             if (p_hit->View() != geo::kW) continue;
 
@@ -319,7 +283,7 @@ void ana::Truechecks::analyze(art::Event const& e)
             if (std::find_if(
                 vph_mcp.begin(),
                 vph_mcp.end(),
-                [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
             ) != vph_mcp.end()) {
                 // shared_hits.push_back(p_hit);
                 // shared_e += p_hit->Integral() * fADC2MeV;
@@ -365,13 +329,12 @@ void ana::Truechecks::analyze(art::Event const& e)
             }
         }
         // SharedEnergy *= fADC2MeV;
-        MichelHitEnergy = MichelHits.energy() * fADC2MeV;
-
+        MichelHitEnergy = MichelHits.energy();
 
         // MichelSphereTrueEnergy.resize(radii.size(), 0.F);
         // MichelSphereEnergy.resize(radii.size(), 0.F);
         
-        // for (HitPtr const& p_hit : vp_michel_hit) {
+        // for (PtrHit const& p_hit : vp_michel_hit) {
         //     // collection hits
         //     if (p_hit->View() != geo::kW) continue;
 
@@ -389,7 +352,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         //     if (std::find_if(
         //         vph_mcp.begin(),
         //         vph_mcp.end(),
-        //         [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+        //         [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
         //     ) != vph_mcp.end()) continue;
 
         //     for (int i=radii.size()-1; i>=0; i--) {
@@ -399,7 +362,7 @@ void ana::Truechecks::analyze(art::Event const& e)
         //     }
         // }
 
-        for (HitPtr const& p_hit : vp_hit) {
+        for (PtrHit const& p_hit : vp_hit) {
             // collection hits
             if (p_hit->View() != geo::kW) continue;
 
@@ -417,7 +380,7 @@ void ana::Truechecks::analyze(art::Event const& e)
             if (std::find_if(
                 vph_mcp.begin(),
                 vph_mcp.end(),
-                [k=p_hit.key()](HitPtr const& p) { return p.key() == k; }
+                [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
             ) != vph_mcp.end()) continue;
 
             // not from other muons?
@@ -450,10 +413,10 @@ void ana::Truechecks::analyze(art::Event const& e)
     iEvent++;
 } // end analyze
 
-void ana::Truechecks::beginJob() {}  
-void ana::Truechecks::endJob() {}
+void ana::MichelTruth::beginJob() {}  
+void ana::MichelTruth::endJob() {}
 
-std::string ana::Truechecks::GetParticleName(int pdg) {
+std::string ana::MichelTruth::GetParticleName(int pdg) {
 
     std::vector<std::string> periodic_table = { "",
         "H",                                                                                                  "He", 
@@ -489,4 +452,4 @@ std::string ana::Truechecks::GetParticleName(int pdg) {
     return Form("%d", pdg);
 }
 
-DEFINE_ART_MODULE(ana::Truechecks)
+DEFINE_ART_MODULE(ana::MichelTruth)

@@ -13,9 +13,6 @@ namespace ana {
     class TagAna;
 }
 
-using PtrHit = art::Ptr<recob::Hit>;
-using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
-
 class ana::TagAna : public art::EDAnalyzer, private ana::MichelAnalyzer {
 public:
     explicit TagAna(fhicl::ParameterSet const& p);
@@ -28,8 +25,8 @@ public:
     void beginJob() override;
     void endJob() override;
 private:
-    bounds3D<float> geoHighX, geoLowX;
     bounds<float> wireWindow;
+    bounds3D<float> geoHighX, geoLowX;
     float fCathodeGap; // cm
 
     // Input Parameters
@@ -100,6 +97,7 @@ private:
         art::FindOneP<recob::Track> const& fop_hit2trk,
         VecPtrHit *vph_sec_bragg = nullptr,
         float *max_dQdx = nullptr,
+        float *mip_dQdx = nullptr,
         int *error = nullptr
     );
 };
@@ -116,6 +114,7 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
     wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
@@ -287,6 +286,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         resetMuon();
 
         VecPtrHit vph_bragg_muon;
+        float MIPdQdx = 0.F;
         PtrHit ph_bragg = GetBraggEnd(
             sh_muon.vph,
             sh_muon.end,
@@ -297,8 +297,10 @@ void ana::TagAna::analyze(art::Event const& e) {
             fop_hit2trk,
             &vph_bragg_muon,
             &CutdQdxMax,
+            &MIPdQdx,
             &TagBraggError
         );
+        CutdQdxMax /= MIPdQdx;
         BraggEndHit = ph_bragg ? GetHit(ph_bragg) : ana::Hit{};
         for (PtrHit const& ph_bragg_muon : vph_bragg_muon)
             BraggMuonHits.push_back(GetHit(ph_bragg_muon));
@@ -312,7 +314,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
             if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-                != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
+                != MuonEndHit.section) continue;
 
             PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
 
@@ -365,46 +367,33 @@ void ana::TagAna::analyze(art::Event const& e) {
         }
 
         // a decaying muon has nu_mu, nu_e and elec as last daughters
-        simb::MCParticle const* mcp_michel = nullptr;
+        simb::MCParticle const* mcp_michel = GetMichelMCP(mcp);
         VecPtrHit vph_mcp_michel;
-        if (mcp && mcp->NumberDaughters() >= 3) {
-            bool has_numu = false, has_nue = false;
-            for (
-                int i_dau=mcp->NumberDaughters()-3;
-                i_dau<mcp->NumberDaughters();
-                i_dau++
-            ) {
-                simb::MCParticle const* mcp_dau = pi_serv->TrackIdToParticle_P(mcp->Daughter(i_dau));    
-                if (!mcp_dau) continue;
-                switch (abs(mcp_dau->PdgCode())) {
-                    case 14: has_numu = true; break;
-                    case 12: has_nue = true; break;
-                    case 11: mcp_michel = mcp_dau; break;
-                    default: break;
-                }
-            }
+        if (mcp_michel) {
+            TrueTagHasMichel = (
+                geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
+                || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+            ) ? kHasMichelFiducial : (
+                geoHighX.isInside(mcp_michel->Position().Vect())
+                || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                ? kHasMichelInside
+                : kHasMichelOutside
+            );
 
-            if (mcp_michel and has_numu and has_nue) {
-                TrueTagHasMichel = (
-                    geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
-                    || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
-                ) ? kHasMichelFiducial : (
-                    geoHighX.isInside(mcp_michel->Position().Vect())
-                    || geoLowX.isInside(mcp_michel->EndPosition().Vect())
-                    ? kHasMichelInside
-                    : kHasMichelOutside
-                );
+            PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
+            MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
+            MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 
-                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
-                MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
-                MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
-
-                VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
-                for (PtrHit const& ph_michel : vph_michel)
-                    if (ph_michel->View() == geo::kW)
-                        MichelHits.push_back(GetHit(ph_michel));
-                MichelHitEnergy = MichelHits.energy();
-            }
+            VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
+            for (PtrHit const& ph_michel : vph_michel)
+                if (ph_michel->View() == geo::kW)
+                    MichelHits.push_back(GetHit(ph_michel));
+            MichelHitEnergy = MichelHits.energy();
+        } else {
+            TrueTagHasMichel = kNoMichel;
+            MichelTrackLength = -1;
+            MichelTrueEnergy = 0;
+            MichelHitEnergy = 0;
         }
         tMuon->Fill();
         iMuon++;
@@ -456,6 +445,7 @@ PtrHit ana::TagAna::GetBraggEnd(
     art::FindOneP<recob::Track> const& fop_hit2trk,
     VecPtrHit *vph_sec_bragg,
     float *max_dQdx,
+    float *mip_dQdx,
     int *error
 ) {
     VecPtrHit vph_sec_trk;
@@ -491,6 +481,29 @@ PtrHit ana::TagAna::GetBraggEnd(
             return GetDistance(h, ph_trk_end) > fBodyDistance;
         }
     );
+
+    if (mip_dQdx) {
+        VecPtrHit::iterator jph_body = std::find_if(
+            vph_sec_trk.begin(),
+            vph_sec_trk.end(),
+            [&](PtrHit const& h) -> bool {
+                return GetDistance(h, ph_trk_end) > 2*fBodyDistance;
+            }
+        );
+        float mean_dQ = 0;
+        float mean_dx = 0;
+        for (auto iph=iph_body; iph!=jph_body; iph++) {
+            mean_dQ += (*iph)->Integral();
+            mean_dx += iph==vph_sec_trk.begin()
+                ? GetDistance(*iph, *(iph+1))
+                : ( iph==vph_sec_trk.end()-1
+                    ? GetDistance(*(iph-1), *iph)
+                    : .5*GetDistance(*(iph-1), *(iph+1))
+                );
+        }
+        *mip_dQdx = mean_dQ / mean_dx;
+    }
+
     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
         if (error) *error = kSmallBody;
         return PtrHit{};
