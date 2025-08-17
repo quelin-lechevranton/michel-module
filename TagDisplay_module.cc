@@ -331,10 +331,11 @@ PtrHit ana::TagDisplay::GetBraggEnd(
     int *error
 ) {
     VecPtrHit vph_sec_trk;
-    for (PtrHit const& p_hit : vph_trk) {
-        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
-        vph_sec_trk.push_back(p_hit);
-    }
+    for (PtrHit const& p_hit : vph_trk)
+        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC]
+            == ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC])
+            vph_sec_trk.push_back(p_hit);
+    
     if (vph_sec_trk.empty()
         || std::find_if(
             vph_sec_trk.begin(), vph_sec_trk.end(),
@@ -367,25 +368,6 @@ PtrHit ana::TagDisplay::GetBraggEnd(
         return PtrHit{};
     }
 
-    VecPtrHit vph_reg{iph_body, iph_body+fRegN};
-    auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
-        LinearRegression reg;
-        for (PtrHit const& ph : vph) {
-            double z = GetSpace(ph->WireID());
-            double t = ph->PeakTime() * fTick2cm;
-            reg.add(z, t);
-        }
-        reg.compute();
-        // DEBUG(reg.corr == 0)
-        int dirz = GetSpace(vph.back()->WireID())
-            > GetSpace(vph.front()->WireID())
-            ? 1 : -1;
-        double sigma = TMath::Pi() / 4 / reg.corr;
-        double theta = reg.theta(dirz);
-        return std::make_pair(theta, sigma);
-    };
-    std::pair<double, double> reg = orientation(vph_reg);
-
     VecPtrHit vph_near;
     for (PtrHit const& ph_ev : vph_ev) {
         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
@@ -417,6 +399,29 @@ PtrHit ana::TagDisplay::GetBraggEnd(
     }
     DEBUG(vph_near.empty())
 
+    VecPtrHit vph_reg{iph_body, iph_body+fRegN};
+    std::reverse(vph_reg.begin(), vph_reg.end());
+    auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
+        LinearRegression reg;
+        for (PtrHit const& ph : vph) {
+            double z = GetSpace(ph->WireID());
+            double t = ph->PeakTime() * fTick2cm;
+            reg.add(z, t);
+        }
+        reg.compute();
+        // DEBUG(reg.corr == 0)
+        int dirz = GetSpace(vph.back()->WireID())
+            > GetSpace(vph.front()->WireID())
+            ? 1 : -1;
+        int dirt = vph.back()->PeakTime()
+            > vph.front()->PeakTime()
+            ? 1 : -1;
+        double theta = reg.theta(dirz, dirt);
+        double sigma = TMath::Pi() / 4 / reg.corr;
+        return std::make_pair(theta, sigma);
+    };
+    std::pair<double, double> reg = orientation(vph_reg);
+
     auto score = [&](PtrHit const& ph1, PtrHit const& ph2, double theta, double sigma) -> double {
         double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
         double dt = (ph2->PeakTime() - ph1->PeakTime()) * fTick2cm;
@@ -428,7 +433,7 @@ PtrHit ana::TagDisplay::GetBraggEnd(
     };
 
     VecPtrHit vph_sec{vph_reg.begin(), vph_reg.end()};
-    std::reverse(vph_sec.begin(), vph_sec.end());
+    // std::reverse(vph_sec.begin(), vph_sec.end());
     PtrHit ph_prev = ph_trk_end;
     while (vph_near.size()) {
         VecPtrHit::iterator iph_max = std::max_element(
@@ -440,8 +445,10 @@ PtrHit ana::TagDisplay::GetBraggEnd(
         );
 
         vph_near.erase(iph_max);
-        vph_reg.insert(vph_reg.begin(), *iph_max);
-        vph_reg.pop_back();
+        // vph_reg.insert(vph_reg.begin(), *iph_max);
+        // vph_reg.pop_back();
+        vph_reg.erase(vph_reg.begin());
+        vph_reg.push_back(*iph_max);
         vph_sec.push_back(*iph_max);
         ph_prev = *iph_max;
 

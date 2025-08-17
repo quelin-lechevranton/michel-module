@@ -134,8 +134,8 @@ namespace ana {
         double projection(double x, double y) const {
             return (x + m*(y-p)) / (1 + m*m);
         }
-        double theta(int dirx) {
-            return atan2(dirx * abs(cov), dirx* abs(lp-vary));
+        double theta(int dirx, int diry) {
+            return atan2(diry * abs(cov), dirx* abs(lp-vary));
         }
         void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sRegM", pre), &m);
