@@ -158,13 +158,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    VecPtrHit vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
+    VecPtrHit vph_ev;
+    art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    std::vector<PtrTrk> vp_trk;
-    art::fill_ptr_vector(vp_trk, vh_trk);
+    std::vector<PtrTrk> vpt_ev;
+    art::fill_ptr_vector(vpt_ev, vh_trk);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
@@ -179,10 +179,11 @@ void ana::TagDisplay::analyze(art::Event const& e) {
 
     std::vector<char const*> cuts = {
         "None",
-        Form("TrackLength >= %.0f cm", fTrackLengthCut),
-        "EndInVolume (20 cm)",
-        "CathodeCrossing",
-        "AnodeCrossing (20 cm)",
+        // Form("TrackLength >= %.0f cm", fTrackLengthCut),
+        // "EndInVolume (20 cm)",
+        // "CathodeCrossing",
+        // "AnodeCrossing (20 cm)",
+        "HasMichelHits",
         "BraggEndAlogithm",
         Form("BraggThreshold %.1f MIP", fBraggThreshold)
     };
@@ -197,7 +198,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             1300,800
         );
         ana::DrawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
-        DrawGraph(hc, vp_hit, "p", ms_ev);
+        DrawGraph(hc, vph_ev, "p", ms_ev);
         hcs.push_back(hc);
     }
 
@@ -222,13 +223,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
     }
         
     unsigned im=0;
-    for (PtrTrk const& p_trk : vp_trk) {
-        VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
+    for (PtrTrk const& pt_ev : vpt_ev) {
+        VecPtrHit vph_muon = fmp_trk2hit.at(pt_ev.key());
         ASSERT(vph_muon.size())
 
-        bool isUpright =  IsUpright(*p_trk);
-        geo::Point_t Start = isUpright ? p_trk->Start() : p_trk->End();
-        geo::Point_t End = isUpright ? p_trk->End() : p_trk->Start();
+        bool isUpright =  IsUpright(*pt_ev);
+        geo::Point_t Start = isUpright ? pt_ev->Start() : pt_ev->End();
+        geo::Point_t End = isUpright ? pt_ev->End() : pt_ev->Start();
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
         ASSERT(sh_muon)
 
@@ -239,8 +240,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         PtrHit ph_bragg = GetBraggEnd(
             sh_muon.vph,
             sh_muon.end,
-            p_trk,
-            vp_hit,
+            pt_ev,
+            vph_ev,
             fop_hit2trk,
             &vph_bragg_muon,
             &CutdQdxMax,
@@ -256,16 +257,16 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             if (!tag) {
                 Color_t c_fail = vc_fail[im%vc_fail.size()];
                 DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_fail, ls_fail.l, ls_fail.w});
-                DrawGraph2D(*itc, p_trk, {}, {c_fail, ls_fail.l, ls_fail.w});
+                DrawGraph2D(*itc, pt_ev, {}, {c_fail, ls_fail.l, ls_fail.w});
                 for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
                     DrawGraph(*jhc, sh_muon.vph, "l", {}, ls_back);
                 for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
-                    DrawGraph2D(*jtc, p_trk, ms_back);
+                    DrawGraph2D(*jtc, pt_ev, ms_back);
                 return false;
             }
             Color_t c_pass = vc_pass[im%vc_pass.size()];
             DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
-            DrawGraph2D(*itc, p_trk, {}, {c_pass, ls_pass.l, ls_pass.w});
+            DrawGraph2D(*itc, pt_ev, {}, {c_pass, ls_pass.l, ls_pass.w});
             for (PtrHit const& sc : sh_muon.sc)
                 DrawMarker(*ihc, sc, ms_sc);
             DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
@@ -279,7 +280,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             return true;
         };
 
-        bool TagTrackLength = p_trk->Length() >= fTrackLengthCut;
+        bool TagTrackLength = pt_ev->Length() >= fTrackLengthCut;
         bool TagEndInVolume = geoHighX.isInsideYZ(End, 20.F);
         // MuonEndIsInWindowT = wireWindow.isInside(MuonEndHit.tick, fMichelTickRadius);
         bool TagCathodeCrossing = (
@@ -295,11 +296,25 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
 
+        simb::MCParticle const* mcp_mu = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
+        simb::MCParticle const* mcp_mi = GetMichelMCP(mcp_mu);
+        VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+        bool TrueTagHasMichelHits = !vph_mi.empty();
+
         DrawFilter(true);
-        if (!DrawFilter(LOG(TagTrackLength))) continue;
-        if (!DrawFilter(LOG(TagEndInVolume))) continue;
-        if (!DrawFilter(LOG(TagCathodeCrossing))) continue;
-        if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
+        // if (!DrawFilter(LOG(TagTrackLength))) continue;
+        // if (!DrawFilter(LOG(TagEndInVolume))) continue;
+        // if (!DrawFilter(LOG(TagCathodeCrossing))) continue;
+        // if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
+        // if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
+        // DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
+        // DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        // if (!DrawFilter(LOG(CutdQdxMax >= fBraggThreshold * MIPdQdx))) continue;
+        // DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
+        // DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        if (!DrawFilter(LOG(TrueTagHasMichelHits))) continue;
+        DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
+        DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
         if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
         DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
         DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});

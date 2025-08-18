@@ -403,34 +403,36 @@ namespace ana {
     }
     VecPtrTrk mcp2trks(
         simb::MCParticle const* mcp,
-        VecPtrTrk const& vp_trk,
+        VecPtrTrk const& vpt_ev,
         detinfo::DetectorClocksData const& clockData,
         art::FindManyP<recob::Hit> const& fmp_trk2hit
     ) {
-        VecPtrTrk vp_trk_from_mcp;
-        for (PtrTrk p_trk : vp_trk) {
-            simb::MCParticle const* mcp_from_trk = trk2mcp(p_trk, clockData, fmp_trk2hit);
-            if (mcp_from_trk && mcp_from_trk->TrackId() == mcp->TrackId())
-                vp_trk_from_mcp.push_back(p_trk);
+        if (!mcp) return VecPtrTrk{};
+        VecPtrTrk vpt_mcp;
+        for (PtrTrk pt_ev : vpt_ev) {
+            simb::MCParticle const* mcp_trk = trk2mcp(pt_ev, clockData, fmp_trk2hit);
+            if (mcp_trk && mcp_trk->TrackId() == mcp->TrackId())
+                vpt_mcp.push_back(pt_ev);
         }
-        return vp_trk_from_mcp;
+        return vpt_mcp;
     }
     VecPtrHit mcp2hits(
         simb::MCParticle const* mcp,
-        VecPtrHit const& vph_unsorted,
+        VecPtrHit const& vph_ev,
         detinfo::DetectorClocksData const& clockData,
         bool use_eve
     ) {
-        VecPtrHit vph_unsorted_from_mcp;
-        for (PtrHit p_hit : vph_unsorted)
+        if (!mcp) return VecPtrHit{};
+        VecPtrHit vph_mcp;
+        for (PtrHit ph_ev : vph_ev)
             for (sim::TrackIDE ide : (use_eve
-                ? bt_serv->HitToEveTrackIDEs(clockData, p_hit)
-                : bt_serv->HitToTrackIDEs(clockData, p_hit))
-            ) {
+                ? bt_serv->HitToEveTrackIDEs(clockData, ph_ev)
+                : bt_serv->HitToTrackIDEs(clockData, ph_ev)
+            )) {
                 if (ide.trackID == mcp->TrackId())
-                    vph_unsorted_from_mcp.push_back(p_hit);
+                    vph_mcp.push_back(ph_ev);
             }
-        return vph_unsorted_from_mcp;
+        return vph_mcp;
     }
 
 
