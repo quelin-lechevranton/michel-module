@@ -488,7 +488,7 @@ namespace ana {
         float nearby_radius; // radius to search for nearby hits
     };
     struct Bragg {
-        VecPtrHit vph_muon={}; // hits of the muon in section after bragg algorithm
+        VecPtrHit vph_clu={}; // hits of the muon in section after bragg algorithm
         float mip_dQdx=0; // dQ/dx of the MIP
         float max_dQdx=0; // maximum dQ/dx of the muon
         PtrHit end={}; // end of the muon track after bragg algorithm
@@ -836,7 +836,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         return TMath::Gaus(da, 0, sigma) / r;
     };
 
-    bragg.vph_muon.assign(vph_reg.begin(), vph_reg.end());
+    bragg.vph_clu.assign(vph_reg.begin(), vph_reg.end());
     PtrHit ph_prev = ph_trk_end;
     while (vph_near.size()) {
         VecPtrHit::iterator iph_max = std::max_element(
@@ -852,7 +852,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         // vph_reg.pop_back();
         vph_reg.erase(vph_reg.begin());
         vph_reg.push_back(*iph_max);
-        bragg.vph_muon.push_back(*iph_max);
+        bragg.vph_clu.push_back(*iph_max);
         ph_prev = *iph_max;
 
         reg = orientation(vph_reg);
@@ -860,9 +860,11 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
 
     unsigned const trailing_radius = 6;
     bragg.max_dQdx = std::numeric_limits<double>::lowest();
-    for (auto iph_sec=bragg.vph_muon.begin(); iph_sec!=bragg.vph_muon.end(); iph_sec++) {
-        VecPtrHit::iterator jph_sec = std::distance(iph_sec, bragg.vph_muon.end()) > trailing_radius
-            ? iph_sec+trailing_radius : bragg.vph_muon.end();
+    for (auto iph_sec=bragg.vph_clu.begin(); iph_sec!=bragg.vph_clu.end(); iph_sec++) {
+        VecPtrHit::iterator jph_sec =
+            std::distance(iph_sec, bragg.vph_clu.end()) > trailing_radius
+            ? iph_sec+trailing_radius
+            : bragg.vph_clu.end();
         unsigned l = std::distance(iph_sec, jph_sec);
 
         double dQ = std::accumulate(
@@ -873,14 +875,14 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         );
         dQ /= l;
 
-        double dx = iph_sec == bragg.vph_muon.begin()
+        double dx = iph_sec == bragg.vph_clu.begin()
             ? GetDistance(*iph_sec, *(iph_sec+1))
-            : ( iph_sec == bragg.vph_muon.end()-1
+            : ( iph_sec == bragg.vph_clu.end()-1
                 ? GetDistance(*(iph_sec-1), *iph_sec)
                 : .5*GetDistance(*(iph_sec-1), *(iph_sec+1))
             );
         for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
-            dx += iph == bragg.vph_muon.end()-1
+            dx += iph == bragg.vph_clu.end()-1
                 ? GetDistance(*(iph-1), *iph)
                 : .5*GetDistance(*(iph-1), *(iph+1));
         dx /= l;

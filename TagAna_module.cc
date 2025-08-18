@@ -83,6 +83,7 @@ private:
     ana::Hits MichelHits;
     float MichelTrueEnergy, MichelHitEnergy;
     float BraggSphereEnergy;
+    float Bragg2SphereEnergy;
     float PandoraSphereEnergy;
 
     void resetEvent();
@@ -188,6 +189,7 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
     tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
+    tMuon->Branch("Bragg2SphereEnergy", &Bragg2SphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
 
     MichelHits.SetBranches(tMuon, "Michel");
@@ -205,12 +207,11 @@ void ana::TagAna::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    std::vector<PtrTrk> vp_trk;
+    VecPtrTrk vp_trk;
     art::fill_ptr_vector(vp_trk, vh_trk);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
@@ -288,7 +289,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         if (bragg) {
             CutdQdxMax = bragg.max_dQdx / bragg.mip_dQdx;
             BraggEndHit = GetHit(bragg.end);
-            for (PtrHit const& ph_bragg_muon : bragg.vph_muon)
+            for (PtrHit const& ph_bragg_muon : bragg.vph_clu)
                 BraggMuonHits.push_back(GetHit(ph_bragg_muon));
         } else {
             CutdQdxMax = 0.F;
@@ -296,10 +297,15 @@ void ana::TagAna::analyze(art::Event const& e) {
         }
 
         // getting all muon hits
-        for (PtrHit const& vph_muon : sh_muon.vph)
-            if (vph_muon->View() == geo::kW)
-                MuonHits.push_back(GetHit(vph_muon));
+        for (PtrHit const& ph_muon : sh_muon.vph)
+            if (ph_muon->View() == geo::kW)
+                MuonHits.push_back(GetHit(ph_muon));
 
+        VecPtrHit::iterator iph_bragg = std::find_if(
+            bragg.vph_clu.begin(), bragg.vph_clu.end(),
+            [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
+        );
+        if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
         // integrate charges around muon endpoint
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
@@ -328,13 +334,17 @@ void ana::TagAna::analyze(art::Event const& e) {
                 !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
             ) && (
                 std::find_if(
-                    bragg.vph_muon.begin(), bragg.vph_muon.end(),
+                    bragg.vph_clu.begin(), iph_bragg,
                     [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-                ) == bragg.vph_muon.end()
+                ) == iph_bragg
             )) {
                 BraggSphereEnergy += ph_ev->Integral();
             }
         }
+        Bragg2SphereEnergy = std::accumulate(
+            iph_bragg, bragg.vph_clu.end(), 0.F,
+            [](float sum, PtrHit const& h) -> float { return sum + h->Integral(); }
+        );
         
         // Truth Information
 
@@ -416,6 +426,7 @@ void ana::TagAna::resetMuon() {
 
     MichelHitEnergy = 0;
     BraggSphereEnergy = 0;
+    Bragg2SphereEnergy = 0;
     PandoraSphereEnergy = 0;
 }
 

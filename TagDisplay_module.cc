@@ -51,6 +51,7 @@ private:
         ms_fail = {vc_fail.front(), kFullCircle},
         ms_back = {kGray, kFullCircle, 0.5},
         ms_bragg = {kAzure+10, kFourSquaresX},
+        ms_clu = {ms_bragg.c, kMultiply, 0.5},
         ms_michel = {kGreen-8, kOpenDoubleDiamond},
         ms_shw = {kYellow+2, kOpenCircle, 0.5};
 
@@ -153,17 +154,16 @@ void ana::TagDisplay::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    std::vector<PtrTrk> vpt_ev;
+    VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
-
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
     auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
     if (!vh_shw.isValid()) return;
-    std::vector<art::Ptr<recob::Shower>> vps_ev;
+    VecPtrShw vps_ev;
     art::fill_ptr_vector(vps_ev, vh_shw);
 
+    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
@@ -314,7 +314,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
-        DrawGraph(*ihc, bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        DrawGraph(*ihc, bragg.vph_clu, "p", ms_clu);
         ihc++; itc++;
 
         if (!LOG(bragg.max_dQdx >= fBraggThreshold * bragg.mip_dQdx)) {
@@ -324,7 +324,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
-        DrawGraph(*ihc, bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        DrawGraph(*ihc, bragg.vph_clu, "p", ms_clu);
     }
 
     for (TCanvas* hc : hcs)
