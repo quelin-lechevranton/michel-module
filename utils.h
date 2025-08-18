@@ -39,9 +39,10 @@
 
 using PtrHit = art::Ptr<recob::Hit>;
 using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
-using PairPtrHit = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 using PtrTrk = art::Ptr<recob::Track>;
 using VecPtrTrk = std::vector<art::Ptr<recob::Track>>;
+using PtrShw = art::Ptr<recob::Shower>;
+using VecPtrShw = std::vector<art::Ptr<recob::Shower>>;
 
 namespace ana {
     enum EnumDet { kPDVD, kPDHD };

@@ -51,7 +51,8 @@ private:
         ms_fail = {vc_fail.front(), kFullCircle},
         ms_back = {kGray, kFullCircle, 0.5},
         ms_bragg = {kAzure+10, kFourSquaresX},
-        ms_michel = {kGreen-8, kOpenDoubleDiamond};
+        ms_michel = {kGreen-8, kOpenDoubleDiamond},
+        ms_shw = {kYellow+2, kOpenCircle, 0.5};
 
     ana::LineStyle
         ls_pass = {vc_pass.front(), kSolid, 2},
@@ -60,17 +61,6 @@ private:
 
     bool IsUpright(recob::Track const& T);
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
-    // PtrHit GetBraggEnd(
-    //     VecPtrHit const& vph_trk,
-    //     PtrHit const& ph_trk_end,
-    //     PtrTrk const& p_trk,
-    //     VecPtrHit const& vph_ev,
-    //     art::FindOneP<recob::Track> const& fop_hit2trk,
-    //     VecPtrHit *vph_sec_bragg = nullptr,
-    //     float *max_dQdx = nullptr,
-    //     float *mip_dQdx = nullptr,
-    //     int *error = nullptr
-    // );
 };
 
 ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
@@ -171,8 +161,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
 
     auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
     if (!vh_shw.isValid()) return;
-    std::vector<art::Ptr<recob::Shower>> vp_shw;
-    art::fill_ptr_vector(vp_shw, vh_shw);
+    std::vector<art::Ptr<recob::Shower>> vps_ev;
+    art::fill_ptr_vector(vps_ev, vh_shw);
 
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
@@ -184,7 +174,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         // "CathodeCrossing",
         // "AnodeCrossing (20 cm)",
         "HasMichelHits",
-        "BraggEndAlogithm",
+        "BraggEndNoError",
         Form("BraggThreshold %.1f MIP", fBraggThreshold)
     };
 
@@ -199,6 +189,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         );
         ana::DrawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
         DrawGraph(hc, vph_ev, "p", ms_ev);
+
+        for (PtrShw const& ps_ev : vps_ev) {
+            VecPtrHit vph_shw = fmp_shw2hit.at(ps_ev.key());
+            if (!vph_shw.size()) continue;
+            DrawGraph(hc, vph_shw, "p", ms_shw);
+        }
+
         hcs.push_back(hc);
     }
 
@@ -288,23 +285,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         bool TrueTagHasMichelHits = !vph_mi.empty();
 
-        // DrawFilter(true);
+        // unused variables
         LOG(TagTrackLength);
         LOG(TagEndInVolume);
         LOG(TagEndInWindow);
         LOG(TagCathodeCrossing);
         LOG(TagAnodeCrossing);
-        // if (!DrawFilter(LOG(TagTrackLength))) continue;
-        // if (!DrawFilter(LOG(TagEndInVolume))) continue;
-        // if (!DrawFilter(LOG(TagCathodeCrossing))) continue;
-        // if (!DrawFilter(LOG(TagAnodeCrossing))) continue;
-        // if (!DrawFilter(LOG(TagBraggError == kNoError))) continue;
-        // DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
-        // DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-        // if (!DrawFilter(LOG(CutdQdxMax >= fBraggThreshold * MIPdQdx))) continue;
-        // DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
-        // DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-
+        LOG(TrueTagHasMichelHits);
 
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
@@ -357,204 +344,5 @@ bool ana::TagDisplay::IsUpright(recob::Track const& T) {
         return T.Start().Y() > T.End().Y();
     return false;
 }
-
-// PtrHit ana::TagDisplay::GetBraggEnd(
-//     VecPtrHit const& vph_trk,
-//     PtrHit const& ph_trk_end,
-//     PtrTrk const& p_trk,
-//     VecPtrHit const& vph_ev,
-//     art::FindOneP<recob::Track> const& fop_hit2trk,
-//     VecPtrHit *vph_sec_bragg,
-//     float *max_dQdx,
-//     float *mip_dQdx,
-//     int *error
-// ) {
-//     VecPtrHit vph_sec_trk;
-//     for (PtrHit const& p_hit : vph_trk)
-//         if (ana::tpc2sec[geoDet][p_hit->WireID().TPC]
-//             == ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC])
-//             vph_sec_trk.push_back(p_hit);
-    
-//     if (vph_sec_trk.empty()
-//         || std::find_if(
-//             vph_sec_trk.begin(), vph_sec_trk.end(),
-//             [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
-//                 return ph.key() == key;
-//             }
-//         ) == vph_sec_trk.end()
-//     ) {
-//         if (error) *error = kEndNotFound;
-//         return PtrHit{};
-//     }
-
-//     std::sort(
-//         vph_sec_trk.begin(),
-//         vph_sec_trk.end(),
-//         [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-//             return GetDistance(ph2, ph_trk_end) > GetDistance(ph1, ph_trk_end);
-//         }
-//     );
-
-//     VecPtrHit::iterator iph_body = std::find_if(
-//         vph_sec_trk.begin(),
-//         vph_sec_trk.end(),
-//         [&](PtrHit const& h) -> bool {
-//             return GetDistance(h, ph_trk_end) > fBodyDistance;
-//         }
-//     );
-
-//     if (mip_dQdx) {
-//         VecPtrHit::iterator jph_body = std::find_if(
-//             vph_sec_trk.begin(),
-//             vph_sec_trk.end(),
-//             [&](PtrHit const& h) -> bool {
-//                 return GetDistance(h, ph_trk_end) > 2*fBodyDistance;
-//             }
-//         );
-//         float mean_dQ = 0;
-//         float mean_dx = 0;
-//         for (auto iph=iph_body; iph!=jph_body; iph++) {
-//             mean_dQ += (*iph)->Integral();
-//             mean_dx += iph==vph_sec_trk.begin()
-//                 ? GetDistance(*iph, *(iph+1))
-//                 : ( iph==vph_sec_trk.end()-1
-//                     ? GetDistance(*(iph-1), *iph)
-//                     : .5*GetDistance(*(iph-1), *(iph+1))
-//                 );
-//         }
-//         *mip_dQdx = mean_dQ / mean_dx;
-//     }
-
-//     if (std::distance(iph_body, vph_sec_trk.end()) < fRegN) {
-//         if (error) *error = kSmallBody;
-//         return PtrHit{};
-//     }
-
-//     VecPtrHit vph_near;
-//     for (PtrHit const& ph_ev : vph_ev) {
-//         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-//             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
-
-//         // check if the hit is in a track
-//         PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-//         if (pt_hit) {
-//             // check if the hit is on the body of the track
-//             if (pt_hit.key() == p_trk.key()
-//                 && std::find_if(
-//                     iph_body, vph_sec_trk.end(),
-//                     [key=ph_ev.key()](PtrHit const& ph) -> bool {
-//                         return ph.key() == key;
-//                     }
-//                 ) != vph_sec_trk.end()
-//             ) continue;
-//             // check if the hit is on a long track
-//             if (
-//                 pt_hit.key() != p_trk.key()
-//                 && pt_hit->Length() > fTrackLengthCut
-//             ) continue;
-//         }
-
-//         // check if the hit is close enough
-//         if (GetDistance(ph_ev, ph_trk_end) > fNearbyRadius) continue;
-
-//         vph_near.push_back(ph_ev);
-//     }
-//     DEBUG(vph_near.empty())
-
-//     VecPtrHit vph_reg{iph_body, iph_body+fRegN};
-//     std::reverse(vph_reg.begin(), vph_reg.end());
-//     auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
-//         LinearRegression reg;
-//         for (PtrHit const& ph : vph) {
-//             double z = GetSpace(ph->WireID());
-//             double t = ph->PeakTime() * fTick2cm;
-//             reg.add(z, t);
-//         }
-//         reg.compute();
-//         // DEBUG(reg.corr == 0)
-//         int dirz = GetSpace(vph.back()->WireID())
-//             > GetSpace(vph.front()->WireID())
-//             ? 1 : -1;
-//         int dirt = vph.back()->PeakTime()
-//             > vph.front()->PeakTime()
-//             ? 1 : -1;
-//         double theta = reg.theta(dirz, dirt);
-//         double sigma = TMath::Pi() / 4 / reg.corr;
-//         return std::make_pair(theta, sigma);
-//     };
-//     std::pair<double, double> reg = orientation(vph_reg);
-
-//     auto score = [&](PtrHit const& ph1, PtrHit const& ph2, double theta, double sigma) -> double {
-//         double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
-//         double dt = (ph2->PeakTime() - ph1->PeakTime()) * fTick2cm;
-//         double da = atan2(dt, dz) - theta;
-//         da = abs(da) < TMath::Pi() ? da : da - (da>0?1:-1)*2*TMath::Pi();
-//         double r = sqrt(dt*dt + dz*dz);
-
-//         return TMath::Gaus(da, 0, sigma) / r;
-//     };
-
-//     VecPtrHit vph_sec{vph_reg.begin(), vph_reg.end()};
-//     // std::reverse(vph_sec.begin(), vph_sec.end());
-//     PtrHit ph_prev = ph_trk_end;
-//     while (vph_near.size()) {
-//         VecPtrHit::iterator iph_max = std::max_element(
-//             vph_near.begin(), vph_near.end(),
-//             [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-//                 return score(ph_prev, ph1, reg.first, reg.second)
-//                     < score(ph_prev, ph2, reg.first, reg.second);
-//             }
-//         );
-
-//         vph_near.erase(iph_max);
-//         // vph_reg.insert(vph_reg.begin(), *iph_max);
-//         // vph_reg.pop_back();
-//         vph_reg.erase(vph_reg.begin());
-//         vph_reg.push_back(*iph_max);
-//         vph_sec.push_back(*iph_max);
-//         ph_prev = *iph_max;
-
-//         reg = orientation(vph_reg);
-//     }
-
-//     unsigned const trailing_radius = 6;
-//     double max = std::numeric_limits<double>::lowest();
-//     PtrHit ph_max;
-//     for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
-//         VecPtrHit::iterator jph_sec = std::distance(iph_sec, vph_sec.end()) > trailing_radius
-//             ? iph_sec+trailing_radius : vph_sec.end();
-//         unsigned l = std::distance(iph_sec, jph_sec);
-
-//         double dQ = std::accumulate(
-//             iph_sec, jph_sec, 0.,
-//             [](double sum, PtrHit const& ph) {
-//                 return sum+ph->Integral();
-//             }
-//         );
-//         dQ /= l;
-
-//         double dx = iph_sec == vph_sec.begin()
-//             ? GetDistance(*iph_sec, *(iph_sec+1))
-//             : ( iph_sec == vph_sec.end()-1
-//                 ? GetDistance(*(iph_sec-1), *iph_sec)
-//                 : .5*GetDistance(*(iph_sec-1), *(iph_sec+1))
-//             );
-//         for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
-//             dx += iph == vph_sec.end()-1
-//                 ? GetDistance(*(iph-1), *iph)
-//                 : .5*GetDistance(*(iph-1), *(iph+1));
-//         dx /= l;
-
-//         double dQdx = dQ / dx;
-//         if (dQdx > max) {
-//             max = dQdx;
-//             ph_max = *iph_sec;
-//         }
-//     }
-//     if (vph_sec_bragg) *vph_sec_bragg = vph_sec;
-//     if (max_dQdx) *max_dQdx = float(max);
-//     if (error) *error = kNoError;
-//     return ph_max;
-// }   
 
 DEFINE_ART_MODULE(ana::TagDisplay)
