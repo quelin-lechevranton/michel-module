@@ -708,6 +708,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     art::FindOneP<recob::Track> const& fop_hit2trk,
     ana::BraggOptions const& opt
 ) const {
+    ana::Bragg bragg;
     VecPtrHit vph_sec_trk;
     for (PtrHit const& p_hit : vph_trk)
         if (ana::tpc2sec[geoDet][p_hit->WireID().TPC]
@@ -721,7 +722,10 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
                 return ph.key() == key;
             }
         ) == vph_sec_trk.end()
-    ) return ana::Bragg{ .error = ana::Bragg::kEndNotFound };
+    ) {
+        bragg.error = ana::Bragg::kEndNotFound;
+        return bragg;
+    }
 
     std::sort(
         vph_sec_trk.begin(),
@@ -757,10 +761,12 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
                 : .5*GetDistance(*(iph-1), *(iph+1))
             );
     }
-    float mip_dQdx = mean_dQ / mean_dx;
+    bragg.mip_dQdx = mean_dQ / mean_dx;
 
-    if (std::distance(iph_body, vph_sec_trk.end()) < opt.reg_n)
-        return ana::Bragg{ .error = ana::Bragg::kSmallBody };
+    if (std::distance(iph_body, vph_sec_trk.end()) < opt.reg_n) {
+        bragg.error = ana::Bragg::kSmallBody;
+        return bragg;
+    }
 
     VecPtrHit vph_near;
     for (PtrHit const& ph_ev : vph_ev) {
@@ -791,7 +797,10 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
 
         vph_near.push_back(ph_ev);
     }
-    if (vph_near.empty()) return ana::Bragg{ .error = ana::Bragg::kNoNearbyHits };
+    if (vph_near.empty()) {
+        bragg.error = ana::Bragg::kNoNearbyHits;
+        return bragg;
+    }
 
     VecPtrHit vph_reg{iph_body, iph_body+opt.reg_n};
     std::reverse(vph_reg.begin(), vph_reg.end());
@@ -826,8 +835,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         return TMath::Gaus(da, 0, sigma) / r;
     };
 
-    VecPtrHit vph_sec{vph_reg.begin(), vph_reg.end()};
-    // std::reverse(vph_sec.begin(), vph_sec.end());
+    bragg.vph_muon.assign(vph_reg.begin(), vph_reg.end());
     PtrHit ph_prev = ph_trk_end;
     while (vph_near.size()) {
         VecPtrHit::iterator iph_max = std::max_element(
@@ -843,18 +851,17 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         // vph_reg.pop_back();
         vph_reg.erase(vph_reg.begin());
         vph_reg.push_back(*iph_max);
-        vph_sec.push_back(*iph_max);
+        bragg.vph_muon.push_back(*iph_max);
         ph_prev = *iph_max;
 
         reg = orientation(vph_reg);
     }
 
     unsigned const trailing_radius = 6;
-    float max_dQdx = std::numeric_limits<double>::lowest();
-    PtrHit ph_max_dQdx;
-    for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
-        VecPtrHit::iterator jph_sec = std::distance(iph_sec, vph_sec.end()) > trailing_radius
-            ? iph_sec+trailing_radius : vph_sec.end();
+    bragg.max_dQdx = std::numeric_limits<double>::lowest();
+    for (auto iph_sec=bragg.vph_muon.begin(); iph_sec!=bragg.vph_muon.end(); iph_sec++) {
+        VecPtrHit::iterator jph_sec = std::distance(iph_sec, bragg.vph_muon.end()) > trailing_radius
+            ? iph_sec+trailing_radius : bragg.vph_muon.end();
         unsigned l = std::distance(iph_sec, jph_sec);
 
         double dQ = std::accumulate(
@@ -865,32 +872,27 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         );
         dQ /= l;
 
-        double dx = iph_sec == vph_sec.begin()
+        double dx = iph_sec == bragg.vph_muon.begin()
             ? GetDistance(*iph_sec, *(iph_sec+1))
-            : ( iph_sec == vph_sec.end()-1
+            : ( iph_sec == bragg.vph_muon.end()-1
                 ? GetDistance(*(iph_sec-1), *iph_sec)
                 : .5*GetDistance(*(iph_sec-1), *(iph_sec+1))
             );
         for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
-            dx += iph == vph_sec.end()-1
+            dx += iph == bragg.vph_muon.end()-1
                 ? GetDistance(*(iph-1), *iph)
                 : .5*GetDistance(*(iph-1), *(iph+1));
         dx /= l;
 
         double dQdx = dQ / dx;
-        if (dQdx > max_dQdx) {
-            max_dQdx = dQdx;
-            ph_max_dQdx = *iph_sec;
+        if (dQdx > bragg.max_dQdx) {
+            bragg.max_dQdx = dQdx;
+            bragg.end = *iph_sec;
         }
     }
 
-    return ana::Bragg{
-        .vph_muon = vph_sec,
-        .mip_dQdx = mip_dQdx,
-        .max_dQdx = max_dQdx,
-        .end = ph_trk_end,
-        .error = ana::Bragg::kNoError
-    };
+    bragg.error = ana::Bragg::kNoError;
+    return bragg;
 }
 
 simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
