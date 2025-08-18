@@ -50,7 +50,8 @@ private:
         ms_pass = {vc_pass.front(), kFullCircle},
         ms_fail = {vc_fail.front(), kFullCircle},
         ms_back = {kGray, kFullCircle, 0.5},
-        ms_bragg = {kAzure+10, kFourSquaresX};
+        ms_bragg = {kAzure+10, kFourSquaresX},
+        ms_michel = {kGreen-8, kOpenDoubleDiamond};
 
     ana::LineStyle
         ls_pass = {vc_pass.front(), kSolid, 2},
@@ -232,10 +233,6 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
         ASSERT(sh_muon)
 
-        // int TagBraggError = -1;
-        // float CutdQdxMax = 0.F;
-        // float MIPdQdx = 0.F;
-        // VecPtrHit vph_bragg_muon;
         ana::Bragg bragg = GetBragg(
             sh_muon.vph,
             sh_muon.end,
@@ -243,27 +240,20 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             vph_ev,
             fop_hit2trk,
             { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-            // &vph_bragg_muon,
-            // &CutdQdxMax,
-            // &MIPdQdx,
-            // &TagBraggError
         );
 
         im++;
 
-        std::vector<TCanvas*>::iterator ihc = hcs.begin();
-        std::vector<TCanvas*>::iterator itc = tcs.begin();
-        auto DrawFilter = [&](bool tag) -> bool {
-            if (!tag) {
-                Color_t c_fail = vc_fail[im%vc_fail.size()];
-                DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_fail, ls_fail.l, ls_fail.w});
-                DrawGraph2D(*itc, pt_ev, {}, {c_fail, ls_fail.l, ls_fail.w});
-                for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
-                    DrawGraph(*jhc, sh_muon.vph, "l", {}, ls_back);
-                for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
-                    DrawGraph2D(*jtc, pt_ev, ms_back);
-                return false;
-            }
+        auto DrawFail = [&](std::vector<TCanvas*>::iterator ihc, std::vector<TCanvas*>::iterator itc) -> void {
+            Color_t c_fail = vc_fail[im%vc_fail.size()];
+            DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_fail, ls_fail.l, ls_fail.w});
+            DrawGraph2D(*itc, pt_ev, {}, {c_fail, ls_fail.l, ls_fail.w});
+            for (auto jhc=ihc+1; jhc!=hcs.end(); jhc++)
+                DrawGraph(*jhc, sh_muon.vph, "l", {}, ls_back);
+            for (auto jtc=itc+1; jtc!=tcs.end(); jtc++)
+                DrawGraph2D(*jtc, pt_ev, ms_back);
+        };
+        auto DrawPass = [&](std::vector<TCanvas*>::iterator ihc, std::vector<TCanvas*>::iterator itc) -> void {
             Color_t c_pass = vc_pass[im%vc_pass.size()];
             DrawGraph(*ihc, sh_muon.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
             DrawGraph2D(*itc, pt_ev, {}, {c_pass, ls_pass.l, ls_pass.w});
@@ -275,9 +265,6 @@ void ana::TagDisplay::analyze(art::Event const& e) {
                 DrawMarker(*ihc, sh_muon.cc.first, ms_cc);
                 DrawMarker(*ihc, sh_muon.cc.second, ms_cc);
             }
-            ihc++;
-            itc++;
-            return true;
         };
 
         bool TagTrackLength = pt_ev->Length() >= fTrackLengthCut;
@@ -301,7 +288,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         bool TrueTagHasMichelHits = !vph_mi.empty();
 
-        DrawFilter(true);
+        // DrawFilter(true);
         LOG(TagTrackLength);
         LOG(TagEndInVolume);
         LOG(TagEndInWindow);
@@ -317,15 +304,40 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         // if (!DrawFilter(LOG(CutdQdxMax >= fBraggThreshold * MIPdQdx))) continue;
         // DrawMarker(*(ihc-1), ph_bragg, ms_bragg);
         // DrawGraph(*(ihc-1), vph_bragg_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-        if (!DrawFilter(LOG(TrueTagHasMichelHits))) continue;
-        DrawMarker(*(ihc-1), bragg.end, ms_bragg);
-        DrawGraph(*(ihc-1), bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-        if (!DrawFilter(LOG(bragg.error == kNoError))) continue;
-        DrawMarker(*(ihc-1), bragg.end, ms_bragg);
-        DrawGraph(*(ihc-1), bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
-        if (!DrawFilter(LOG(bragg.max_dQdx >= fBraggThreshold * bragg.mip_dQdx))) continue;
-        DrawMarker(*(ihc-1), bragg.end, ms_bragg);
-        DrawGraph(*(ihc-1), bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+
+
+        std::vector<TCanvas*>::iterator ihc = hcs.begin();
+        std::vector<TCanvas*>::iterator itc = tcs.begin();
+
+        DrawPass(ihc, itc);
+        ihc++; itc++;
+
+        if (!LOG(TrueTagHasMichelHits)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
+
+        if (!LOG(bragg.error == kNoError)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        DrawMarker(*ihc, bragg.end, ms_bragg);
+        DrawGraph(*ihc, bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
+        ihc++; itc++;
+
+        if (!LOG(bragg.max_dQdx >= fBraggThreshold * bragg.mip_dQdx)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        DrawMarker(*ihc, bragg.end, ms_bragg);
+        DrawGraph(*ihc, bragg.vph_muon, "p", {ms_bragg.c, kMultiply, 0.5});
     }
 
     for (TCanvas* hc : hcs)
