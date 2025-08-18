@@ -480,15 +480,21 @@ namespace ana {
         }
     };
 
-    // struct Bragg {
-    //     VecPtrHit vph_muon; 
-    //     float max_dQdx;
-
-    //     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
-    //     int error;
-    // };
-
-
+    struct BraggOptions {
+        float body_dist; // distance from the end of the track to the body
+        unsigned reg_n; // number of hits to use for the regression
+        float track_length_cut; // cut on the track length
+        float nearby_radius; // radius to search for nearby hits
+    };
+    struct Bragg {
+        VecPtrHit vph_muon={}; // hits of the muon in section after bragg algorithm
+        float mip_dQdx=0; // dQ/dx of the MIP
+        float max_dQdx=0; // maximum dQ/dx of the muon
+        PtrHit end={}; // end of the muon track after bragg algorithm
+        enum EnumBraggError { kNoError, kEndNotFound, kSmallBody, kNoNearbyHits };
+        int error=-1; // error code of the bragg algorithm
+        operator bool() const { return error == kNoError; }
+    };
 
     class MichelAnalyzer {
     public:
@@ -519,17 +525,14 @@ namespace ana {
             int dirz = 1,
             geo::View_t view = geo::kW
         ) const;
-        // Bragg GetBragg(
-        //     VecPtrHit const& vph_trk,
-        //     PtrHit const& ph_trk_end,
-        //     PtrTrk const& pt,
-        //     VecPtrHit const& vph_ev,
-        //     art::FindOneP<recob::Track> const& fop_hit2trk,
-        //     float body_dist,
-        //     unsigned reg_n,
-        //     float track_length_cut,
-        //     float nearby_radius
-        // ) const;
+        Bragg GetBragg(
+            VecPtrHit const& vph_trk,
+            PtrHit const& ph_trk_end,
+            PtrTrk const& pt,
+            VecPtrHit const& vph_ev,
+            art::FindOneP<recob::Track> const& fop_hit2trk,
+            BraggOptions const& opt
+        ) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
     };
 }
@@ -696,101 +699,199 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
     return sh;
 }
-// ana::Bragg ana::MichelAnalyzer::GetBragg(
-//     VecPtrHit const& vph_trk,
-//     PtrHit const& ph_trk_end,
-//     PtrTrk const& pt,
-//     VecPtrHit const& vph_ev,
-//     art::FindOneP<recob::Track> const& fop_hit2trk,
-//     float body_dist,
-//     unsigned reg_n,
-//     float track_length_cut,
-//     float nearby_radius
-// ) const {
-//     ana::Bragg bragg;
 
-//     VecPtrHit vph_trk_sec;
-//     for (PtrHit const& ph : vph_trk)
-//         if (ana::tpc2sec[geoDet][ph->WireID().TPC]
-//             == ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC])
-//             vph_trk_sec.push_back(ph);
-//     if (vph_trk_sec.empty()
-//         || std::find_if(
-//             vph_trk_sec.begin(), vph_trk_sec.end(),
-//             [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
-//                 return ph.key() == key;
-//             }
-//         ) == vph_trk_sec.end()
-//     ) return ana::Bragg{ .error = ana::Bragg::kEndNotFound };
+ana::Bragg ana::MichelAnalyzer::GetBragg(
+    VecPtrHit const& vph_trk,
+    PtrHit const& ph_trk_end,
+    PtrTrk const& p_trk,
+    VecPtrHit const& vph_ev,
+    art::FindOneP<recob::Track> const& fop_hit2trk,
+    ana::BraggOptions const& opt
+) const {
+    VecPtrHit vph_sec_trk;
+    for (PtrHit const& p_hit : vph_trk)
+        if (ana::tpc2sec[geoDet][p_hit->WireID().TPC]
+            == ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC])
+            vph_sec_trk.push_back(p_hit);
+    
+    if (vph_sec_trk.empty()
+        || std::find_if(
+            vph_sec_trk.begin(), vph_sec_trk.end(),
+            [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
+                return ph.key() == key;
+            }
+        ) == vph_sec_trk.end()
+    ) return ana::Bragg{ .error = ana::Bragg::kEndNotFound };
 
-//     std::sort(
-//         vph_trk_sec.begin(),
-//         vph_trk_sec.end(),
-//         [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-//             return GetDistance(ph2, ph_trk_end) > GetDistance(ph1, ph_trk_end);
-//         }
-//     );
+    std::sort(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
+            return GetDistance(ph2, ph_trk_end) > GetDistance(ph1, ph_trk_end);
+        }
+    );
 
-//     VecPtrHit::iterator iph_body = std::find_if(
-//         vph_trk_sec.begin(),
-//         vph_trk_sec.end(),
-//         [&](PtrHit const& h) -> bool {
-//             return GetDistance(h, ph_trk_end) > body_dist;
-//         }
-//     );
-//     if (std::distance(iph_body, vph_trk_sec.end()) < reg_n)
-//         return Bragg{ .error = ana::Bragg::kSmallBody };
+    VecPtrHit::iterator iph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& h) -> bool {
+            return GetDistance(h, ph_trk_end) > opt.body_dist;
+        }
+    );
 
-//     VecPtrHit vph_reg{iph_body, iph_body+reg_n};
-//     auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
-//         LinearRegression reg;
-//         for (PtrHit const& ph : vph) {
-//             double z = GetSpace(ph->WireID());
-//             double t = ph->PeakTime() * fTick2cm;
-//             reg.add(z, t);
-//         }
-//         reg.compute();
-//         // DEBUG(reg.corr == 0)
-//         int dirz = GetSpace(vph.back()->WireID())
-//             > GetSpace(vph.front()->WireID())
-//             ? 1 : -1;
-//         double sigma = TMath::Pi() / 4 / reg.corr;
-//         double theta = reg.theta(dirz);
-//         return std::make_pair(theta, sigma);
-//     };
-//     std::pair<double, double> reg = orientation(vph_reg);
+    VecPtrHit::iterator jph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& h) -> bool {
+            return GetDistance(h, ph_trk_end) > 2*opt.body_dist;
+        }
+    );
+    float mean_dQ = 0;
+    float mean_dx = 0;
+    for (auto iph=iph_body; iph!=jph_body; iph++) {
+        mean_dQ += (*iph)->Integral();
+        mean_dx += iph==vph_sec_trk.begin()
+            ? GetDistance(*iph, *(iph+1))
+            : ( iph==vph_sec_trk.end()-1
+                ? GetDistance(*(iph-1), *iph)
+                : .5*GetDistance(*(iph-1), *(iph+1))
+            );
+    }
+    float mip_dQdx = mean_dQ / mean_dx;
 
-//     VecPtrHit vph_near;
-//     for (PtrHit const& ph_ev : vph_ev) {
-//         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-//             != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
+    if (std::distance(iph_body, vph_sec_trk.end()) < opt.reg_n)
+        return ana::Bragg{ .error = ana::Bragg::kSmallBody };
 
-//         // check if the hit is in a track
-//         PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-//         if (pt_hit) {
-//             // check if the hit is on the body of the track
-//             if (pt_hit.key() == pt.key()
-//                 && std::find_if(
-//                     iph_body, vph_trk_sec.end(),
-//                     [key=ph_ev.key()](PtrHit const& ph) -> bool {
-//                         return ph.key() == key;
-//                     }
-//                 ) != vph_trk_sec.end()
-//             ) continue;
-//             // check if the hit is on a long track
-//             if (
-//                 pt_hit.key() != pt.key()
-//                 && pt_hit->Length() > track_length_cut
-//             ) continue;
-//         }
+    VecPtrHit vph_near;
+    for (PtrHit const& ph_ev : vph_ev) {
+        if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
+            != ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC]) continue;
 
-//         // check if the hit is close enough
-//         if (GetDistance(ph_ev, ph_trk_end) > nearby_radius) continue;
+        // check if the hit is in a track
+        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+        if (pt_hit) {
+            // check if the hit is on the body of the track
+            if (pt_hit.key() == p_trk.key()
+                && std::find_if(
+                    iph_body, vph_sec_trk.end(),
+                    [key=ph_ev.key()](PtrHit const& ph) -> bool {
+                        return ph.key() == key;
+                    }
+                ) != vph_sec_trk.end()
+            ) continue;
+            // check if the hit is on a long track
+            if (
+                pt_hit.key() != p_trk.key()
+                && pt_hit->Length() > opt.track_length_cut
+            ) continue;
+        }
 
-//         vph_near.push_back(ph_ev);
-//     }
+        // check if the hit is close enough
+        if (GetDistance(ph_ev, ph_trk_end) > opt.nearby_radius) continue;
 
-// }
+        vph_near.push_back(ph_ev);
+    }
+    if (vph_near.empty()) return ana::Bragg{ .error = ana::Bragg::kNoNearbyHits };
+
+    VecPtrHit vph_reg{iph_body, iph_body+opt.reg_n};
+    std::reverse(vph_reg.begin(), vph_reg.end());
+    auto orientation = [&](VecPtrHit const& vph) -> std::pair<double, double> {
+        LinearRegression reg;
+        for (PtrHit const& ph : vph) {
+            double z = GetSpace(ph->WireID());
+            double t = ph->PeakTime() * fTick2cm;
+            reg.add(z, t);
+        }
+        reg.compute();
+        // DEBUG(reg.corr == 0)
+        int dirz = GetSpace(vph.back()->WireID())
+            > GetSpace(vph.front()->WireID())
+            ? 1 : -1;
+        int dirt = vph.back()->PeakTime()
+            > vph.front()->PeakTime()
+            ? 1 : -1;
+        double theta = reg.theta(dirz, dirt);
+        double sigma = TMath::Pi() / 4 / reg.corr;
+        return std::make_pair(theta, sigma);
+    };
+    std::pair<double, double> reg = orientation(vph_reg);
+
+    auto score = [&](PtrHit const& ph1, PtrHit const& ph2, double theta, double sigma) -> double {
+        double dz = GetSpace(ph2->WireID()) - GetSpace(ph1->WireID());
+        double dt = (ph2->PeakTime() - ph1->PeakTime()) * fTick2cm;
+        double da = atan2(dt, dz) - theta;
+        da = abs(da) < TMath::Pi() ? da : da - (da>0?1:-1)*2*TMath::Pi();
+        double r = sqrt(dt*dt + dz*dz);
+
+        return TMath::Gaus(da, 0, sigma) / r;
+    };
+
+    VecPtrHit vph_sec{vph_reg.begin(), vph_reg.end()};
+    // std::reverse(vph_sec.begin(), vph_sec.end());
+    PtrHit ph_prev = ph_trk_end;
+    while (vph_near.size()) {
+        VecPtrHit::iterator iph_max = std::max_element(
+            vph_near.begin(), vph_near.end(),
+            [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
+                return score(ph_prev, ph1, reg.first, reg.second)
+                    < score(ph_prev, ph2, reg.first, reg.second);
+            }
+        );
+
+        vph_near.erase(iph_max);
+        // vph_reg.insert(vph_reg.begin(), *iph_max);
+        // vph_reg.pop_back();
+        vph_reg.erase(vph_reg.begin());
+        vph_reg.push_back(*iph_max);
+        vph_sec.push_back(*iph_max);
+        ph_prev = *iph_max;
+
+        reg = orientation(vph_reg);
+    }
+
+    unsigned const trailing_radius = 6;
+    float max_dQdx = std::numeric_limits<double>::lowest();
+    PtrHit ph_max_dQdx;
+    for (auto iph_sec=vph_sec.begin(); iph_sec!=vph_sec.end(); iph_sec++) {
+        VecPtrHit::iterator jph_sec = std::distance(iph_sec, vph_sec.end()) > trailing_radius
+            ? iph_sec+trailing_radius : vph_sec.end();
+        unsigned l = std::distance(iph_sec, jph_sec);
+
+        double dQ = std::accumulate(
+            iph_sec, jph_sec, 0.,
+            [](double sum, PtrHit const& ph) {
+                return sum+ph->Integral();
+            }
+        );
+        dQ /= l;
+
+        double dx = iph_sec == vph_sec.begin()
+            ? GetDistance(*iph_sec, *(iph_sec+1))
+            : ( iph_sec == vph_sec.end()-1
+                ? GetDistance(*(iph_sec-1), *iph_sec)
+                : .5*GetDistance(*(iph_sec-1), *(iph_sec+1))
+            );
+        for (auto iph=iph_sec+1; iph!=jph_sec; iph++)
+            dx += iph == vph_sec.end()-1
+                ? GetDistance(*(iph-1), *iph)
+                : .5*GetDistance(*(iph-1), *(iph+1));
+        dx /= l;
+
+        double dQdx = dQ / dx;
+        if (dQdx > max_dQdx) {
+            max_dQdx = dQdx;
+            ph_max_dQdx = *iph_sec;
+        }
+    }
+
+    return ana::Bragg{
+        .vph_muon = vph_sec,
+        .mip_dQdx = mip_dQdx,
+        .max_dQdx = max_dQdx,
+        .end = ph_trk_end,
+        .error = ana::Bragg::kNoError
+    };
+}
 
 simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
     simb::MCParticle const* muon
