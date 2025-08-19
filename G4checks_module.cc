@@ -57,7 +57,7 @@ private:
     float fDriftVelocity; // cm/µs
     float fCathodeGap; // cm
 
-    std::map<geo::PlaneID, ana::axis> plane2axis;
+    std::map<geo::PlaneID, ana::Axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
 
     // Diagnostic Variables
@@ -245,7 +245,7 @@ void ana::G4checks::analyze(art::Event const& e) {
 
             mich_hit_energy += hit_michel->Integral() * fADC2MeV;
 
-            std::vector<sim::TrackIDE> v_tid = bt_serv->HitToTrackIDEs(clockData, *hit_michel); 
+            std::vector<sim::TrackIDE> v_tid = bt_serv->HitToTrackIDEs(clockData, hit_michel); 
             std::cout << "\t\thit#" << i_hit++
                 << " Integral: " << hit_michel->Integral() * fADC2MeV
                 << " MeV / ROIADC: " << hit_michel->ROISummedADC() * fADC2MeV
