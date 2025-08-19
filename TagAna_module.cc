@@ -350,36 +350,35 @@ void ana::TagAna::analyze(art::Event const& e) {
         TagHitCathodeCrossing = sh_mu.is_cc();
         TagHitGoodCathodeCrossing = sh_mu.is_cc() && GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap;
 
-        // if (sh_mu) {
+        if (sh_mu) {
             AgnoTagEndHitError = false; 
             // ASSERT(sh_mu)
             // bool TagHitCathodeCrossing = sh_mu.is_cc();
 
             // Last Hit: SUPPOSITION: Muon is downward
-            // MuonEndHit = GetHit(sh_mu.lastHit(dirz));
-            // MuonEndHit = GetHit(sh_mu.end);
+            MuonEndHit = GetHit(sh_mu.end);
 
-            HitPtrPair ends = GetTrackEndsHits(vph_mu);
-            if (!LOG(ends.first && ends.second)) continue;
+            // HitPtrPair ends = GetTrackEndsHits(vph_mu);
+            // if (!LOG(ends.first && ends.second)) continue;
 
-            bool increasing_z = IsUpright(*pt_ev)
-                ? increasing_z = pt_ev->End().Z() > pt_ev->Start().Z()
-                : increasing_z = pt_ev->Start().Z() > pt_ev->End().Z();
-            int dir_z = increasing_z ? 1 : -1;
-            float fz = GetSpace(ends.first->WireID());
-            float sz = GetSpace(ends.second->WireID());
-            HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
-            MuonEndHit = GetHit(end);
+            // bool increasing_z = IsUpright(*pt_ev)
+            //     ? pt_ev->End().Z() > pt_ev->Start().Z()
+            //     : pt_ev->Start().Z() > pt_ev->End().Z();
+            // int dir_z = increasing_z ? 1 : -1;
+            // float fz = GetSpace(ends.first->WireID());
+            // float sz = GetSpace(ends.second->WireID());
+            // HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
+            // MuonEndHit = GetHit(end);
 
             MuonEndPoint = ana::Point(End);
 
             TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             ana::Bragg bragg = GetBragg(
-                // sh_mu.vph,
-                // sh_mu.end,
                 vph_mu,
-                end,
+                sh_mu.end,
+                // vph_mu,
+                // end,
                 pt_ev,
                 vph_ev,
                 fop_hit2trk,
@@ -408,6 +407,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                 [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
             );
             if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
+
             // integrate charges around muon endpoint
             for (PtrHit const& ph_ev : vph_ev) {
                 if (ph_ev->View() != geo::kW) continue;
@@ -421,8 +421,8 @@ void ana::TagAna::analyze(art::Event const& e) {
                 // if (ps_hit) continue;
 
                 if ((
-                    // GetDistance(ph_ev, sh_mu.end) <= fMichelRadius
-                    GetDistance(ph_ev, end) <= fMichelRadius
+                    GetDistance(ph_ev, sh_mu.end) <= fMichelRadius
+                    // GetDistance(ph_ev, end) <= fMichelRadius
                 ) && (
                     !pt_hit || pt_hit->Length() < fTrackLengthCut
                 )) {
@@ -430,32 +430,30 @@ void ana::TagAna::analyze(art::Event const& e) {
                 } 
 
                 if ((
-                    bragg && std::distance(iph_bragg, bragg.vph_clu.end()) > 1
+                    bragg
                 ) && (
                     GetDistance(ph_ev, bragg.end) <= fMichelRadius
                 ) && (
                     !pt_hit || pt_hit.key() == pt_ev.key() || pt_hit->Length() < fTrackLengthCut
                 ) && (
                     std::find_if(
-                        bragg.vph_clu.begin(), iph_bragg+1,
+                        bragg.vph_clu.begin(), iph_bragg,
                         [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                     ) == iph_bragg
                 )) {
                     BraggSphereEnergy += ph_ev->Integral();
                 }
             }
-            Bragg2SphereEnergy = 
-                std::distance(iph_bragg, bragg.vph_clu.end()) > 1
-                ? std::accumulate(
-                    iph_bragg+1, bragg.vph_clu.end(), 0.F,
-                    [&](float sum, PtrHit const& h) -> float {
-                        if (GetDistance(h, bragg.end) < fMichelRadius)
-                            return sum + h->Integral(); 
-                        else 
-                            return sum;
-                    })
-                : 0.F;
-        // } else AgnoTagEndHitError = true;
+            Bragg2SphereEnergy = std::accumulate(
+                iph_bragg, bragg.vph_clu.end(), 0.F,
+                [&](float sum, PtrHit const& h) -> float {
+                    if (GetDistance(h, bragg.end) < fMichelRadius)
+                        return sum + h->Integral(); 
+                    else 
+                        return sum;
+                }
+            );
+        } else AgnoTagEndHitError = true;
         
         // Truth Information
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
