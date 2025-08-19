@@ -222,8 +222,8 @@ void ana::TagAna::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    VecPtrTrk vp_trk;
-    art::fill_ptr_vector(vp_trk, vh_trk);
+    VecPtrTrk vpt_ev;
+    art::fill_ptr_vector(vpt_ev, vh_trk);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
@@ -241,20 +241,20 @@ void ana::TagAna::analyze(art::Event const& e) {
             EventHits.push_back(GetHit(p_hit));
 
     // loop over tracks to find muons
-    for (PtrTrk const& p_trk : vp_trk) {
-        if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
+    for (PtrTrk const& pt_ev : vpt_ev) {
+        if (fLog) std::cout << "e" << iEvent << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
         AgnoCountAll++;
 
-        VecPtrHit vph_mu = fmp_trk2hit.at(p_trk.key());
+        VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
         if (vph_mu.empty()) AgnoCountNoHit++;
         ASSERT(vph_mu.size())
 
-        CutTrackLength = p_trk->Length();
+        CutTrackLength = pt_ev->Length();
 
-        TagIsUpright =  IsUpright(*p_trk);
-        geo::Point_t Start = TagIsUpright ? p_trk->Start() : p_trk->End();
-        geo::Point_t End = TagIsUpright ? p_trk->End() : p_trk->Start();
+        TagIsUpright =  IsUpright(*pt_ev);
+        geo::Point_t Start = TagIsUpright ? pt_ev->Start() : pt_ev->End();
+        geo::Point_t End = TagIsUpright ? pt_ev->End() : pt_ev->Start();
 
         TagEndInVolume = geoHighX.isInsideYZ(End, fMichelRadius);
 
@@ -358,7 +358,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             ana::Bragg bragg = GetBragg(
                 sh_mu.vph,
                 sh_mu.end,
-                p_trk,
+                pt_ev,
                 vph_ev,
                 fop_hit2trk,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
@@ -411,7 +411,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                 ) && (
                     GetDistance(ph_ev, bragg.end) <= fMichelRadius
                 ) && (
-                    !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
+                    !pt_hit || pt_hit.key() == pt_ev.key() || pt_hit->Length() < fTrackLengthCut
                 ) && (
                     std::find_if(
                         bragg.vph_clu.begin(), iph_bragg,
@@ -433,7 +433,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         } else AgnoTagEndHitError = true;
         
         // Truth Information
-        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
+        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         if (mcp) {
             TrueTagPdg = mcp->PdgCode();
             TrueTagEndProcess = mcp->EndProcess();
@@ -464,7 +464,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                     : kHasMichelOutside
                 );
 
-                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
+                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vpt_ev, clockData, fmp_trk2hit);
                 MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
                 MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
 

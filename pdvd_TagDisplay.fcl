@@ -36,6 +36,7 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"],
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
+            Log: false
         }
     }
     ana: [ checks ]
