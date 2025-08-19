@@ -30,6 +30,16 @@ public:
     void endJob() override;
 private:
 
+    // Debug
+
+    unsigned dbAll = 0,
+             dbTrkLen = 0,
+             dbHitSize = 0,
+             dbTrkEndLowN = 0,
+             dbTrkEndNoCC = 0;
+
+
+
     // Utilities
     art::ServiceHandle<art::TFileService> tfs;
 
@@ -53,12 +63,12 @@ private:
     float fChannelPitch; // cm/channel
     float fCathodeGap; // cm
 
-    bounds<float> wireWindow;
-    // bounds3D<float> lower_bounds, upper_bounds;
-    // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
+    ana::Bounds<float> wireWindow;
+    // ana::Bounds3D<float> lower_bounds, upper_bounds;
+    // std::map<int,ana::Bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
 
-    std::map<geo::PlaneID, ana::axis> plane2axis;
+    std::map<geo::PlaneID, ana::Axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
 
     std::unordered_map<int, std::string> tid2gen;
@@ -161,7 +171,8 @@ private:
         HitPtrPair *pp_cathode_crossing = nullptr,
         HitPtrVec *vp_tpc_crossing = nullptr,
         HitPtrVec *vp_sorted_hit = nullptr,
-        geo::View_t view = geo::kW
+        geo::View_t view = geo::kW,
+        bool debug = false
     );
 };
 
@@ -224,7 +235,7 @@ ana::Agnochecks::Agnochecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
             geoLowX = geo::BoxBoundedGeo{
@@ -434,9 +445,13 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
+        dbAll++;
 
         // no short tracks
-        if (!LOG(p_trk->Length() > fTrackLengthCut)) continue;
+        if (!LOG(p_trk->Length() > fTrackLengthCut)) {
+            dbTrkLen++;
+            continue;
+        }
 
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
 
@@ -448,7 +463,10 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
         HitPtrVec vp_hit_muon = fmp_trk2hit.at(p_trk.key());
 
-        if (!LOG(vp_hit_muon.size())) continue;
+        if (!LOG(vp_hit_muon.size())) {
+            dbHitSize++;
+            continue;
+        }
 
         resetMuon();
 
@@ -492,7 +510,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
         } else MuonTrueEndHit = ana::Hit{};
 
         HitPtrPair ends;
-        ends = GetTrackEndsHits(vp_hit_muon);
+        ends = GetTrackEndsHits(vp_hit_muon, nullptr, nullptr, nullptr, geo::kW, true);
 
         if (!LOG(ends.first && ends.second)) continue;
 
@@ -944,7 +962,16 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 }
 
 void ana::Agnochecks::beginJob() {}
-void ana::Agnochecks::endJob() {}
+void ana::Agnochecks::endJob() {
+
+    std::cout << "DEBUG: ===================" << std::endl;
+    std::cout << "  Tracks found: " << dbAll << std::endl;
+    std::cout << "  Tracks with length <= " << fTrackLengthCut << ": " << dbTrkLen << std::endl;
+    std::cout << "  Tracks without hits: " << dbHitSize << std::endl;
+    std::cout << "  Tracks with < " << ana::LinearRegression::nmin << " hits on each side: " << dbTrkEndLowN << std::endl;
+    std::cout << "  Tracks with >= : " << ana::LinearRegression::nmin << " hits on each side but no pair of ends < " << 2*fCathodeGap << ": " << dbTrkEndNoCC << std::endl;
+    std::cout << "==========================" << std::endl;
+}
 
 
 void ana::Agnochecks::resetEvent() {
@@ -1176,7 +1203,8 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
     HitPtrPair *pp_cathode_crossing,
     HitPtrVec *vp_tpc_crossing,
     HitPtrVec *vp_sorted_hit,
-    geo::View_t view
+    geo::View_t view,
+    bool debug
 ) {
     // minimum number of hits to perform a linear regression
     unsigned const nmin = ana::LinearRegression::nmin;
@@ -1228,14 +1256,17 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
     }
 
     // if not enough hits on both sides, return empty pair
-    if (side_reg[0].n < nmin && side_reg[1].n < nmin) return {};
+    if (side_reg[0].n < nmin && side_reg[1].n < nmin) {
+        if (debug) dbTrkEndLowN++;
+        return {};
+    }
 
     // compute average from sum
     for (ana::LinearRegression& reg : side_reg) reg.compute();
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
-    std::vector<bounds<double>> side_mimmax(2);
+    std::vector<Bounds<double>> side_mimmax(2);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
         int side = cathodeSide(p_hit->WireID().TPC);
@@ -1267,7 +1298,8 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
         HitPtrPair const& pph1,
         HitPtrPair const& pph2,
         double dmin,
-        HitPtrPair *otherHits = nullptr
+        HitPtrPair *otherHits = nullptr,
+        bool debug = false
     ) -> HitPtrPair {
 
         // all combinations of pairs
@@ -1299,8 +1331,10 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
             candidates_idx.push_back(std::distance(d2s.begin(), it++));
         
         // no candidates found
-        if (candidates_idx.empty())
+        if (candidates_idx.empty()) {
+            if (debug) dbTrkEndNoCC++;
             return {};
+        }
 
         // get the closest pair
         unsigned closest_idx = *std::min_element(
@@ -1327,7 +1361,8 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
             side_ends[0],
             side_ends[1],
             2*fCathodeGap,
-            &trk_ends
+            &trk_ends,
+            true
         );
 
     // if cathode crossing info is requested
