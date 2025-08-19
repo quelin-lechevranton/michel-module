@@ -25,8 +25,8 @@ public:
     void beginJob() override;
     void endJob() override;
 private:
-    bounds<float> wireWindow;
-    bounds3D<float> geoHighX, geoLowX;
+    ana::Bounds<float> wireWindow;
+    ana::Bounds3D<float> geoHighX, geoLowX;
     float fCathodeGap; // cm
 
     // Input Parameters
@@ -105,24 +105,24 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
-    wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
-            geoLowX = bounds3D<float>{
+            geoLowX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 0}).Min(), 
                 asGeo->TPC(geo::TPCID{0, 7}).Max()
             };
-            geoHighX = bounds3D<float>{
+            geoHighX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 8}).Min(),
                 asGeo->TPC(geo::TPCID{0, 15}).Max()
             };
             break;
         case kPDHD:
-            geoLowX = bounds3D<float>{
+            geoLowX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 1}).Min(),
                 asGeo->TPC(geo::TPCID{0, 5}).Max()
             };
-            geoHighX = bounds3D<float>{
+            geoHighX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 2}).Min(),
                 asGeo->TPC(geo::TPCID{0, 6}).Max()
             };
@@ -267,9 +267,6 @@ void ana::TagAna::analyze(art::Event const& e) {
 
         TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
-        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
-        ASSERT(mcp)
-
         // we found a muon candidate!
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
         EventiMuon.push_back(iMuon);
@@ -343,57 +340,60 @@ void ana::TagAna::analyze(art::Event const& e) {
         }
         Bragg2SphereEnergy = std::accumulate(
             iph_bragg, bragg.vph_clu.end(), 0.F,
-            [](float sum, PtrHit const& h) -> float { return sum + h->Integral(); }
+            [&](float sum, PtrHit const& h) -> float {
+                if (GetDistance(h, bragg.end) < fMichelRadius)
+                    return sum + h->Integral(); 
+                else 
+                    return sum;
+            }
         );
         
         // Truth Information
 
-        TrueTagPdg = mcp->PdgCode();
-        TrueTagEndProcess = mcp->EndProcess();
-
-        if (geoDet == kPDVD)
-            TrueTagDownward = mcp->Position(0).X() > mcp->EndPosition().X();
-        else if (geoDet == kPDHD)
-            TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
-
-        VecPtrHit vph_mcp_muon;
+        simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         if (mcp) {
-            vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
-            if (sh_mcp) 
-                MuonTrueEndHit = GetHit(sh_mcp.end);
-            
-            MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
-        }
+            TrueTagPdg = mcp->PdgCode();
+            TrueTagEndProcess = mcp->EndProcess();
 
-        // a decaying muon has nu_mu, nu_e and elec as last daughters
-        simb::MCParticle const* mcp_michel = GetMichelMCP(mcp);
-        VecPtrHit vph_mcp_michel;
-        if (mcp_michel) {
-            TrueTagHasMichel = (
-                geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
-                || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
-            ) ? kHasMichelFiducial : (
-                geoHighX.isInside(mcp_michel->Position().Vect())
-                || geoLowX.isInside(mcp_michel->EndPosition().Vect())
-                ? kHasMichelInside
-                : kHasMichelOutside
-            );
+            if (geoDet == kPDVD)
+                TrueTagDownward = mcp->Position(0).X() > mcp->EndPosition().X();
+            else if (geoDet == kPDHD)
+                TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
-            MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
-            MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
+            VecPtrHit vph_mcp_muon;
+            if (mcp) {
+                vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
+                ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+                if (sh_mcp) 
+                    MuonTrueEndHit = GetHit(sh_mcp.end);
+                
+                MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
+            }
 
-            VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
-            for (PtrHit const& ph_michel : vph_michel)
-                if (ph_michel->View() == geo::kW)
-                    MichelHits.push_back(GetHit(ph_michel));
-            MichelHitEnergy = MichelHits.energy();
-        } else {
-            TrueTagHasMichel = kNoMichel;
-            MichelTrackLength = -1;
-            MichelTrueEnergy = 0;
-            MichelHitEnergy = 0;
+            // a decaying muon has nu_mu, nu_e and elec as last daughters
+            simb::MCParticle const* mcp_michel = GetMichelMCP(mcp);
+            VecPtrHit vph_mcp_michel;
+            if (mcp_michel) {
+                TrueTagHasMichel = (
+                    geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
+                    || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+                ) ? kHasMichelFiducial : (
+                    geoHighX.isInside(mcp_michel->Position().Vect())
+                    || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                    ? kHasMichelInside
+                    : kHasMichelOutside
+                );
+
+                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vp_trk, clockData, fmp_trk2hit);
+                MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
+                MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
+
+                VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
+                for (PtrHit const& ph_michel : vph_michel)
+                    if (ph_michel->View() == geo::kW)
+                        MichelHits.push_back(GetHit(ph_michel));
+                MichelHitEnergy = MichelHits.energy();
+            }
         }
         tMuon->Fill();
         iMuon++;
@@ -413,21 +413,26 @@ void ana::TagAna::resetEvent() {
 }
 void ana::TagAna::resetMuon() {
     MuonHits.clear();
-    MuonTrueEndHit = ana::Hit{};
-    MuonTrueEndPoint = ana::Point{};
     MichelTrackLength = 0;
-    MichelTrueEnergy = 0;
     MichelHits.clear();
     BraggMuonHits.clear();
-
-    TrueTagHasMichel = kNoMichel;
-    MichelTrackLength = -1;
-    MichelHitEnergy = -1;
-
     MichelHitEnergy = 0;
     BraggSphereEnergy = 0;
     Bragg2SphereEnergy = 0;
     PandoraSphereEnergy = 0;
+
+    // Truth Information
+    TrueTagPdg = 0;
+    MuonTrueEndPoint = ana::Point{};
+    TrueTagEndProcess = "";
+    TrueTagDownward = false;
+    MuonTrueEndHit = ana::Hit{};
+    MuonTrueEndPoint = ana::Point{};
+    // Michel Information
+    TrueTagHasMichel = kNoMichel;
+    MichelTrackLength = -1;
+    MichelTrueEnergy = -1;
+    MichelHitEnergy = -1;
 }
 
 bool ana::TagAna::IsUpright(recob::Track const& T) {

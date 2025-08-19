@@ -146,25 +146,25 @@ namespace ana {
     };
 
     template<typename T>
-    struct bounds {
+    struct Bounds {
         T min, max;
-        bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
-        bounds(T m, T M) : min(m), max(M) {}
+        Bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
+        Bounds(T m, T M) : min(m), max(M) {}
         bool isInside(T x, float r=0) const { 
             return min+r <= x && x <= max-r;
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const bounds& b) {
+        friend std::ostream& operator<<(std::ostream& os, const Bounds& b) {
             return os << "[" << b.min << ", " << b.max << "]";
         }
     };
     template<typename T>
-    struct bounds3D {
-        bounds<T> x, y, z;
-        bounds3D() : x(), y(), z() {}
-        bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
+    struct Bounds3D {
+        Bounds<T> x, y, z;
+        Bounds3D() : x(), y(), z() {}
+        Bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
             x{T(min.x()), T(max.x())}, y{T(min.y()), T(max.y())}, z{T(min.z()), T(max.z())} {}
-        // bounds3D(geo::BoxBoundedGeo const& bb) :
+        // Bounds3D(geo::BoxBoundedGeo const& bb) :
         //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
         bool isInside(geo::Point_t const& p, float r=0) const {
             return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
@@ -182,19 +182,18 @@ namespace ana {
             return geo::Point_t{x.max, y.max, z.max};
         }
 
-        friend std::ostream& operator<<(std::ostream& os, const bounds3D& b) {
+        friend std::ostream& operator<<(std::ostream& os, const Bounds3D& b) {
             return os << b.min() << " -> " << b.max();
         }
     };
 
-    struct axis {
+    // axis of equation ay*Y - az*Z = 0
+    struct Axis {
         double ay, az;
         double space(geo::WireGeo wiregeo) {
             return ay * wiregeo.GetCenter().Y() + az * wiregeo.GetCenter().Z();
         }
     };
-
-    // class Hit: public recob::Hit {};
 
     struct Hit {
         unsigned tpc;
@@ -439,30 +438,7 @@ namespace ana {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    // Analysis Module Subclass
 
     struct SortedHits {
         // std::vector<VecPtrHit> vph_sec; // sorted hits per section
@@ -477,7 +453,7 @@ namespace ana {
 
         SortedHits() : vph(0), secs(0), regs(2), isCathodeCrossing(false) {}
         operator bool() const {
-            return !(regs[0].n == 0 && regs[1].n == 0);
+            return !vph.empty();
         }
     };
 
@@ -486,6 +462,7 @@ namespace ana {
         unsigned reg_n; // number of hits to use for the regression
         float track_length_cut; // cut on the track length
         float nearby_radius; // radius to search for nearby hits
+        // float bragg_threshold; 
     };
     struct Bragg {
         VecPtrHit vph_clu={}; // hits of the muon in section after bragg algorithm
@@ -517,7 +494,7 @@ namespace ana {
         enum EnumDet { kPDVD, kPDHD };
         float fTick2cm;
 
-        axis GetAxis(geo::PlaneID) const;
+        Axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
         Hit GetHit(PtrHit const&) const;
         double GetDistance(PtrHit const&, PtrHit const&) const;
@@ -582,7 +559,7 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 }
 
-ana::axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
+ana::Axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
     geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
     geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
     int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
@@ -888,6 +865,10 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         dx /= l;
 
         double dQdx = dQ / dx;
+        // if (dQdx > opt.bragg_threshold * bragg.mip_dQdx) {
+        //     bragg.end = *iph_sec;
+        //     break;
+        // }
         if (dQdx > bragg.max_dQdx) {
             bragg.max_dQdx = dQdx;
             bragg.end = *iph_sec;

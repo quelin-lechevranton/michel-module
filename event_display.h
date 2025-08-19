@@ -57,13 +57,13 @@ namespace ana {
             gPad->SetTicks(1, 1);
             TH2F* f = new TH2F();  // -Werror=maybe-uninitialized
             if (geoDet == kPDVD) {
-                f = new TH2F(Form("f%u", s), ";Z (cm);T (cm)",
+                f = new TH2F(Form("f%u", s), ";Z [cm];T [cm];Q [ACD.ticks]",
                     600, 0, 300,
                     // 600, 0, 6000
                     600, 0, 480
                 );
             } else if (geoDet == kPDHD) {
-                f = new TH2F(Form("f%u", s), ";T (cm);Z (cm)",
+                f = new TH2F(Form("f%u", s), ";T [cm];Z [cm];Q [ACD.ticks]",
                     // 600, 0, 6000,
                     600, 0, 480,
                     600, 0, 464
@@ -77,6 +77,7 @@ namespace ana {
             f->SetTitleOffset(title_offset_x, "x");
             f->SetTitleOffset(title_offset_y, "y");
             for (TAxis* ax : {f->GetXaxis(), f->GetYaxis()}) ax->CenterTitle();
+            f->SetNdivisions(10, "xy");
             f->Draw();
 
             t->DrawText(
@@ -98,6 +99,10 @@ namespace ana {
                     1-gPad->GetTopMargin()+0.01,
                     right_title
                 );
+
+                // space for colz on top right frame
+                // gPad->SetRightMargin(0.14);
+                // f->GetZaxis()->SetLabelSize(0);
             }
         }
     }

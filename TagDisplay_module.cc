@@ -25,8 +25,8 @@ public:
     void beginJob() override;
     void endJob() override;
 private:
-    bounds<float> wireWindow;
-    bounds3D<float> geoHighX, geoLowX;
+    ana::Bounds<float> wireWindow;
+    ana::Bounds3D<float> geoHighX, geoLowX;
     float fCathodeGap; // cm
 
     // Input Parameters
@@ -75,24 +75,24 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
-    wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
-            geoLowX = bounds3D<float>{
+            geoLowX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 0}).Min(), 
                 asGeo->TPC(geo::TPCID{0, 7}).Max()
             };
-            geoHighX = bounds3D<float>{
+            geoHighX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 8}).Min(),
                 asGeo->TPC(geo::TPCID{0, 15}).Max()
             };
             break;
         case kPDHD:
-            geoLowX = bounds3D<float>{
+            geoLowX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 1}).Min(),
                 asGeo->TPC(geo::TPCID{0, 5}).Max()
             };
-            geoHighX = bounds3D<float>{
+            geoHighX = ana::Bounds3D<float>{
                 asGeo->TPC(geo::TPCID{0, 2}).Min(),
                 asGeo->TPC(geo::TPCID{0, 6}).Max()
             };

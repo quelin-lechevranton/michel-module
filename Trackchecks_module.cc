@@ -53,12 +53,12 @@ private:
     float fChannelPitch; // cm/channel
     float fCathodeGap; // cm
 
-    bounds<float> wireWindow;
-    // bounds3D<float> lower_bounds, upper_bounds;
-    // std::map<int,ana::bounds<unsigned>> map_tpc_ch;
+    ana::Bounds<float> wireWindow;
+    // ana::Bounds3D<float> lower_bounds, upper_bounds;
+    // std::map<int,ana::Bounds<unsigned>> map_tpc_ch;
     // std::map<int,float> map_ch_z;
 
-    std::map<geo::PlaneID, ana::axis> plane2axis;
+    std::map<geo::PlaneID, ana::Axis> plane2axis;
     std::map<geo::PlaneID, double> plane2pitch;
 
     // Data Products
@@ -165,7 +165,7 @@ ana::Trackchecks::Trackchecks(fhicl::ParameterSet const& p)
     fTick2cm = fDriftVelocity * fSamplingRate;
     fMichelTickRadius = fMichelSpaceRadius / fDriftVelocity / fSamplingRate;
 
-    wireWindow = bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+    wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
             geoLowX = geo::BoxBoundedGeo{
@@ -1223,7 +1223,7 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
 
     // find the track ends on each side of the cathode
     std::vector<HitPtrPair> side_ends(2);
-    std::vector<bounds<double>> side_mimmax(2);
+    std::vector<Bounds<double>> side_mimmax(2);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
         int side = cathodeSide(p_hit->WireID().TPC);
