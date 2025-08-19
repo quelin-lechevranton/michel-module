@@ -271,26 +271,26 @@ void ana::TagAna::analyze(art::Event const& e) {
 
 
 
-
-
-
+        // Compare to Agnochecks
         std::vector<ana::LinearRegression> reg_side(2);
         std::vector<VecPtrHit> vph_side(2);
         for (PtrHit const& ph_hit : vph_muon) {
             if (ph_hit->View() != geo::kW) continue;
-            int side = ana::tpc2sec[geoDet][ph_hit->WireID().TPC];
+            int side = ana::tpc2side[geoDet][ph_hit->WireID().TPC];
             if (side == -1) continue;
             double z = GetSpace(ph_hit->WireID());
             double t = ph_hit->PeakTime() * fTick2cm;
             reg_side[side].add(z, t);
             vph_side[side].push_back(ph_hit);
         }
-        AgnoCountNoHit = reg_side[0].n < ana::LinearRegression::nmin
+        AgnoTagTrkEndLowN = reg_side[0].n < ana::LinearRegression::nmin
             && reg_side[1].n < ana::LinearRegression::nmin;
 
         if (reg_side[0].n >= ana::LinearRegression::nmin
             && reg_side[1].n >= ana::LinearRegression::nmin
         ) {
+            reg_side[0].compute();
+            reg_side[1].compute();
             std::vector<std::pair<VecPtrHit::iterator, VecPtrHit::iterator>> ends_side(2);
             ends_side[0] = std::minmax_element(
                 vph_side[0].begin(), vph_side[0].end(),
@@ -323,6 +323,11 @@ void ana::TagAna::analyze(art::Event const& e) {
         } else {
             AgnoTagTrkEndBadCC = false;
         }
+
+
+
+
+
 
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
