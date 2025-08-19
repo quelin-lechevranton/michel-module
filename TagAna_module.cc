@@ -430,29 +430,31 @@ void ana::TagAna::analyze(art::Event const& e) {
                 } 
 
                 if ((
-                    bragg
+                    bragg && std::distance(iph_bragg, bragg.vph_clu.end()) > 1
                 ) && (
                     GetDistance(ph_ev, bragg.end) <= fMichelRadius
                 ) && (
                     !pt_hit || pt_hit.key() == pt_ev.key() || pt_hit->Length() < fTrackLengthCut
                 ) && (
                     std::find_if(
-                        bragg.vph_clu.begin(), iph_bragg,
+                        bragg.vph_clu.begin(), iph_bragg+1,
                         [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                     ) == iph_bragg
                 )) {
                     BraggSphereEnergy += ph_ev->Integral();
                 }
             }
-            Bragg2SphereEnergy = std::accumulate(
-                iph_bragg, bragg.vph_clu.end(), 0.F,
-                [&](float sum, PtrHit const& h) -> float {
-                    if (GetDistance(h, bragg.end) < fMichelRadius)
-                        return sum + h->Integral(); 
-                    else 
-                        return sum;
-                }
-            );
+            Bragg2SphereEnergy = 
+                std::distance(iph_bragg, bragg.vph_clu.end()) > 1
+                ? std::accumulate(
+                    iph_bragg+1, bragg.vph_clu.end(), 0.F,
+                    [&](float sum, PtrHit const& h) -> float {
+                        if (GetDistance(h, bragg.end) < fMichelRadius)
+                            return sum + h->Integral(); 
+                        else 
+                            return sum;
+                    })
+                : 0.F;
         // } else AgnoTagEndHitError = true;
         
         // Truth Information

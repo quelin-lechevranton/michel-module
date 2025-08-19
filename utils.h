@@ -135,7 +135,7 @@ namespace ana {
         double projection(double x, double y) const {
             return (x + m*(y-p)) / (1 + m*m);
         }
-        double theta(int dirx) {
+        double theta(int dirx, int diry) {
             return atan2(dirx * abs(cov), dirx * abs(lp-vary));
         }
         void SetBranches(TTree* t, const char* pre="") {
@@ -506,7 +506,7 @@ namespace ana {
         ) const;
         Bragg GetBragg(
             VecPtrHit const& vph_trk,
-            PtrHit const& ph_trk_end,
+            PtrHit const& ph_end,
             PtrTrk const& pt,
             VecPtrHit const& vph_ev,
             art::FindOneP<recob::Track> const& fop_hit2trk,
@@ -679,7 +679,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
 ana::Bragg ana::MichelAnalyzer::GetBragg(
     VecPtrHit const& vph_trk,
-    PtrHit const& ph_trk_end,
+    PtrHit const& ph_end,
     PtrTrk const& pt_mu,
     VecPtrHit const& vph_ev,
     art::FindOneP<recob::Track> const& fop_hit2trk,
@@ -687,7 +687,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
 ) const {
     ana::Bragg bragg;
     VecPtrHit vph_sec_trk;
-    int sec_end = ana::tpc2sec[geoDet][ph_trk_end->WireID().TPC];
+    int sec_end = ana::tpc2sec[geoDet][ph_end->WireID().TPC];
     for (PtrHit const& ph : vph_trk)
         if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sec_end)
             vph_sec_trk.push_back(ph);
@@ -695,7 +695,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     if (vph_sec_trk.empty()
         || std::find_if(
             vph_sec_trk.begin(), vph_sec_trk.end(),
-            [key=ph_trk_end.key()](PtrHit const& ph) -> bool {
+            [key=ph_end.key()](PtrHit const& ph) -> bool {
                 return ph.key() == key;
             }
         ) == vph_sec_trk.end()
@@ -708,7 +708,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
-            return GetDistance(ph1, ph_trk_end) < GetDistance(ph2, ph_trk_end);
+            return GetDistance(ph1, ph_end) < GetDistance(ph2, ph_end);
         }
     );
 
@@ -716,7 +716,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& h) -> bool {
-            return GetDistance(h, ph_trk_end) > opt.body_dist;
+            return GetDistance(h, ph_end) >= opt.body_dist;
         }
     );
 
@@ -729,7 +729,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& h) -> bool {
-            return GetDistance(h, ph_trk_end) > 2*opt.body_dist;
+            return GetDistance(h, ph_end) >= 2*opt.body_dist;
         }
     );
 
@@ -737,11 +737,14 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     float mip_dx = 0;
     for (auto iph=iph_body; iph!=jph_body; iph++) {
         mip_dQ += (*iph)->Integral();
-        mip_dx += iph==vph_sec_trk.begin()
-            ? GetDistance(*iph, *(iph+1))
-            : ( iph==vph_sec_trk.end()-1
-                ? GetDistance(*(iph-1), *iph)
-                : .5*GetDistance(*(iph-1), *(iph+1))
+        if (iph == vph_sec_trk.begin())
+            mip_dx += GetDistance(*iph, *(iph+1));
+        else if (iph == vph_sec_trk.end()-1)
+            mip_dx += GetDistance(*(iph-1), *iph);
+        else 
+            mip_dx += .5 * (
+                GetDistance(*(iph-1), *iph)
+                + GetDistance(*iph, *(iph+1))
             );
     }
     bragg.mip_dQdx = mip_dQ / mip_dx;
@@ -751,7 +754,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != sec_end) continue;
 
         // check if the hit is close enough
-        if (GetDistance(ph_ev, ph_trk_end) > opt.nearby_radius) continue;
+        if (GetDistance(ph_ev, ph_end) > opt.nearby_radius) continue;
 
         // check if the hit is in a track
         PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -794,7 +797,10 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         int dirz = GetSpace(vph.back()->WireID())
             > GetSpace(vph.front()->WireID())
             ? 1 : -1;
-        double theta = reg.theta(dirz);
+        int dirt = vph.back()->PeakTime() * fTick2cm
+            > vph.front()->PeakTime() * fTick2cm
+            ? 1 : -1;
+        double theta = reg.theta(dirz, dirt);
         double sigma = TMath::Pi() / 4 / reg.corr;
         return { theta, sigma };
     };
@@ -840,8 +846,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
             [](double sum, PtrHit const& ph) {
                 return sum+ph->Integral();
             }
-        );
-        dQ /= trailing_n;
+        ) / trailing_n;
 
         double dx = 0;
         for (auto iph=jph_clu; iph!=iph_clu; iph++) {
@@ -850,7 +855,10 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
             else if (iph == bragg.vph_clu.end()-1)
                 dx += GetDistance(*(iph-1), *iph);
             else
-                dx += .5*GetDistance(*(iph-1), *(iph+1));
+                dx += .5 * (
+                    GetDistance(*(iph-1), *iph)
+                    + GetDistance(*iph, *(iph+1))
+                );
         }
         dx /= trailing_n;
 
