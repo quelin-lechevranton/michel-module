@@ -445,6 +445,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
     // loop over tracks to find muons
     for (art::Ptr<recob::Track> const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
+        resetMuon();
         dbAll++;
 
         // no short tracks
@@ -467,8 +468,6 @@ void ana::Agnochecks::analyze(art::Event const& e) {
             dbHitSize++;
             continue;
         }
-
-        resetMuon();
 
         bool increasing_z;
         // track end point is the deepest

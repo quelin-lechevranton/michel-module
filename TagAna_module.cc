@@ -66,7 +66,7 @@ private:
     ana::Hits BraggMuonHits;
 
     bool AgnoTagTrkEndLowN,
-         AgnoTagTrkEndNoCC;
+         AgnoTagTrkEndBadCC;
     unsigned AgnoCountAll=0,
              AgnoCountNoHit=0,
              AgnoCountNoSec=0;
@@ -178,6 +178,9 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     tMuon->Branch("CutdQdxMax", &CutdQdxMax);
     tMuon->Branch("TagBraggError", &TagBraggError);
 
+    tMuon->Branch("AgnoTagTrkEndLowN", &AgnoTagTrkEndLowN);
+    tMuon->Branch("AgnoTagTrkEndBadCC", &AgnoTagTrkEndBadCC);
+
     tMuon->Branch("TrueTagPdg", &TrueTagPdg);
     tMuon->Branch("TrueTagDownward", &TrueTagDownward);
     tMuon->Branch("TrueTagEndProcess", &TrueTagEndProcess);
@@ -234,7 +237,7 @@ void ana::TagAna::analyze(art::Event const& e) {
     // loop over tracks to find muons
     for (PtrTrk const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
-
+        resetMuon();
         AgnoCountAll++;
 
         VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
@@ -263,101 +266,159 @@ void ana::TagAna::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TagAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
 
+
+        
+
+
+
+
+
+
+        std::vector<ana::LinearRegression> reg_side(2);
+        std::vector<VecPtrHit> vph_side(2);
+        for (PtrHit const& ph_hit : vph_muon) {
+            if (ph_hit->View() != geo::kW) continue;
+            int side = ana::tpc2sec[geoDet][ph_hit->WireID().TPC];
+            if (side == -1) continue;
+            double z = GetSpace(ph_hit->WireID());
+            double t = ph_hit->PeakTime() * fTick2cm;
+            reg_side[side].add(z, t);
+            vph_side[side].push_back(ph_hit);
+        }
+        AgnoCountNoHit = reg_side[0].n < ana::LinearRegression::nmin
+            && reg_side[1].n < ana::LinearRegression::nmin;
+
+        if (reg_side[0].n >= ana::LinearRegression::nmin
+            && reg_side[1].n >= ana::LinearRegression::nmin
+        ) {
+            std::vector<std::pair<VecPtrHit::iterator, VecPtrHit::iterator>> ends_side(2);
+            ends_side[0] = std::minmax_element(
+                vph_side[0].begin(), vph_side[0].end(),
+                [&](PtrHit const& a, PtrHit const& b) -> bool {
+                    double sa = reg_side[0].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
+                    double sb = reg_side[0].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
+                    return sa < sb;
+                } 
+            );
+            ends_side[1] = std::minmax_element(
+                vph_side[1].begin(), vph_side[1].end(),
+                [&](PtrHit const& a, PtrHit const& b) -> bool {
+                    double sa = reg_side[1].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
+                    double sb = reg_side[1].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
+                    return sa < sb;
+                } 
+            );
+            std::vector<std::pair<PtrHit, PtrHit>> pairs = {
+                { *ends_side[0].first, *ends_side[1].first },
+                { *ends_side[0].first, *ends_side[1].second },
+                { *ends_side[0].second, *ends_side[1].first },
+                { *ends_side[0].second, *ends_side[1].second }
+            };
+            AgnoTagTrkEndBadCC = std::find_if(
+                pairs.begin(), pairs.end(),
+                [&](std::pair<PtrHit, PtrHit> const& p) -> bool {
+                    return GetDistance(p.first, p.second) < 2 * fCathodeGap;
+                }
+            ) == pairs.end();
+        } else {
+            AgnoTagTrkEndBadCC = false;
+        }
+
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
 
-
         if (!sh_muon) AgnoCountNoSec++;
-        ASSERT(sh_muon)
-        // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
+        if (sh_muon) {
+            // ASSERT(sh_muon)
+            // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
 
-        // Last Hit: SUPPOSITION: Muon is downward
-        // MuonEndHit = GetHit(sh_muon.lastHit(dirz));
-        MuonEndHit = GetHit(sh_muon.end);
-        MuonEndPoint = ana::Point(End);
+            // Last Hit: SUPPOSITION: Muon is downward
+            // MuonEndHit = GetHit(sh_muon.lastHit(dirz));
+            MuonEndHit = GetHit(sh_muon.end);
+            MuonEndPoint = ana::Point(End);
 
-        TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
+            TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
-        // we found a muon candidate!
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
-        EventiMuon.push_back(iMuon);
-        resetMuon();
+            // we found a muon candidate!
+            if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
+            EventiMuon.push_back(iMuon);
 
-        ana::Bragg bragg = GetBragg(
-            sh_muon.vph,
-            sh_muon.end,
-            p_trk,
-            vph_ev,
-            fop_hit2trk,
-            { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-        );
-        TagBraggError = bragg.error;
+            ana::Bragg bragg = GetBragg(
+                sh_muon.vph,
+                sh_muon.end,
+                p_trk,
+                vph_ev,
+                fop_hit2trk,
+                { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
+            );
+            TagBraggError = bragg.error;
 
-        BraggMuonHits.clear();
-        if (bragg) {
-            CutdQdxMax = bragg.max_dQdx / bragg.mip_dQdx;
-            BraggEndHit = GetHit(bragg.end);
-            for (PtrHit const& ph_bragg_muon : bragg.vph_clu)
-                BraggMuonHits.push_back(GetHit(ph_bragg_muon));
-        } else {
-            CutdQdxMax = 0.F;
-            BraggEndHit = ana::Hit{};
-        }
-
-        // getting all muon hits
-        for (PtrHit const& ph_muon : sh_muon.vph)
-            if (ph_muon->View() == geo::kW)
-                MuonHits.push_back(GetHit(ph_muon));
-
-        VecPtrHit::iterator iph_bragg = std::find_if(
-            bragg.vph_clu.begin(), bragg.vph_clu.end(),
-            [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
-        );
-        if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
-        // integrate charges around muon endpoint
-        for (PtrHit const& ph_ev : vph_ev) {
-            if (ph_ev->View() != geo::kW) continue;
-            if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-                != MuonEndHit.section) continue;
-
-            PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-
-            // ??????????????????????
-            // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
-            // if (ps_hit) continue;
-
-            if ((
-                GetDistance(ph_ev, sh_muon.end) <= fMichelRadius
-            ) && (
-                !pt_hit || pt_hit->Length() < fTrackLengthCut
-            )) {
-                PandoraSphereEnergy += ph_ev->Integral();
-            } 
-
-            if ((
-                bragg
-            ) && (
-                GetDistance(ph_ev, bragg.end) <= fMichelRadius
-            ) && (
-                !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
-            ) && (
-                std::find_if(
-                    bragg.vph_clu.begin(), iph_bragg,
-                    [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-                ) == iph_bragg
-            )) {
-                BraggSphereEnergy += ph_ev->Integral();
+            BraggMuonHits.clear();
+            if (bragg) {
+                CutdQdxMax = bragg.max_dQdx / bragg.mip_dQdx;
+                BraggEndHit = GetHit(bragg.end);
+                for (PtrHit const& ph_bragg_muon : bragg.vph_clu)
+                    BraggMuonHits.push_back(GetHit(ph_bragg_muon));
+            } else {
+                CutdQdxMax = 0.F;
+                BraggEndHit = ana::Hit{};
             }
-        }
-        Bragg2SphereEnergy = std::accumulate(
-            iph_bragg, bragg.vph_clu.end(), 0.F,
-            [&](float sum, PtrHit const& h) -> float {
-                if (GetDistance(h, bragg.end) < fMichelRadius)
-                    return sum + h->Integral(); 
-                else 
-                    return sum;
+
+            // getting all muon hits
+            for (PtrHit const& ph_muon : sh_muon.vph)
+                if (ph_muon->View() == geo::kW)
+                    MuonHits.push_back(GetHit(ph_muon));
+
+            VecPtrHit::iterator iph_bragg = std::find_if(
+                bragg.vph_clu.begin(), bragg.vph_clu.end(),
+                [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
+            );
+            if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
+            // integrate charges around muon endpoint
+            for (PtrHit const& ph_ev : vph_ev) {
+                if (ph_ev->View() != geo::kW) continue;
+                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
+                    != MuonEndHit.section) continue;
+
+                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+
+                // ??????????????????????
+                // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
+                // if (ps_hit) continue;
+
+                if ((
+                    GetDistance(ph_ev, sh_muon.end) <= fMichelRadius
+                ) && (
+                    !pt_hit || pt_hit->Length() < fTrackLengthCut
+                )) {
+                    PandoraSphereEnergy += ph_ev->Integral();
+                } 
+
+                if ((
+                    bragg
+                ) && (
+                    GetDistance(ph_ev, bragg.end) <= fMichelRadius
+                ) && (
+                    !pt_hit || pt_hit.key() == p_trk.key() || pt_hit->Length() < fTrackLengthCut
+                ) && (
+                    std::find_if(
+                        bragg.vph_clu.begin(), iph_bragg,
+                        [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+                    ) == iph_bragg
+                )) {
+                    BraggSphereEnergy += ph_ev->Integral();
+                }
             }
-        );
+            Bragg2SphereEnergy = std::accumulate(
+                iph_bragg, bragg.vph_clu.end(), 0.F,
+                [&](float sum, PtrHit const& h) -> float {
+                    if (GetDistance(h, bragg.end) < fMichelRadius)
+                        return sum + h->Integral(); 
+                    else 
+                        return sum;
+                }
+            );
+        }
         
         // Truth Information
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
