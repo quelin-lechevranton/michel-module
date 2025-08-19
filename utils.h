@@ -446,15 +446,16 @@ namespace ana {
         std::vector<int> secs; // sorted sections
         std::vector<LinearRegression> regs; // regressions per side
 
-        bool isCathodeCrossing;
         PtrHit start, end;
         std::pair<PtrHit, PtrHit> cc; // cathode crossing
         std::vector<PtrHit> sc; // section crossing
 
-        SortedHits() : vph(0), secs(0), regs(2), isCathodeCrossing(false) {}
+        SortedHits() : vph(0), secs(0), regs(2) {}
         operator bool() const {
             return !vph.empty();
         }
+        bool is_cc() { return cc.first && cc.second; }
+        bool is_sc() { return !sc.empty(); }
     };
 
     struct BraggOptions {
@@ -641,7 +642,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
     for (unsigned i=0; i<sh.secs.size(); i++) {
         int sec = sh.secs[i];
-        ana::LinearRegression &reg = sh.regs[ana::sec2side[geoDet][sec]];
+        ana::LinearRegression const& reg = sh.regs[ana::sec2side[geoDet][sec]];
         std::sort(
             vph_sec[sec].begin(), vph_sec[sec].end(),
             [&](PtrHit const& ph1, PtrHit const& ph2) {
@@ -656,7 +657,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         else {
             if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i-1]]) {
                 sh.cc.second = vph_sec[sec].front(); 
-                sh.isCathodeCrossing = true;
             } else
                 sh.sc.push_back(vph_sec[sec].front());
         } 
@@ -665,7 +665,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         else {
             if (ana::sec2side[geoDet][sec] != ana::sec2side[geoDet][sh.secs[i+1]]) {
                 sh.cc.first = vph_sec[sec].back(); 
-                sh.isCathodeCrossing = true;
             } else
                 sh.sc.push_back(vph_sec[sec].back());
         }

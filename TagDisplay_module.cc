@@ -258,7 +258,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
                 DrawMarker(*ihc, sc, ms_sc);
             DrawMarker(*ihc, sh_muon.vph.front(), ms_end);
             DrawMarker(*ihc, sh_muon.vph.back(), ms_end);
-            if (sh_muon.isCathodeCrossing) {
+            if (sh_muon.is_cc()) {
                 DrawMarker(*ihc, sh_muon.cc.first, ms_cc);
                 DrawMarker(*ihc, sh_muon.cc.second, ms_cc);
             }

@@ -59,6 +59,8 @@ private:
     float CutTrackLength;
     bool TagEndInWindow;
     bool TagEndInVolume;
+    bool TagHitCathodeCrossing;
+    bool TagHitGoodCathodeCrossing;
 
     float CutdQdxMax;
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
@@ -66,7 +68,8 @@ private:
     ana::Hits BraggMuonHits;
 
     bool AgnoTagTrkEndLowN,
-         AgnoTagTrkEndBadCC;
+         AgnoTagTrkEndBadCC,
+         AgnoTagEndHitError;
     unsigned AgnoCountAll=0,
              AgnoCountNoHit=0,
              AgnoCountNoSec=0;
@@ -175,11 +178,14 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     tMuon->Branch("CutTrackLength", &CutTrackLength);
     tMuon->Branch("TagEndInWindow", &TagEndInWindow);
     tMuon->Branch("TagEndInVolume", &TagEndInVolume);
+    tMuon->Branch("TagHitCathodeCrossing", &TagHitCathodeCrossing);
+    tMuon->Branch("TagHitGoodCathodeCrossing", &TagHitGoodCathodeCrossing);
     tMuon->Branch("CutdQdxMax", &CutdQdxMax);
     tMuon->Branch("TagBraggError", &TagBraggError);
 
     tMuon->Branch("AgnoTagTrkEndLowN", &AgnoTagTrkEndLowN);
     tMuon->Branch("AgnoTagTrkEndBadCC", &AgnoTagTrkEndBadCC);
+    tMuon->Branch("AgnoTagEndHitError", &AgnoTagEndHitError);
 
     tMuon->Branch("TrueTagPdg", &TrueTagPdg);
     tMuon->Branch("TrueTagDownward", &TrueTagDownward);
@@ -240,9 +246,9 @@ void ana::TagAna::analyze(art::Event const& e) {
         resetMuon();
         AgnoCountAll++;
 
-        VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
-        if (vph_muon.empty()) AgnoCountNoHit++;
-        ASSERT(vph_muon.size())
+        VecPtrHit vph_mu = fmp_trk2hit.at(p_trk.key());
+        if (vph_mu.empty()) AgnoCountNoHit++;
+        ASSERT(vph_mu.size())
 
         CutTrackLength = p_trk->Length();
 
@@ -274,7 +280,7 @@ void ana::TagAna::analyze(art::Event const& e) {
         // Compare to Agnochecks
         std::vector<ana::LinearRegression> reg_side(2);
         std::vector<VecPtrHit> vph_side(2);
-        for (PtrHit const& ph_hit : vph_muon) {
+        for (PtrHit const& ph_hit : vph_mu) {
             if (ph_hit->View() != geo::kW) continue;
             int side = ana::tpc2side[geoDet][ph_hit->WireID().TPC];
             if (side == -1) continue;
@@ -323,34 +329,35 @@ void ana::TagAna::analyze(art::Event const& e) {
         } else {
             AgnoTagTrkEndBadCC = false;
         }
+        // End of Agnochecks
 
 
 
-
+        if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
+        EventiMuon.push_back(iMuon);
 
 
         int dirz = End.Z() > Start.Z() ? 1 : -1;
-        ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirz);
 
-        if (!sh_muon) AgnoCountNoSec++;
-        if (sh_muon) {
-            // ASSERT(sh_muon)
-            // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
+        TagHitCathodeCrossing = sh_mu.is_cc();
+        TagHitGoodCathodeCrossing = sh_mu.is_cc() && GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap;
+
+        if (sh_mu) {
+            AgnoTagEndHitError = false; 
+            // ASSERT(sh_mu)
+            // bool TagHitCathodeCrossing = sh_mu.is_cc();
 
             // Last Hit: SUPPOSITION: Muon is downward
-            // MuonEndHit = GetHit(sh_muon.lastHit(dirz));
-            MuonEndHit = GetHit(sh_muon.end);
+            // MuonEndHit = GetHit(sh_mu.lastHit(dirz));
+            MuonEndHit = GetHit(sh_mu.end);
             MuonEndPoint = ana::Point(End);
 
             TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
-            // we found a muon candidate!
-            if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
-            EventiMuon.push_back(iMuon);
-
             ana::Bragg bragg = GetBragg(
-                sh_muon.vph,
-                sh_muon.end,
+                sh_mu.vph,
+                sh_mu.end,
                 p_trk,
                 vph_ev,
                 fop_hit2trk,
@@ -362,17 +369,17 @@ void ana::TagAna::analyze(art::Event const& e) {
             if (bragg) {
                 CutdQdxMax = bragg.max_dQdx / bragg.mip_dQdx;
                 BraggEndHit = GetHit(bragg.end);
-                for (PtrHit const& ph_bragg_muon : bragg.vph_clu)
-                    BraggMuonHits.push_back(GetHit(ph_bragg_muon));
+                for (PtrHit const& ph_bragg_mu : bragg.vph_clu)
+                    BraggMuonHits.push_back(GetHit(ph_bragg_mu));
             } else {
                 CutdQdxMax = 0.F;
                 BraggEndHit = ana::Hit{};
             }
 
             // getting all muon hits
-            for (PtrHit const& ph_muon : sh_muon.vph)
-                if (ph_muon->View() == geo::kW)
-                    MuonHits.push_back(GetHit(ph_muon));
+            for (PtrHit const& ph_mu : sh_mu.vph)
+                if (ph_mu->View() == geo::kW)
+                    MuonHits.push_back(GetHit(ph_mu));
 
             VecPtrHit::iterator iph_bragg = std::find_if(
                 bragg.vph_clu.begin(), bragg.vph_clu.end(),
@@ -392,7 +399,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                 // if (ps_hit) continue;
 
                 if ((
-                    GetDistance(ph_ev, sh_muon.end) <= fMichelRadius
+                    GetDistance(ph_ev, sh_mu.end) <= fMichelRadius
                 ) && (
                     !pt_hit || pt_hit->Length() < fTrackLengthCut
                 )) {
@@ -423,7 +430,7 @@ void ana::TagAna::analyze(art::Event const& e) {
                         return sum;
                 }
             );
-        }
+        } else AgnoTagEndHitError = true;
         
         // Truth Information
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
@@ -436,9 +443,9 @@ void ana::TagAna::analyze(art::Event const& e) {
             else if (geoDet == kPDHD)
                 TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            VecPtrHit vph_mcp_muon;
-            vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            VecPtrHit vph_mcp_mu;
+            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
             if (sh_mcp) 
                 MuonTrueEndHit = GetHit(sh_mcp.end);
             
