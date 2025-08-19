@@ -65,6 +65,12 @@ private:
     int TagBraggError;
     ana::Hits BraggMuonHits;
 
+    bool AgnoTagTrkEndLowN,
+         AgnoTagTrkEndNoCC;
+    unsigned AgnoCountAll=0,
+             AgnoCountNoHit=0,
+             AgnoCountNoSec=0;
+
     bool TrueTagDownward;
     int TrueTagPdg;
     std::string TrueTagEndProcess;
@@ -229,7 +235,10 @@ void ana::TagAna::analyze(art::Event const& e) {
     for (PtrTrk const& p_trk : vp_trk) {
         if (fLog) std::cout << "e" << iEvent << "t" << p_trk->ID() << "\r" << std::flush;
 
+        AgnoCountAll++;
+
         VecPtrHit vph_muon = fmp_trk2hit.at(p_trk.key());
+        if (vph_muon.empty()) AgnoCountNoHit++;
         ASSERT(vph_muon.size())
 
         CutTrackLength = p_trk->Length();
@@ -257,6 +266,8 @@ void ana::TagAna::analyze(art::Event const& e) {
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_muon = GetSortedHits(vph_muon, dirz);
 
+
+        if (!sh_muon) AgnoCountNoSec++;
         ASSERT(sh_muon)
         // bool TagHitCathodeCrossing = sh_muon.isCathodeCrossing();
 
@@ -349,7 +360,6 @@ void ana::TagAna::analyze(art::Event const& e) {
         );
         
         // Truth Information
-
         simb::MCParticle const* mcp = ana::trk2mcp(p_trk, clockData, fmp_trk2hit);
         if (mcp) {
             TrueTagPdg = mcp->PdgCode();
@@ -361,18 +371,15 @@ void ana::TagAna::analyze(art::Event const& e) {
                 TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
             VecPtrHit vph_mcp_muon;
-            if (mcp) {
-                vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
-                ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
-                if (sh_mcp) 
-                    MuonTrueEndHit = GetHit(sh_mcp.end);
-                
-                MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
-            }
+            vph_mcp_muon = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_muon, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            if (sh_mcp) 
+                MuonTrueEndHit = GetHit(sh_mcp.end);
+            
+            MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
 
             // a decaying muon has nu_mu, nu_e and elec as last daughters
             simb::MCParticle const* mcp_michel = GetMichelMCP(mcp);
-            VecPtrHit vph_mcp_michel;
             if (mcp_michel) {
                 TrueTagHasMichel = (
                     geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
@@ -404,7 +411,15 @@ void ana::TagAna::analyze(art::Event const& e) {
 }
 
 void ana::TagAna::beginJob() {}
-void ana::TagAna::endJob() {}
+void ana::TagAna::endJob() {
+
+    std::cout << "DEBUG: ===================" << std::endl;
+    std::cout << "  Tracks found: " << AgnoCountAll << std::endl;
+    std::cout << "  Tracks without hits: " << AgnoCountNoHit << std::endl;
+    std::cout << "  Tracks with < " << ana::LinearRegression::nmin << " hits on each sec: " << AgnoCountNoSec << std::endl;
+    std::cout << "==========================" << std::endl;
+
+}
 
 void ana::TagAna::resetEvent() {
     EventNMuon = 0;
