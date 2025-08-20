@@ -629,15 +629,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         }
     );
 
-    // if not enough hits on both sides, return empty pair
-    // if ((
-    //     sh.regs[0].n == 0 && sh.regs[1].n == 0
-    // ) || (
-    //     0 < sh.regs[0].n && sh.regs[0].n < ana::LinearRegression::nmin
-    // ) || (
-    //     0 < sh.regs[1].n && sh.regs[1].n < ana::LinearRegression::nmin
-    // )) return ana::SortedHits{};
-
     for (unsigned i=0; i<sh.secs.size(); i++) {
         int sec = sh.secs[i];
         ana::LinearRegression const& reg = sh.regs[ana::sec2side[geoDet][sec]];
@@ -826,8 +817,6 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         vph_reg.push_back(*iph_max);
         bragg.vph_clu.push_back(*iph_max);
         vph_near.erase(iph_max);
-        // vph_reg.insert(vph_reg.begin(), *iph_max);
-        // vph_reg.pop_back();
         vph_reg.erase(vph_reg.begin());
 
         reg = do_reg(vph_reg);

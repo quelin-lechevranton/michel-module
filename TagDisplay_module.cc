@@ -190,11 +190,11 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         ana::DrawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
         DrawGraph(hc, vph_ev, "p", ms_ev);
 
-        // for (PtrShw const& ps_ev : vps_ev) {
-        //     VecPtrHit vph_shw = fmp_shw2hit.at(ps_ev.key());
-        //     if (!vph_shw.size()) continue;
-        //     DrawGraph(hc, vph_shw, "p", ms_shw);
-        // }
+        for (PtrShw const& ps_ev : vps_ev) {
+            VecPtrHit vph_shw = fmp_shw2hit.at(ps_ev.key());
+            if (!vph_shw.size()) continue;
+            DrawGraph(hc, vph_shw, "p", ms_shw);
+        }
 
         hcs.push_back(hc);
     }
@@ -257,8 +257,8 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             DrawGraph2D(*itc, pt_ev, {}, {c_pass, ls_pass.l, ls_pass.w});
             for (PtrHit const& sc : sh_mu.sc)
                 DrawMarker(*ihc, sc, ms_sc);
-            DrawMarker(*ihc, sh_mu.vph.front(), ms_end);
-            DrawMarker(*ihc, sh_mu.vph.back(), ms_end);
+            DrawMarker(*ihc, sh_mu.start, ms_end);
+            DrawMarker(*ihc, sh_mu.end, ms_end);
             if (sh_mu.is_cc()) {
                 DrawMarker(*ihc, sh_mu.cc.first, ms_cc);
                 DrawMarker(*ihc, sh_mu.cc.second, ms_cc);
@@ -313,67 +313,38 @@ void ana::TagDisplay::analyze(art::Event const& e) {
             continue;
         }
 
-
         VecPtrHit::iterator iph_bragg = std::find_if(
             bragg.vph_clu.begin(), bragg.vph_clu.end(),
             [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
         );
         if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
         
-        VecPtrHit vph_bragg;
         VecPtrHit vph_pandora;
-        VecPtrHit vph_bragg2 = {iph_bragg, bragg.vph_clu.end()};
-
-        // integrate charges around muon endpoint
         int sec_end = ana::tpc2sec[geoDet][sh_mu.end->WireID().TPC];
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
-            if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-                != sec_end) continue;
-
+            if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != sec_end) continue;
             PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-
-            // ??????????????????????
-            // art::Ptr<recob::Shower> ps_hit = fop_hit2shw.at(ph_ev.key());
+            // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
             // if (ps_hit) continue;
-
-            if ((
-                GetDistance(ph_ev, sh_mu.end) <= 20
-                // GetDistance(ph_ev, end) <= fMichelRadius
-            ) && (
-                !pt_hit || pt_hit->Length() < fTrackLengthCut
-            )) {
-                vph_pandora.push_back(ph_ev);
-            } 
-
-            if ((
-                bragg
-            ) && (
-                GetDistance(ph_ev, bragg.end) <= 20
-            ) && (
-                !pt_hit || pt_hit.key() == pt_ev.key() || pt_hit->Length() < fTrackLengthCut
-            ) && (
-                std::find_if(
-                    bragg.vph_clu.begin(), iph_bragg,
-                    [&](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-                ) == iph_bragg
-            )) {
-                vph_bragg.push_back(ph_ev);
-            }
+            if (GetDistance(ph_ev, sh_mu.end) > 20.F) continue;
+            if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
+            vph_pandora.push_back(ph_ev);
         }
-
-
+        VecPtrHit vph_bragg;
+        for (PtrHit const& ph_clu : bragg.vph_clu) {
+            if (GetDistance(ph_clu, bragg.end) > 20.F) continue;
+            vph_bragg.push_back(ph_clu);
+        }
 
 
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
+
         DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
-
-        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, 0.5});
-        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1});
-        DrawGraph(*ihc, vph_bragg2, "p", {kViolet, kOpenCircle, 1.5});
-
+        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
+        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
 
         ihc++; itc++;
 
@@ -384,11 +355,10 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
-        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
 
-        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, 0.5});
-        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1});
-        DrawGraph(*ihc, vph_bragg2, "p", {kViolet, kOpenCircle, 1.5});
+        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
+        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
+        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
     }
 
     for (TCanvas* hc : hcs)
