@@ -718,7 +718,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
             // if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != ana::tpc2sec[geoDet][MuonEndHit.tpc]) continue;
+            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != MuonEndHit.section) continue;
             ana::Hit hit = GetHit(p_hit);
 
             float dz = (hit.space - MuonEndHit.space);
@@ -970,6 +970,7 @@ void ana::Agnochecks::endJob() {
     std::cout << "  Tracks with < " << ana::LinearRegression::nmin << " hits on each side: " << dbTrkEndLowN << std::endl;
     std::cout << "  Tracks with >= : " << ana::LinearRegression::nmin << " hits on each side but no pair of ends < " << 2*fCathodeGap << ": " << dbTrkEndNoCC << std::endl;
     std::cout << "==========================" << std::endl;
+
 }
 
 

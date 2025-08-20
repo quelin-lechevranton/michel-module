@@ -451,9 +451,7 @@ namespace ana {
         std::vector<PtrHit> sc; // section crossing
 
         SortedHits() : vph(0), secs(0), regs(2) {}
-        operator bool() const {
-            return !vph.empty();
-        }
+        operator bool() const { return !vph.empty(); }
         bool is_cc() { return cc.first && cc.second; }
         bool is_sc() { return !sc.empty(); }
     };
