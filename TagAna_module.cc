@@ -375,7 +375,7 @@ void ana::TagAna::analyze(art::Event const& e) {
             TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             ana::Bragg bragg = GetBragg(
-                vph_mu,
+                sh_mu.vph,
                 sh_mu.end,
                 // vph_mu,
                 // end,

@@ -240,9 +240,6 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         );
 
 
-
-
-
         im++;
 
         auto DrawFail = [&](std::vector<TCanvas*>::iterator ihc, std::vector<TCanvas*>::iterator itc) -> void {
