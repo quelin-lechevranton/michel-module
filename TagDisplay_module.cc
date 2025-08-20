@@ -371,7 +371,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
-        // DrawGraph(*ihc, bragg.vph_clu, "p", ms_clu);
+        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
 
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, 0.5});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1});
@@ -387,7 +387,7 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         DrawMarker(*ihc, bragg.end, ms_bragg);
-        // DrawGraph(*ihc, bragg.vph_clu, "p", ms_clu);
+        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
 
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, 0.5});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1});

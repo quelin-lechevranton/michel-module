@@ -749,6 +749,8 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
 
     VecPtrHit vph_near;
     for (PtrHit const& ph_ev : vph_ev) {
+        if (ph_ev->View() != geo::kW) continue;
+
         if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != sec_end) continue;
 
         // check if the hit is close enough
