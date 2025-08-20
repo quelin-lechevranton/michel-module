@@ -358,27 +358,27 @@ void ana::TagAna::analyze(art::Event const& e) {
             // Last Hit: SUPPOSITION: Muon is downward
             MuonEndHit = GetHit(sh_mu.end);
 
-            // HitPtrPair ends = GetTrackEndsHits(vph_mu);
-            // if (!LOG(ends.first && ends.second)) continue;
+            HitPtrPair ends = GetTrackEndsHits(vph_mu);
+            if (!LOG(ends.first && ends.second)) continue;
 
-            // bool increasing_z = IsUpright(*pt_ev)
-            //     ? pt_ev->End().Z() > pt_ev->Start().Z()
-            //     : pt_ev->Start().Z() > pt_ev->End().Z();
-            // int dir_z = increasing_z ? 1 : -1;
-            // float fz = GetSpace(ends.first->WireID());
-            // float sz = GetSpace(ends.second->WireID());
-            // HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
-            // MuonEndHit = GetHit(end);
+            bool increasing_z = IsUpright(*pt_ev)
+                ? pt_ev->End().Z() > pt_ev->Start().Z()
+                : pt_ev->Start().Z() > pt_ev->End().Z();
+            int dir_z = increasing_z ? 1 : -1;
+            float fz = GetSpace(ends.first->WireID());
+            float sz = GetSpace(ends.second->WireID());
+            HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
+            MuonEndHit = GetHit(end);
 
             MuonEndPoint = ana::Point(End);
 
             TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             ana::Bragg bragg = GetBragg(
-                sh_mu.vph,
-                sh_mu.end,
-                // vph_mu,
-                // end,
+                // sh_mu.vph,
+                // sh_mu.end,
+                vph_mu,
+                end,
                 pt_ev,
                 vph_ev,
                 fop_hit2trk,
@@ -421,8 +421,8 @@ void ana::TagAna::analyze(art::Event const& e) {
                 // if (ps_hit) continue;
 
                 if ((
-                    GetDistance(ph_ev, sh_mu.end) <= fMichelRadius
-                    // GetDistance(ph_ev, end) <= fMichelRadius
+                    // GetDistance(ph_ev, sh_mu.end) <= fMichelRadius
+                    GetDistance(ph_ev, end) <= fMichelRadius
                 ) && (
                     !pt_hit || pt_hit->Length() < fTrackLengthCut
                 )) {
