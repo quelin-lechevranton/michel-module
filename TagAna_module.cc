@@ -13,9 +13,9 @@ namespace ana {
     class TagAna;
 }
 
-using HitPtr = art::Ptr<recob::Hit>;
-using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
+// using HitPtr = art::Ptr<recob::Hit>;
+// using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
+// using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
 class ana::TagAna : public art::EDAnalyzer, private ana::MichelAnalyzer {
 public:
@@ -347,9 +347,9 @@ void ana::TagAna::analyze(art::Event const& e) {
             TagSortedHitsError = 0; 
             TagHitCathodeCrossing = sh_mu.is_cc();
             TagHitGoodCathodeCrossing = sh_mu.is_cc() && GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap;
-            TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             MuonEndHit = GetHit(sh_mu.end);
+            TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             for (PtrHit const& ph_mu : sh_mu.vph)
                 if (ph_mu->View() == geo::kW)
