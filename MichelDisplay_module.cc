@@ -1,25 +1,16 @@
-////////////////////////////////////////////////////////////////////////
-// Class:       TagDisplay
-// Plugin Type: analyzer (Unknown Unknown)
-// File:        TagDisplay_module.cc
-//
-// Generated at Fri Feb 21 03:35:05 2025 by Jeremy Quelin Lechevranton using cetskelgen
-// from cetlib version 3.18.02.
-////////////////////////////////////////////////////////////////////////
-
 #include "event_display.h"
 
 namespace ana {
-    class TagDisplay;
+    class MichelDisplay;
 }
 
-class ana::TagDisplay : public art::EDAnalyzer, private ana::MichelDisplayer {
+class ana::MichelDisplay : public art::EDAnalyzer, private ana::MichelDisplayer {
 public:
-    explicit TagDisplay(fhicl::ParameterSet const& p);
-    TagDisplay(TagDisplay const&) = delete;
-    TagDisplay(TagDisplay&&) = delete;
-    TagDisplay& operator=(TagDisplay const&) = delete;
-    TagDisplay& operator=(TagDisplay&&) = delete;
+    explicit MichelDisplay(fhicl::ParameterSet const& p);
+    MichelDisplay(MichelDisplay const&) = delete;
+    MichelDisplay(MichelDisplay&&) = delete;
+    MichelDisplay& operator=(MichelDisplay const&) = delete;
+    MichelDisplay& operator=(MichelDisplay&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -64,7 +55,7 @@ private:
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
 };
 
-ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
+ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelDisplayer{p},
     fLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
@@ -111,7 +102,7 @@ ana::TagDisplay::TagDisplay(fhicl::ParameterSet const& p)
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl;
 }
 
-void ana::TagDisplay::beginJob() {
+void ana::MichelDisplay::beginJob() {
     // TCanvas *c = asFile->make<TCanvas>(
     //     "legend", "legend",
     //     1300, 800
@@ -142,7 +133,7 @@ void ana::TagDisplay::beginJob() {
     // c->Write();
 }
 
-void ana::TagDisplay::analyze(art::Event const& e) {
+void ana::MichelDisplay::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
@@ -300,13 +291,13 @@ void ana::TagDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         ihc++; itc++;
 
-        if (!LOG(TrueTagHasMichelHits)) {
-            DrawFail(ihc, itc);
-            continue;
-        }
-        DrawPass(ihc, itc);
-        DrawGraph(*ihc, vph_mi, "p", ms_michel);
-        ihc++; itc++;
+        // if (!LOG(TrueTagHasMichelHits)) {
+        //     DrawFail(ihc, itc);
+        //     continue;
+        // }
+        // DrawPass(ihc, itc);
+        // DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        // ihc++; itc++;
 
         if (!LOG(bragg)) {
             DrawFail(ihc, itc);
@@ -369,9 +360,9 @@ void ana::TagDisplay::analyze(art::Event const& e) {
     ev++;
 }
 
-void ana::TagDisplay::endJob() {}
+void ana::MichelDisplay::endJob() {}
 
-bool ana::TagDisplay::IsUpright(recob::Track const& T) {
+bool ana::MichelDisplay::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
     if (geoDet == kPDHD)
@@ -379,4 +370,4 @@ bool ana::TagDisplay::IsUpright(recob::Track const& T) {
     return false;
 }
 
-DEFINE_ART_MODULE(ana::TagDisplay)
+DEFINE_ART_MODULE(ana::MichelDisplay)

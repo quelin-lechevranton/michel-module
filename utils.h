@@ -434,7 +434,23 @@ namespace ana {
             }
         return vph_mcp;
     }
+    PtrShw mcp2shw(
+        simb::MCParticle const* mcp, 
+        VecPtrShw const& vp_shw,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_shw2hit
+    ) {
+        std::unordered_map<PtrShw, unsigned> map_shw_nhit;
+        for (PtrShw ps : vp_shw)
+            map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_shw2hit.at(ps.key())).size();
 
+        unsigned max = 0;
+        PtrShw p_shw_from_mcp;
+        for (std::pair<PtrShw, unsigned> p : map_shw_nhit)
+            if (p.second > max)
+                max = p.second, p_shw_from_mcp = p.first;
+        return p_shw_from_mcp;
+    }
 
 
 

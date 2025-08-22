@@ -1,12 +1,3 @@
-////////////////////////////////////////////////////////////////////////
-// Class:       TagAna
-// Plugin Type: analyzer (Unknown Unknown)
-// File:        Agnochecks_module.cc
-//
-// Generated at Fri Feb 21 03:35:05 2025 by Jeremy Quelin Lechevranton using cetskelgen
-// from cetlib version 3.18.02.
-////////////////////////////////////////////////////////////////////////
-
 #include "utils.h"
 
 namespace ana {
@@ -89,9 +80,11 @@ private:
     ana::Point MuonTrueEndPoint;
     ana::Hit BraggEndHit;
 
-    float MichelTrackLength;
-    ana::Hits MichelHits;
     float MichelTrueEnergy, MichelHitEnergy;
+    ana::Hits MichelHits;
+    float MichelTrackLength;
+    float MichelShowerLength;
+
     float BraggSphereEnergy;
     float PandoraSphereEnergy;
 
@@ -209,9 +202,10 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     BraggEndHit.SetBranches(tMuon, "BraggEnd");
     BraggMuonHits.SetBranches(tMuon, "BraggMuon");
 
-    tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
+    tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
+    tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
     tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
 
@@ -233,9 +227,15 @@ void ana::TagAna::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
+    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    if (!vh_shw.isValid()) return;
+    VecPtrShw vps_ev;
+    art::fill_ptr_vector(vps_ev, vh_shw);
+
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
+    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
 
     resetEvent();
 
@@ -439,27 +439,30 @@ void ana::TagAna::analyze(art::Event const& e) {
             if (sh_mcp) 
                 MuonTrueEndHit = GetHit(sh_mcp.end);
 
-            simb::MCParticle const* mcp_michel = GetMichelMCP(mcp);
-            if (mcp_michel) {
+            simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
+            if (mcp_mi) {
                 TrueTagHasMichel = (
-                    geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
-                    || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+                    geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
+                    || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
                 ) ? kHasMichelFiducial : (
-                    geoHighX.isInside(mcp_michel->Position().Vect())
-                    || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                    geoHighX.isInside(mcp_mi->Position().Vect())
+                    || geoLowX.isInside(mcp_mi->EndPosition().Vect())
                     ? kHasMichelInside
                     : kHasMichelOutside
                 );
+                MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
 
-                PtrTrk trk_michel = ana::mcp2trk(mcp_michel, vpt_ev, clockData, fmp_trk2hit);
-                MichelTrackLength = trk_michel ? trk_michel->Length() : 0;
-                MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3;
-
-                VecPtrHit vph_michel = ana::mcp2hits(mcp_michel, vph_ev, clockData, true);
-                for (PtrHit const& ph_michel : vph_michel)
-                    if (ph_michel->View() == geo::kW)
-                        MichelHits.push_back(GetHit(ph_michel));
+                VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+                for (PtrHit const& ph_mi : vph_mi)
+                    if (ph_mi->View() == geo::kW)
+                        MichelHits.push_back(GetHit(ph_mi));
                 MichelHitEnergy = MichelHits.energy();
+
+                PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+                MichelTrackLength = pt_mi ? pt_mi->Length() : 0;
+
+                PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+                MichelShowerLength = ps_mi ? ps_mi->Length() : 0;
             }
         }
 
@@ -510,9 +513,10 @@ void ana::TagAna::resetMuon() {
 
     // Michel Truth
     TrueTagHasMichel = kNoMichel;
-    MichelTrackLength = -1;
     MichelTrueEnergy = -1;
     MichelHitEnergy = -1;
+    MichelTrackLength = -1;
+    MichelShowerLength = -1;
 }
 
 bool ana::TagAna::IsUpright(recob::Track const& T) {
