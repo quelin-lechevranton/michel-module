@@ -2,10 +2,10 @@
 #include "services_protodunevd.fcl" 
 #include "tools_dune.fcl"	
 
-process_name: RunTagAna
+process_name: RunMichelAnalysis
 
 services: {
-    TFileService: { fileName: "pdvd_TagAna.root" }
+    TFileService: { fileName: "pdvd_MichelAnalysis.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -23,7 +23,7 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "TagAna"
+            module_type:    "MichelAnalysis"
             Products:       [
                 ["SingleGen",  "generator",     "",       "simb::MCTruth"],
                 ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],

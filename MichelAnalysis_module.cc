@@ -1,20 +1,20 @@
 #include "utils.h"
 
 namespace ana {
-    class TagAna;
+    class MichelAnalysis;
 }
 
 // using HitPtr = art::Ptr<recob::Hit>;
 // using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
 // using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
 
-class ana::TagAna : public art::EDAnalyzer, private ana::MichelAnalyzer {
+class ana::MichelAnalysis : public art::EDAnalyzer, private ana::MichelAnalyzer {
 public:
-    explicit TagAna(fhicl::ParameterSet const& p);
-    TagAna(TagAna const&) = delete;
-    TagAna(TagAna&&) = delete;
-    TagAna& operator=(TagAna const&) = delete;
-    TagAna& operator=(TagAna&&) = delete;
+    explicit MichelAnalysis(fhicl::ParameterSet const& p);
+    MichelAnalysis(MichelAnalysis const&) = delete;
+    MichelAnalysis(MichelAnalysis&&) = delete;
+    MichelAnalysis& operator=(MichelAnalysis const&) = delete;
+    MichelAnalysis& operator=(MichelAnalysis&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -82,6 +82,7 @@ private:
 
     float MichelTrueEnergy, MichelHitEnergy;
     ana::Hits MichelHits;
+    std::vector<float> MichelHitMuonAngle;
     float MichelTrackLength;
     float MichelShowerLength;
 
@@ -102,7 +103,7 @@ private:
     // );
 };
 
-ana::TagAna::TagAna(fhicl::ParameterSet const& p)
+ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
@@ -210,9 +211,10 @@ ana::TagAna::TagAna(fhicl::ParameterSet const& p)
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
 
     MichelHits.SetBranches(tMuon, "Michel");
+    tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
 }
 
-void ana::TagAna::analyze(art::Event const& e) {
+void ana::MichelAnalysis::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
@@ -410,12 +412,18 @@ void ana::TagAna::analyze(art::Event const& e) {
                     [&](float sum, PtrHit const& ph) -> float {
                         // PtrShw ps_hit = fop_hit2shw.at(ph.key());
                         // if (ps_hit) return sum;
-                        if (GetDistance(ph, bragg.end) < fMichelRadius)
+                        if (GetDistance(ph, bragg.end) <= fMichelRadius)
                             return sum + ph->Integral(); 
                         else 
                             return sum;
                     }
                 );
+
+
+
+
+
+
             }
         } else TagSortedHitsError = 1;
         
@@ -453,16 +461,59 @@ void ana::TagAna::analyze(art::Event const& e) {
                 MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
 
                 VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
-                for (PtrHit const& ph_mi : vph_mi)
-                    if (ph_mi->View() == geo::kW)
-                        MichelHits.push_back(GetHit(ph_mi));
+
+                float mu_end_angle = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]]
+                    .theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
+                for (PtrHit const& ph_mi : vph_mi) {
+                    if (ph_mi->View() != geo::kW) continue;
+                    Hit hit = GetHit(ph_mi);
+                    MichelHits.push_back(hit);
+                    if (hit.section != MuonEndHit.section) {
+                        MichelHitMuonAngle.push_back(100);
+                        continue;
+                    }
+                    float mu_hit_angle = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                    mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
+                        ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
+                        : mu_hit_angle;
+                    MichelHitMuonAngle.push_back(mu_hit_angle);
+                }
                 MichelHitEnergy = MichelHits.energy();
+
 
                 PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
                 MichelTrackLength = pt_mi ? pt_mi->Length() : 0;
 
                 PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
                 MichelShowerLength = ps_mi ? ps_mi->Length() : 0;
+
+
+                // Cone
+                /*
+                Hits near_hits;
+                for (PtrHit const& ph_mi : vph_mi) {
+                    if (ph_mi->View() != geo::kW) continue;
+                    if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
+                    near_hits.push_back(GetHit(ph_mi));
+                }
+                if (near_hits.size()) {
+                    Vec2 bary = near_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
+                    Vec2 end = MuonTrueEndHit.vec(fTick2cm);
+                    Vec2 end_bary = bary - end;
+
+                    float angle = end_bary.angle();
+                    for (PtrHit const& ph_mi : vph_mi) {
+                        if (ph_mi->View() != geo::kW) continue;
+                        if (GetDistance(ph_mi, sh_mcp.end) > 30) continue;
+
+                        Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
+                        float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
+
+                        if (cosa > cos(30.F * TMath::DegToRad())) continue;
+                        // in cone !! 
+                    }
+                }
+                */
             }
         }
 
@@ -475,18 +526,16 @@ void ana::TagAna::analyze(art::Event const& e) {
     iEvent++;
 }
 
-void ana::TagAna::beginJob() {}
-void ana::TagAna::endJob() {}
+void ana::MichelAnalysis::beginJob() {}
+void ana::MichelAnalysis::endJob() {}
 
-void ana::TagAna::resetEvent() {
+void ana::MichelAnalysis::resetEvent() {
     EventNMuon = 0;
     EventiMuon.clear();
     EventHits.clear();
 }
-void ana::TagAna::resetMuon() {
-    MichelHits.clear();
+void ana::MichelAnalysis::resetMuon() {
     BraggMuonHits.clear();
-    MichelHitEnergy = 0;
 
     // Muon's End
     TagSortedHitsError = -1;
@@ -514,12 +563,14 @@ void ana::TagAna::resetMuon() {
     // Michel Truth
     TrueTagHasMichel = kNoMichel;
     MichelTrueEnergy = -1;
+    MichelHits.clear();
     MichelHitEnergy = -1;
     MichelTrackLength = -1;
     MichelShowerLength = -1;
+    MichelHitMuonAngle.clear();
 }
 
-bool ana::TagAna::IsUpright(recob::Track const& T) {
+bool ana::MichelAnalysis::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
     if (geoDet == kPDHD)
@@ -528,7 +579,7 @@ bool ana::TagAna::IsUpright(recob::Track const& T) {
 }
 
 
-// HitPtrPair ana::TagAna::GetTrackEndsHits(
+// HitPtrPair ana::MichelAnalysis::GetTrackEndsHits(
 //     HitPtrVec const& vp_hit,
 //     HitPtrPair *pp_cathode_crossing,
 //     HitPtrVec *vp_tpc_crossing,
@@ -846,4 +897,4 @@ bool ana::TagAna::IsUpright(recob::Track const& T) {
 //     return trk_ends;
 // }
 
-DEFINE_ART_MODULE(ana::TagAna)
+DEFINE_ART_MODULE(ana::MichelAnalysis)

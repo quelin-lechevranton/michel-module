@@ -195,6 +195,15 @@ namespace ana {
         }
     };
 
+    struct Vec2 {
+        float space, drift;
+        Vec2() : space(0), drift(0) {}
+        Vec2(float s, float d) : space(s), drift(d) {}
+        float norm() const { return sqrt(space*space + drift*drift); }
+        float angle() const { return atan2(drift, space); }    
+        float dot(Vec2 const& v) const { return space*v.space + drift*v.drift; }
+        Vec2 operator-(Vec2 const& v) const { return Vec2{space - v.space, drift - v.drift}; }
+    };
     struct Hit {
         unsigned tpc;
         int section;
@@ -206,11 +215,11 @@ namespace ana {
         Hit(unsigned T, int S, float s, unsigned c, float t, float a) :
             tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
 
+        Vec2 vec(float tick2cm=1) const { return Vec2{space, tick * tick2cm}; }
         // double operator-(Hit const& h) const {
         //     if (section != h.section) return std::numeric_limits<double>::max();
         //     return sqrt(pow(space - h.space, 2) + pow(tick - h.tick, 2));
         // }
-        // unsigned slice() { return 2*(tpc/4) + tpc%2; }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
@@ -256,6 +265,17 @@ namespace ana {
             float e = 0;
             for (float a : adc) e+=a;
             return e;
+        }
+        Vec2 barycenter(int section, float tick2cm=1) const {
+            float bs=0, bt=0;
+            unsigned bn=0;
+            for (unsigned i=0; i<N; i++) {
+                if (this->section[i] != section) continue;
+                bs += this->space[i];
+                bt += this->tick[i] * tick2cm;
+                bn++;
+            }
+            return bn ? Vec2{bs/bn, bt/bn} : Vec2{};
         }
 
         void SetBranches(TTree *t, const char* pre="") {
@@ -464,7 +484,7 @@ namespace ana {
 
         PtrHit start, end;
         std::pair<PtrHit, PtrHit> cc; // cathode crossing
-        std::vector<PtrHit> sc; // section crossing
+        VecPtrHit sc; // section crossing
 
         SortedHits() : vph(0), secs(0), regs(2) {}
         operator bool() const { return !vph.empty(); }
@@ -596,11 +616,9 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
     };
 }
 double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2) const {
-    double z1 = GetSpace(ph1->WireID());
-    double t1 = ph1->PeakTime() * fTick2cm;
-    double z2 = GetSpace(ph2->WireID());
-    double t2 = ph2->PeakTime() * fTick2cm;
-    return sqrt(pow(z2-z1, 2) + pow(t2-t1, 2));
+    Hit h1 = GetHit(ph1), h2 = GetHit(ph2);
+    if (h1.section != h2.section) return std::numeric_limits<double>::max();
+    return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
 // ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(

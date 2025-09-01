@@ -42,7 +42,7 @@ private:
         ms_fail = {vc_fail.front(), kFullCircle},
         ms_back = {kGray, kFullCircle, 0.5},
         ms_bragg = {kAzure+10, kFourSquaresX},
-        ms_clu = {ms_bragg.c, kMultiply, 0.5},
+        ms_clu = {ms_bragg.c, kMultiply, 1},
         ms_michel = {kGreen-8, kOpenDoubleDiamond},
         ms_shw = {kYellow+2, kOpenCircle, 0.5};
 
@@ -303,12 +303,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             DrawFail(ihc, itc);
             continue;
         }
-
-        VecPtrHit::iterator iph_bragg = std::find_if(
-            bragg.vph_clu.begin(), bragg.vph_clu.end(),
-            [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
-        );
-        if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
         
         VecPtrHit vph_pandora;
         int sec_end = ana::tpc2sec[geoDet][sh_mu.end->WireID().TPC];
@@ -322,10 +316,16 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
             vph_pandora.push_back(ph_ev);
         }
+
+        VecPtrHit::iterator iph_bragg = std::find_if(
+            bragg.vph_clu.begin(), bragg.vph_clu.end(),
+            [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
+        );
+        if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
         VecPtrHit vph_bragg;
-        for (PtrHit const& ph_clu : bragg.vph_clu) {
-            if (GetDistance(ph_clu, bragg.end) > 20.F) continue;
-            vph_bragg.push_back(ph_clu);
+        for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+            if (GetDistance(*iph, bragg.end) > 20.F) continue;
+            vph_bragg.push_back(*iph);
         }
 
 
