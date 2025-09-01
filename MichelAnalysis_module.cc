@@ -444,76 +444,78 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             VecPtrHit vph_mcp_mu;
             vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
-            if (sh_mcp) 
+
+            if (sh_mcp) {
                 MuonTrueEndHit = GetHit(sh_mcp.end);
 
-            simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
-            if (mcp_mi) {
-                TrueTagHasMichel = (
-                    geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
-                    || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
-                ) ? kHasMichelFiducial : (
-                    geoHighX.isInside(mcp_mi->Position().Vect())
-                    || geoLowX.isInside(mcp_mi->EndPosition().Vect())
-                    ? kHasMichelInside
-                    : kHasMichelOutside
-                );
-                MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
+                simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
+                if (mcp_mi) {
+                    TrueTagHasMichel = (
+                        geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
+                        || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
+                    ) ? kHasMichelFiducial : (
+                        geoHighX.isInside(mcp_mi->Position().Vect())
+                        || geoLowX.isInside(mcp_mi->EndPosition().Vect())
+                        ? kHasMichelInside
+                        : kHasMichelOutside
+                    );
+                    MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
 
-                VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+                    VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
 
-                float mu_end_angle = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]]
-                    .theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
-                for (PtrHit const& ph_mi : vph_mi) {
-                    if (ph_mi->View() != geo::kW) continue;
-                    Hit hit = GetHit(ph_mi);
-                    MichelHits.push_back(hit);
-                    if (hit.section != MuonEndHit.section) {
-                        MichelHitMuonAngle.push_back(100);
-                        continue;
-                    }
-                    float mu_hit_angle = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
-                    mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
-                        ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
-                        : mu_hit_angle;
-                    MichelHitMuonAngle.push_back(mu_hit_angle);
-                }
-                MichelHitEnergy = MichelHits.energy();
-
-
-                PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
-                MichelTrackLength = pt_mi ? pt_mi->Length() : 0;
-
-                PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
-                MichelShowerLength = ps_mi ? ps_mi->Length() : 0;
-
-
-                // Cone
-                /*
-                Hits near_hits;
-                for (PtrHit const& ph_mi : vph_mi) {
-                    if (ph_mi->View() != geo::kW) continue;
-                    if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
-                    near_hits.push_back(GetHit(ph_mi));
-                }
-                if (near_hits.size()) {
-                    Vec2 bary = near_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
-                    Vec2 end = MuonTrueEndHit.vec(fTick2cm);
-                    Vec2 end_bary = bary - end;
-
-                    float angle = end_bary.angle();
+                    float mu_end_angle = sh_mcp.regs[ana::sec2side[geoDet][sh_mcp.secs.back()]]
+                        .theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
                     for (PtrHit const& ph_mi : vph_mi) {
                         if (ph_mi->View() != geo::kW) continue;
-                        if (GetDistance(ph_mi, sh_mcp.end) > 30) continue;
-
-                        Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
-                        float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
-
-                        if (cosa > cos(30.F * TMath::DegToRad())) continue;
-                        // in cone !! 
+                        Hit hit = GetHit(ph_mi);
+                        MichelHits.push_back(hit);
+                        if (hit.section != MuonEndHit.section) {
+                            MichelHitMuonAngle.push_back(100);
+                            continue;
+                        }
+                        float mu_hit_angle = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                        mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
+                            ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
+                            : mu_hit_angle;
+                        MichelHitMuonAngle.push_back(mu_hit_angle);
                     }
+                    MichelHitEnergy = MichelHits.energy();
+
+
+                    PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+                    MichelTrackLength = pt_mi ? pt_mi->Length() : 0;
+
+                    PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+                    MichelShowerLength = ps_mi ? ps_mi->Length() : 0;
+
+
+                    // Cone
+                    /*
+                    Hits near_hits;
+                    for (PtrHit const& ph_mi : vph_mi) {
+                        if (ph_mi->View() != geo::kW) continue;
+                        if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
+                        near_hits.push_back(GetHit(ph_mi));
+                    }
+                    if (near_hits.size()) {
+                        Vec2 bary = near_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
+                        Vec2 end = MuonTrueEndHit.vec(fTick2cm);
+                        Vec2 end_bary = bary - end;
+
+                        float angle = end_bary.angle();
+                        for (PtrHit const& ph_mi : vph_mi) {
+                            if (ph_mi->View() != geo::kW) continue;
+                            if (GetDistance(ph_mi, sh_mcp.end) > 30) continue;
+
+                            Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
+                            float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
+
+                            if (cosa > cos(30.F * TMath::DegToRad())) continue;
+                            // in cone !! 
+                        }
+                    }
+                    */
                 }
-                */
             }
         }
 
