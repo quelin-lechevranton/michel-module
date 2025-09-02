@@ -66,6 +66,8 @@ private:
     // std::vector<float> MichelSphereEnergy; 
     ana::Hits NearbyHits;
 
+    void resetMuon();
+
     std::string GetParticleName(int pdg);
 };
 
@@ -167,8 +169,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    std::vector<art::Ptr<recob::Hit>> vp_hit;
-    art::fill_ptr_vector(vp_hit, vh_hit);
+    std::vector<art::Ptr<recob::Hit>> vph_ev;
+    art::fill_ptr_vector(vph_ev, vh_hit);
 
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
@@ -180,9 +182,9 @@ void ana::MichelTruth::analyze(art::Event const& e)
     evEvent = e.event();
 
     EventHits.clear();
-    for (PtrHit p_hit : vp_hit)
-        if (p_hit->View() == geo::kW)
-            EventHits.push_back(GetHit(p_hit));
+    for (PtrHit ph_ev : vph_ev)
+        if (ph_ev->View() == geo::kW)
+            EventHits.push_back(GetHit(ph_ev));
 
     for (simb::MCParticle const& mcp : *vh_mcp) {
         if (abs(mcp.PdgCode()) != 13) continue;
@@ -192,7 +194,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         if (!fKeepTransportation && EndProcess == "Transportation") continue;
 
-        VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vp_hit, clockData, false);
+        VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vph_ev, clockData, false);
         if (vph_mcp.empty()) continue;
 
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
@@ -204,8 +206,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         Hits.clear();
         HitProjection.clear();
-        for (PtrHit const& p_hit : sh_muon.vph) {
-            ana::Hit hit = GetHit(p_hit);
+        for (PtrHit const& ph_mu : sh_muon.vph) {
+            ana::Hit hit = GetHit(ph_mu);
             Hits.push_back(hit);
             HitProjection.push_back(
                 sh_muon.regs[ana::tpc2side[geoDet][hit.tpc]].projection(
@@ -216,47 +218,35 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         EndPoint = ana::Point(mcp.EndPosition().Vect());
 
-        simb::MCParticle const* mcp_michel = GetMichelMCP(&mcp);
-        if (mcp_michel) {
+        simb::MCParticle const* mcp_mi = GetMichelMCP(&mcp);
+        if (mcp_mi) {
             HasMichel = (
-                geoHighX.isInside(mcp_michel->Position().Vect(), 20.F)
-                || geoLowX.isInside(mcp_michel->Position().Vect(), 20.F)
+                geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
+                || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
             ) ? kHasMichelFiducial : (
-                geoHighX.isInside(mcp_michel->Position().Vect())
-                || geoLowX.isInside(mcp_michel->EndPosition().Vect())
+                geoHighX.isInside(mcp_mi->Position().Vect())
+                || geoLowX.isInside(mcp_mi->EndPosition().Vect())
                 ? kHasMichelInside
                 : kHasMichelOutside
             );
-        } else {
-            HasMichel = 0;
         }
 
         EventiMuon.push_back(iMuon);
 
-        MichelTrueEnergy = -1.F;
-        MichelHits.clear();
-        MichelHitDist.clear();
-        MichelHitIsShared.clear();
-        MichelHitEnergy = -1.F;
-        MichelHitTIDEEnergy.clear();
-        MichelHitEveTIDEEnergy.clear();
-        MichelHitSimIDEEnergy.clear();
-        NearbyHits.clear();
-
-        if (!mcp_michel) {
+        if (!mcp_mi) {
             tMuon->Fill();
             iMuon++;
             EventNMuon++;
             continue;
         }
 
-        MichelTrueEnergy = (mcp_michel->E() - mcp_michel->Mass()) * 1e3; // MeV
+        MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3; // MeV
         MichelHitEnergy = 0.F;
         // MichelHitTIDEEnergy = 0.F;
         // MichelHitEveTIDEEnergy = 0.F;
         // MichelHitSimIDEEnergy = 0.F;
 
-        VecPtrHit vp_michel_hit = ana::mcp2hits(mcp_michel, vp_hit, clockData, true);
+        VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
 
         // float Oz = EndHit.space;
         // float Ot = EndHit.tick * fTick2cm;
@@ -267,19 +257,19 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         // VecPtrHit shared_hits;
         // float shared_e = 0.F;
-        for (PtrHit const& p_hit : vp_michel_hit) {
+        for (PtrHit const& ph_mi : vph_mi) {
             // collection hits
-            if (p_hit->View() != geo::kW) continue;
+            if (ph_mi->View() != geo::kW) continue;
 
             // also from the mother muon
             if (std::find_if(
                 vph_mcp.begin(),
                 vph_mcp.end(),
-                [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
+                [k=ph_mi.key()](PtrHit const& p) { return p.key() == k; }
             ) != vph_mcp.end()) {
-                // shared_hits.push_back(p_hit);
-                // shared_e += p_hit->Integral() * fADC2MeV;
-                // SharedEnergy += p_hit->Integral();
+                // shared_hits.push_back(ph_mi);
+                // shared_e += ph_mi->Integral() * fADC2MeV;
+                // SharedEnergy += ph_mi->Integral();
                 MichelHitIsShared.push_back(true);
 
 
@@ -288,22 +278,22 @@ void ana::MichelTruth::analyze(art::Event const& e)
             } else {
                 MichelHitIsShared.push_back(false);
             }
-            ana::Hit hit = GetHit(p_hit);
+            ana::Hit hit = GetHit(ph_mi);
             MichelHits.push_back(hit);
 
             float tide_energy = 0.F;
             float eve_tide_energy = 0.F;
             float sim_ide_energy = 0.F;
-            for (sim::TrackIDE const& ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
-                if (ide.trackID == mcp_michel->TrackId())
+            for (sim::TrackIDE const& ide : bt_serv->HitToTrackIDEs(clockData, ph_mi))
+                if (ide.trackID == mcp_mi->TrackId())
                     tide_energy += ide.energy; // MeV
                     // MichelHitTIDEEnergy += ide.energy; // MeV
-            for (sim::TrackIDE const& ide : bt_serv->HitToEveTrackIDEs(clockData, p_hit))
-                if (ide.trackID == mcp_michel->TrackId())
+            for (sim::TrackIDE const& ide : bt_serv->HitToEveTrackIDEs(clockData, ph_mi))
+                if (ide.trackID == mcp_mi->TrackId())
                     eve_tide_energy += ide.energy; // MeV
                     // MichelHitEveTIDEEnergy += ide.energy; // MeV
-            for (sim::IDE const* ide : bt_serv->HitToSimIDEs_Ps(clockData, p_hit))
-                if (ide->trackID == mcp_michel->TrackId())
+            for (sim::IDE const* ide : bt_serv->HitToSimIDEs_Ps(clockData, ph_mi))
+                if (ide->trackID == mcp_mi->TrackId())
                     sim_ide_energy += ide->energy; // MeV
                     // MichelHitSimIDEEnergy += ide->energy; // MeV
             
@@ -314,8 +304,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
             if (hit.section != EndHit.section) {
                 MichelHitDist.push_back(-1.F);
             } else {
-                // float z = GetSpace(p_hit->WireID());
-                // float t = p_hit->PeakTime() * fTick2cm;
+                // float z = GetSpace(ph_mi->WireID());
+                // float t = ph_mi->PeakTime() * fTick2cm;
                 float dr2 = pow(hit.space-EndHit.space, 2) + pow((hit.tick-EndHit.tick)*fTick2cm, 2);
                 MichelHitDist.push_back(sqrt(dr2));
             }
@@ -326,15 +316,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
         // MichelSphereTrueEnergy.resize(radii.size(), 0.F);
         // MichelSphereEnergy.resize(radii.size(), 0.F);
         
-        // for (PtrHit const& p_hit : vp_michel_hit) {
+        // for (PtrHit const& ph_mi : vph_mi) {
         //     // collection hits
-        //     if (p_hit->View() != geo::kW) continue;
+        //     if (ph_mi->View() != geo::kW) continue;
 
         //     // same section of the detector
-        //     if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != EndHit.section) continue;
+        //     if (ana::tpc2sec[geoDet][ph_mi->WireID().TPC] != EndHit.section) continue;
 
-        //     float z = GetSpace(p_hit->WireID());
-        //     float t = p_hit->PeakTime() * fTick2cm;
+        //     float z = GetSpace(ph_mi->WireID());
+        //     float t = ph_mi->PeakTime() * fTick2cm;
         //     float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
 
         //     // at less then r cm from muon's end
@@ -344,23 +334,19 @@ void ana::MichelTruth::analyze(art::Event const& e)
         //     if (std::find_if(
         //         vph_mcp.begin(),
         //         vph_mcp.end(),
-        //         [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
+        //         [k=ph_mi.key()](PtrHit const& p) { return p.key() == k; }
         //     ) != vph_mcp.end()) continue;
 
         //     for (int i=radii.size()-1; i>=0; i--) {
         //         float r2 = pow(radii[i], 2);
         //         if (dr2 > r2) break;
-        //         MichelSphereTrueEnergy[i] += p_hit->Integral() * fADC2MeV;
+        //         MichelSphereTrueEnergy[i] += ph_mi->Integral() * fADC2MeV;
         //     }
         // }
 
-        for (PtrHit const& p_hit : vp_hit) {
-            // collection hits
-            if (p_hit->View() != geo::kW) continue;
-
-            ana::Hit hit = GetHit(p_hit);
-
-            // same section of the detector
+        for (PtrHit const& ph_ev : vph_ev) {
+            if (ph_ev->View() != geo::kW) continue;
+            ana::Hit hit = GetHit(ph_ev);
             if (hit.section != EndHit.section) continue;
 
             float dr2 = pow(hit.space-EndHit.space, 2) + pow((hit.tick-EndHit.tick) * fTick2cm, 2);
@@ -372,11 +358,11 @@ void ana::MichelTruth::analyze(art::Event const& e)
             if (std::find_if(
                 vph_mcp.begin(),
                 vph_mcp.end(),
-                [k=p_hit.key()](PtrHit const& p) { return p.key() == k; }
+                [k=ph_ev.key()](PtrHit const& p) { return p.key() == k; }
             ) != vph_mcp.end()) continue;
 
             // not from other muons?
-            std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, p_hit);
+            std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, ph_ev);
             std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
                 hit_ides.begin(),
                 hit_ides.end(),
@@ -393,7 +379,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             // for (int i=radii.size()-1; i>=0; i--) {
             //     float r2 = pow(radii[i], 2);
             //     if (dr2 > r2) break;
-            //     MichelSphereEnergy[i] += p_hit->Integral() * fADC2MeV;
+            //     MichelSphereEnergy[i] += ph_ev->Integral() * fADC2MeV;
             // }
         }
 
@@ -407,6 +393,24 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
 void ana::MichelTruth::beginJob() {}  
 void ana::MichelTruth::endJob() {}
+
+void ana::MichelTruth::resetMuon() {
+    Hits.clear();
+    HitProjection.clear();
+    
+    // Michel
+    HasMichel = kNoMichel;
+    MichelTrueEnergy = -1.F;
+    MichelHitEnergy = -1.F;
+    MichelHits.clear();
+    MichelHitDist.clear();
+    MichelHitIsShared.clear();
+    MichelHitTIDEEnergy.clear();
+    MichelHitEveTIDEEnergy.clear();
+    MichelHitSimIDEEnergy.clear();
+    NearbyHits.clear();
+}
+
 
 std::string ana::MichelTruth::GetParticleName(int pdg) {
 
