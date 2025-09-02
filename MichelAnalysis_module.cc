@@ -224,17 +224,26 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
-    if (!vh_hit.isValid()) return;
+    if (!vh_hit.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
+        return;
+    }
     VecPtrHit vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
-    if (!vh_trk.isValid()) return;
+    if (!vh_trk.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
+        return;
+    }
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
     auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
-    if (!vh_shw.isValid()) return;
+    if (!vh_shw.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
+        return;
+    }
     VecPtrShw vps_ev;
     art::fill_ptr_vector(vps_ev, vh_shw);
 
