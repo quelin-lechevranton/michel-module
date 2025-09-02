@@ -435,7 +435,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     Vec2 end = MuonTrueEndHit.vec(fTick2cm);
                     Vec2 end_bary = bary - end;
 
-                    float angle = end_bary.angle();
+                    // float angle = end_bary.angle();
                     for (auto iph_mi=iph_bragg; iph_mi!=bragg.vph_clu.end(); iph_mi++) {
                         if ((*iph_mi)->View() != geo::kW) continue;
                         if (GetDistance(*iph_mi, sh_mu.end) > 30) continue;
@@ -527,7 +527,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         Vec2 end = MuonTrueEndHit.vec(fTick2cm);
                         Vec2 end_bary = bary - end;
 
-                        float angle = end_bary.angle();
+                        // float angle = end_bary.angle();
                         MichelConeEnergy = 0;
                         for (PtrHit const& ph_mi : vph_mi) {
                             if (ph_mi->View() != geo::kW) continue;

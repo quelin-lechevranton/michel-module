@@ -53,6 +53,7 @@ private:
     float MichelTrueEnergy;
     ana::Hits MichelHits;
     std::vector<float> MichelHitDist;
+    std::vector<float> MichelHitAngle;
     std::vector<bool> MichelHitIsShared;
     std::vector<float> MichelHitTIDEEnergy;
     std::vector<float> MichelHitEveTIDEEnergy;
@@ -149,6 +150,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
     tMuon->Branch("MichelHitDist", &MichelHitDist);
+    tMuon->Branch("MichelHitAngle", &MichelHitAngle);
     tMuon->Branch("MichelHitIsShared", &MichelHitIsShared);
     tMuon->Branch("MichelHitTIDEEnergy", &MichelHitTIDEEnergy);
     tMuon->Branch("MichelHitEveTIDEEnergy", &MichelHitEveTIDEEnergy);
@@ -281,6 +283,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
             ana::Hit hit = GetHit(ph_mi);
             MichelHits.push_back(hit);
 
+            
+            // G4 Energy Fractions
             float tide_energy = 0.F;
             float eve_tide_energy = 0.F;
             float sim_ide_energy = 0.F;
@@ -301,14 +305,18 @@ void ana::MichelTruth::analyze(art::Event const& e)
             MichelHitEveTIDEEnergy.push_back(eve_tide_energy);
             MichelHitSimIDEEnergy.push_back(sim_ide_energy);
 
-            if (hit.section != EndHit.section) {
+            // Distance from muon
+            if (hit.section != EndHit.section)
                 MichelHitDist.push_back(-1.F);
-            } else {
-                // float z = GetSpace(ph_mi->WireID());
-                // float t = ph_mi->PeakTime() * fTick2cm;
-                float dr2 = pow(hit.space-EndHit.space, 2) + pow((hit.tick-EndHit.tick)*fTick2cm, 2);
-                MichelHitDist.push_back(sqrt(dr2));
-            }
+            else
+                MichelHitDist.push_back(GetDistance(ph_mi, sh_muon.end));
+
+            // Angle with muon
+            float hit_angle = (hit.vec(fTick2cm) - EndHit.vec(fTick2cm)).angle();
+            float muon_angle = MuonReg.theta(RegDirZ);
+            float da = hit_angle - muon_angle;
+            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            MichelHitAngle.push_back(da);
         }
         // SharedEnergy *= fADC2MeV;
         MichelHitEnergy = MichelHits.energy();
@@ -404,6 +412,7 @@ void ana::MichelTruth::resetMuon() {
     MichelHitEnergy = -1.F;
     MichelHits.clear();
     MichelHitDist.clear();
+    MichelHitAngle.clear();
     MichelHitIsShared.clear();
     MichelHitTIDEEnergy.clear();
     MichelHitEveTIDEEnergy.clear();
