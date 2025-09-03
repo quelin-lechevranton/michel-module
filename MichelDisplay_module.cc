@@ -282,13 +282,13 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         ihc++; itc++;
 
-        // if (!LOG(TrueTagHasMichelHits)) {
-        //     DrawFail(ihc, itc);
-        //     continue;
-        // }
-        // DrawPass(ihc, itc);
-        // DrawGraph(*ihc, vph_mi, "p", ms_michel);
-        // ihc++; itc++;
+        if (!LOG(TrueTagHasMichelHits)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
 
         ana::Bragg bragg = GetBragg(
             sh_mu.vph,
@@ -371,7 +371,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         SetMarkerStyle(m_bary, {kMagenta, kOpenFourTrianglesX, 2});
         (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
         m_bary->DrawMarker(bary.space, bary.drift);
-
         DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
 
         ihc++; itc++;
@@ -386,8 +385,11 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
-        DrawGraph(*ihc, vph_cone, "p", {kRed, kOpenTriangleUp, 2});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
+
+        (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
+        m_bary->DrawMarker(bary.space, bary.drift);
+        DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
     }
 
     for (TCanvas* hc : hcs)
