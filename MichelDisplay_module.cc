@@ -318,12 +318,14 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             vph_pandora.push_back(ph_ev);
         }
 
-        // Sphere around bragg end
+        // Bragg end iterator
         VecPtrHit::iterator iph_bragg = std::find_if(
             bragg.vph_clu.begin(), bragg.vph_clu.end(),
             [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
         );
         if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
+
+        // Sphere around bragg end
         VecPtrHit vph_bragg;
         for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
             if (GetDistance(*iph, bragg.end) > 20.F) continue;
@@ -335,7 +337,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         Hits bary_hits;
         Vec2 bary;
         for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-            if ((*iph)->View() != geo::kW) continue;
             if (GetDistance(*iph, bragg.end) > 10) continue;
             bary_hits.push_back(GetHit(*iph));
         }
@@ -347,7 +348,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
             // float angle = end_bary.angle();
             for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                if ((*iph)->View() != geo::kW) continue;
                 if (GetDistance(*iph, bragg.end) > 30) continue;
 
                 Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;

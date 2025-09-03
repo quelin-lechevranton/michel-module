@@ -89,6 +89,7 @@ private:
 
     float BraggSphereEnergy;
     float BraggConeEnergy;
+    float BraggSphereEnergyTP, BraggConeEnergyTP;
     float PandoraSphereEnergy;
 
     void resetEvent();
@@ -212,6 +213,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
     tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
     tMuon->Branch("BraggConeEnergy", &BraggConeEnergy); // ADC
+    tMuon->Branch("BraggSphereEnergyTP", &BraggSphereEnergyTP); // ADC
+    tMuon->Branch("BraggConeEnergyTP", &BraggConeEnergyTP); // ADC
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
 
     MichelHits.SetBranches(tMuon, "Michel");
@@ -270,6 +273,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
         ASSERT(vph_mu.size())
+
+        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
+        simb::MCParticle const* mcp_mi = nullptr;
+        VecPtrHit vph_mcp_mu, vph_mi;
+        if (mcp) {
+            simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
+            VecPtrHit vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+        }
+
 
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
         EventiMuon.push_back(iMuon);
@@ -414,28 +427,29 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 BraggEndHit = GetHit(bragg.end);
                 for (PtrHit const& ph_bragg_mu : bragg.vph_clu)
                     BraggMuonHits.push_back(GetHit(ph_bragg_mu));
+                    
                 VecPtrHit::iterator iph_bragg = std::find_if(
                     bragg.vph_clu.begin(), bragg.vph_clu.end(),
                     [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
                 );
                 if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
 
-                BraggSphereEnergy = std::accumulate(
-                    iph_bragg, bragg.vph_clu.end(), 0.F,
-                    [&](float sum, PtrHit const& ph) -> float {
-                        // PtrShw ps_hit = fop_hit2shw.at(ph.key());
-                        // if (ps_hit) return sum;
-                        if (GetDistance(ph, bragg.end) <= fMichelRadius)
-                            return sum + ph->Integral(); 
-                        else 
-                            return sum;
-                    }
-                );
+                // Sphere
+                for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+                    if (GetDistance(*iph, bragg.end) > fMichelRadius) continue;
+                    // PtrShw ps_hit = fop_hit2shw.at(iph->key());
+                    BraggSphereEnergy += (*iph)->Integral();
+
+                    if (std::find_if(
+                        vph_mi.begin(), vph_mi.end(),
+                        [&iph](PtrHit const& h) -> bool { return h.key() == iph->key(); }
+                    ) != vph_mi.end()) 
+                        BraggSphereEnergyTP = (*iph)->Integral();
+                }
 
                 // Cone
                 Hits near_hits;
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                    if ((*iph)->View() != geo::kW) continue;
                     if (GetDistance(*iph, sh_mu.end) > 10) continue;
                     near_hits.push_back(GetHit(*iph));
                 }
@@ -447,7 +461,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                     // float angle = end_bary.angle();
                     for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                        if ((*iph)->View() != geo::kW) continue;
                         if (GetDistance(*iph, sh_mu.end) > 30) continue;
 
                         Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
@@ -455,15 +468,19 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                         if (cosa < cos(30.F * TMath::DegToRad())) continue;
                         BraggConeEnergy += (*iph)->Integral();
+
+                        if (std::find_if(
+                            vph_mi.begin(), vph_mi.end(),
+                            [&iph](PtrHit const& h) -> bool { return h.key() == iph->key(); }
+                        ) != vph_mi.end()) {
+                            BraggConeEnergyTP += (*iph)->Integral();
                     }
                 }
             }
         } else TagSortedHitsError = 1;
         
 
-
         // Truth Information
-        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         if (mcp) {
             TrueTagPdg = mcp->PdgCode();
             TrueTagEndProcess = mcp->EndProcess();
@@ -474,14 +491,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             else if (geoDet == kPDHD)
                 TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            VecPtrHit vph_mcp_mu;
-            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
 
             if (sh_mcp) {
                 MuonTrueEndHit = GetHit(sh_mcp.end);
 
-                simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
                 if (mcp_mi) {
                     TrueTagHasMichel = (
                         geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
@@ -493,8 +507,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         : kHasMichelOutside
                     );
                     MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
-
-                    VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
 
                     float mu_end_angle = sh_mcp.regs[ana::sec2side[geoDet][sh_mcp.secs.back()]]
                         .theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
@@ -586,6 +598,8 @@ void ana::MichelAnalysis::resetMuon() {
     BraggMuonHits.clear();
     BraggSphereEnergy = 0;
     BraggConeEnergy = 0;
+    BraggSphereEnergyTP = 0;
+    BraggConeEnergyTP = 0;
 
     // Muon Truth
     TrueTagPdg = 0;
