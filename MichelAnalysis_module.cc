@@ -152,7 +152,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
         << "  LowX Bounds: " << geoLowX << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
-        << "  Michel Space Radius: " << fMichelRadius << " cm";
+        << "  Michel Space Radius: " << fMichelRadius << " cm" << std::endl;
 
     tEvent = asFile->make<TTree>("event","");
 
@@ -440,8 +440,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     near_hits.push_back(GetHit(*iph_mi));
                 }
                 if (near_hits.size()) {
-                    Vec2 bary = near_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
-                    Vec2 end = MuonTrueEndHit.vec(fTick2cm);
+                    Vec2 bary = near_hits.barycenter(MuonEndHit.section, fTick2cm);
+                    Vec2 end = MuonEndHit.vec(fTick2cm);
                     Vec2 end_bary = bary - end;
 
                     // float angle = end_bary.angle();

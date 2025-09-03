@@ -304,6 +304,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             continue;
         }
         
+        // Sphere around track end
         VecPtrHit vph_pandora;
         int sec_end = ana::tpc2sec[geoDet][sh_mu.end->WireID().TPC];
         for (PtrHit const& ph_ev : vph_ev) {
@@ -317,6 +318,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             vph_pandora.push_back(ph_ev);
         }
 
+        // Sphere around bragg end
         VecPtrHit::iterator iph_bragg = std::find_if(
             bragg.vph_clu.begin(), bragg.vph_clu.end(),
             [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
@@ -328,6 +330,33 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             vph_bragg.push_back(*iph);
         }
 
+        // Cone around bragg end
+        VecPtrHit vph_cone;
+        Hits bary_hits;
+        for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+            if ((*iph)->View() != geo::kW) continue;
+            if (GetDistance(*iph, sh_mu.end) > 10) continue;
+            bary_hits.push_back(GetHit(*iph));
+        }
+        if (bary_hits.size()) {
+            Hit h_end = GetHit(sh_mu.end);
+            Vec2 bary = bary_hits.barycenter(h_end.section, fTick2cm);
+            Vec2 end = h_end.vec(fTick2cm);
+            Vec2 end_bary = bary - end;
+
+            // float angle = end_bary.angle();
+            for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+                if ((*iph)->View() != geo::kW) continue;
+                if (GetDistance(*iph, sh_mu.end) > 30) continue;
+
+                Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
+                float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
+
+                if (cosa > cos(30.F * TMath::DegToRad())) continue;
+                vph_cone.push_back(*iph);
+            }
+        }
+
 
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
@@ -335,6 +364,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
+        DrawGraph(*ihc, vph_cone, "p", {kRed, kOpenTriangleUp, 2});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
 
         ihc++; itc++;
@@ -349,6 +379,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
+        DrawGraph(*ihc, vph_cone, "p", {kRed, kOpenTriangleUp, 2});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
     }
 
