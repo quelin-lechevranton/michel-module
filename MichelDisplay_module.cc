@@ -353,7 +353,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
                 Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
                 float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                if (cosa > cos(30.F * TMath::DegToRad())) continue;
+                if (cosa < cos(30.F * TMath::DegToRad())) continue;
                 vph_cone.push_back(*iph);
             }
         }
