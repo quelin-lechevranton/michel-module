@@ -434,26 +434,27 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                 // Cone
                 Hits near_hits;
-                for (auto iph_mi=iph_bragg; iph_mi!=bragg.vph_clu.end(); iph_mi++) {
-                    if ((*iph_mi)->View() != geo::kW) continue;
-                    if (GetDistance(*iph_mi, sh_mu.end) > 10) continue;
-                    near_hits.push_back(GetHit(*iph_mi));
+                for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+                    if ((*iph)->View() != geo::kW) continue;
+                    if (GetDistance(*iph, sh_mu.end) > 10) continue;
+                    near_hits.push_back(GetHit(*iph));
                 }
                 if (near_hits.size()) {
-                    Vec2 bary = near_hits.barycenter(MuonEndHit.section, fTick2cm);
-                    Vec2 end = MuonEndHit.vec(fTick2cm);
+                    Hit h_end = GetHit(bragg.end);
+                    Vec2 bary = near_hits.barycenter(h_end.section, fTick2cm);
+                    Vec2 end = h_end.vec(fTick2cm);
                     Vec2 end_bary = bary - end;
 
                     // float angle = end_bary.angle();
-                    for (auto iph_mi=iph_bragg; iph_mi!=bragg.vph_clu.end(); iph_mi++) {
-                        if ((*iph_mi)->View() != geo::kW) continue;
-                        if (GetDistance(*iph_mi, sh_mu.end) > 30) continue;
+                    for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
+                        if ((*iph)->View() != geo::kW) continue;
+                        if (GetDistance(*iph, sh_mu.end) > 30) continue;
 
-                        Vec2 end_hit = GetHit(*iph_mi).vec(fTick2cm) - end;
+                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                         if (cosa < cos(30.F * TMath::DegToRad())) continue;
-                        BraggConeEnergy += (*iph_mi)->Integral();
+                        BraggConeEnergy += (*iph)->Integral();
                     }
                 }
             }
