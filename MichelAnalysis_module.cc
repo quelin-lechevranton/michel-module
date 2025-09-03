@@ -456,10 +456,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         BraggConeEnergy += (*iph_mi)->Integral();
                     }
                 }
-
-
-
-
             }
         } else TagSortedHitsError = 1;
         

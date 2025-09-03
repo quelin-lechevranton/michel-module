@@ -221,15 +221,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         ana::SortedHits sh_mu = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
         ASSERT(sh_mu)
 
-        ana::Bragg bragg = GetBragg(
-            sh_mu.vph,
-            sh_mu.end,
-            pt_ev,
-            vph_ev,
-            fop_hit2trk,
-            { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-        );
-
 
         im++;
 
@@ -299,6 +290,15 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         // DrawGraph(*ihc, vph_mi, "p", ms_michel);
         // ihc++; itc++;
 
+        ana::Bragg bragg = GetBragg(
+            sh_mu.vph,
+            sh_mu.end,
+            pt_ev,
+            vph_ev,
+            fop_hit2trk,
+            { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
+        );
+
         if (!LOG(bragg)) {
             DrawFail(ihc, itc);
             continue;
@@ -333,21 +333,22 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         // Cone around bragg end
         VecPtrHit vph_cone;
         Hits bary_hits;
+        Vec2 bary;
         for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
             if ((*iph)->View() != geo::kW) continue;
-            if (GetDistance(*iph, sh_mu.end) > 10) continue;
+            if (GetDistance(*iph, bragg.end) > 10) continue;
             bary_hits.push_back(GetHit(*iph));
         }
         if (bary_hits.size()) {
-            Hit h_end = GetHit(sh_mu.end);
-            Vec2 bary = bary_hits.barycenter(h_end.section, fTick2cm);
+            Hit h_end = GetHit(bragg.end);
+            bary = bary_hits.barycenter(h_end.section, fTick2cm);
             Vec2 end = h_end.vec(fTick2cm);
             Vec2 end_bary = bary - end;
 
             // float angle = end_bary.angle();
             for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                 if ((*iph)->View() != geo::kW) continue;
-                if (GetDistance(*iph, sh_mu.end) > 30) continue;
+                if (GetDistance(*iph, bragg.end) > 30) continue;
 
                 Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
                 float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
@@ -364,8 +365,14 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
         DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
-        DrawGraph(*ihc, vph_cone, "p", {kRed, kOpenTriangleUp, 2});
         DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
+
+        TMarker *m_bary = new TMarker();
+        SetMarkerStyle(m_bary, {kMagenta, kOpenFourTrianglesX, 2});
+        (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
+        m_bary->DrawMarker(bary.space, bary.drift);
+
+        DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
 
         ihc++; itc++;
 
