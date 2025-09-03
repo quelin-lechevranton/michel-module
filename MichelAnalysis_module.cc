@@ -472,7 +472,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (std::find_if(
                             vph_mi.begin(), vph_mi.end(),
                             [&iph](PtrHit const& h) -> bool { return h.key() == iph->key(); }
-                        ) != vph_mi.end()) {
+                        ) != vph_mi.end())
                             BraggConeEnergyTP += (*iph)->Integral();
                     }
                 }
