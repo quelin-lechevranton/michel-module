@@ -51,6 +51,7 @@ private:
     ana::LinearRegression MuonReg;
 
     float MichelTrueEnergy;
+    float MichelTrackLength, MichelShowerLength;
     ana::Hits MichelHits;
     std::vector<float> MichelHitDist;
     std::vector<float> MichelHitMuonAngle;
@@ -150,6 +151,8 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
     MichelHits.SetBranches(tMuon, "Michel");
+    tMuon->Branch("MichelTrackLength", &MichelTrackLength);
+    tMuon->Branch("MichelShowerLength", &MichelShowerLength);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
     tMuon->Branch("MichelHitDist", &MichelHitDist);
     tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
@@ -174,11 +177,30 @@ void ana::MichelTruth::analyze(art::Event const& e)
     auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
 
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
-    if (!vh_hit.isValid()) return;
+    if (!vh_hit.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
+        return;
+    }
     std::vector<art::Ptr<recob::Hit>> vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
-    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+    auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
+    if (!vh_trk.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
+        return;
+    }
+    VecPtrTrk vpt_ev;
+    art::fill_ptr_vector(vpt_ev, vh_trk);
+    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    if (!vh_shw.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
+        return;
+    }
+    VecPtrShw vps_ev;
+    art::fill_ptr_vector(vps_ev, vh_shw);
+
+    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindManyP<recob::Hit> fop_shw2hit(vh_shw, e, tag_shw);
 
     EventNMuon = 0;
     EventiMuon.clear();
@@ -211,6 +233,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         EndHit = GetHit(sh_mu.end);
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+
 
         for (PtrHit const& ph_mu : sh_mu.vph) {
             ana::Hit hit = GetHit(ph_mu);
@@ -251,6 +274,11 @@ void ana::MichelTruth::analyze(art::Event const& e)
         // MichelHitTIDEEnergy = 0.F;
         // MichelHitEveTIDEEnergy = 0.F;
         // MichelHitSimIDEEnergy = 0.F;
+
+        PtrTrk pt_mu = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+        MichelTrackLength = pt_mu ? pt_mu->Length() : -1.F;
+        PtrShw ps_mu = ana::mcp2shw(mcp_mi, vps_ev, clockData, fop_shw2hit);
+        MichelShowerLength = ps_mu ? ps_mu->Length() : -1.F;
 
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
 
