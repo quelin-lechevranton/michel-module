@@ -283,7 +283,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         }
 
-
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
         EventiMuon.push_back(iMuon);
 
@@ -448,14 +447,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
 
                 // Cone
-                Hits near_hits;
+                Hits bary_hits;
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                     if (GetDistance(*iph, sh_mu.end) > 10) continue;
-                    near_hits.push_back(GetHit(*iph));
+                    bary_hits.push_back(GetHit(*iph));
                 }
-                if (near_hits.size()) {
+                if (bary_hits.size()) {
                     Hit h_end = GetHit(bragg.end);
-                    Vec2 bary = near_hits.barycenter(h_end.section, fTick2cm);
+                    Vec2 bary = bary_hits.barycenter(h_end.section, fTick2cm);
                     Vec2 end = h_end.vec(fTick2cm);
                     Vec2 end_bary = bary - end;
 
@@ -534,14 +533,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
                     // Cone
-                    Hits near_hits;
+                    Hits bary_hits;
                     for (PtrHit const& ph_mi : vph_mi) {
                         if (ph_mi->View() != geo::kW) continue;
                         if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
-                        near_hits.push_back(GetHit(ph_mi));
+                        bary_hits.push_back(GetHit(ph_mi));
                     }
-                    if (near_hits.size()) {
-                        Vec2 bary = near_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
+                    if (bary_hits.size()) {
+                        Vec2 bary = bary_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
                         Vec2 end = MuonTrueEndHit.vec(fTick2cm);
                         Vec2 end_bary = bary - end;
 

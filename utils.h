@@ -203,6 +203,10 @@ namespace ana {
         float angle() const { return atan2(drift, space); }    
         float dot(Vec2 const& v) const { return space*v.space + drift*v.drift; }
         Vec2 operator-(Vec2 const& v) const { return Vec2{space - v.space, drift - v.drift}; }
+        void SetBranches(TTree* t, const char* pre="") {
+            t->Branch(Form("%sSpace", pre), &space);
+            t->Branch(Form("%sDrift", pre), &drift);
+        }
     };
     struct Hit {
         unsigned tpc;

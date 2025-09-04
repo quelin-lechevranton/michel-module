@@ -53,7 +53,9 @@ private:
     float MichelTrueEnergy;
     ana::Hits MichelHits;
     std::vector<float> MichelHitDist;
-    std::vector<float> MichelHitAngle;
+    std::vector<float> MichelHitMuonAngle;
+    ana::Vec2 MichelBary;
+    float MichelBaryMuonAngle;
     std::vector<bool> MichelHitIsShared;
     std::vector<float> MichelHitTIDEEnergy;
     std::vector<float> MichelHitEveTIDEEnergy;
@@ -150,7 +152,9 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy);
     tMuon->Branch("MichelHitDist", &MichelHitDist);
-    tMuon->Branch("MichelHitAngle", &MichelHitAngle);
+    tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
+    MichelBary.SetBranches(tMuon, "MichelBary");
+    tMuon->Branch("MichelBaryMuonAngle", &MichelBaryMuonAngle);
     tMuon->Branch("MichelHitIsShared", &MichelHitIsShared);
     tMuon->Branch("MichelHitTIDEEnergy", &MichelHitTIDEEnergy);
     tMuon->Branch("MichelHitEveTIDEEnergy", &MichelHitEveTIDEEnergy);
@@ -200,19 +204,19 @@ void ana::MichelTruth::analyze(art::Event const& e)
         ASSERT(vph_mcp.size())
 
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
-        ana::SortedHits sh_muon = GetSortedHits(vph_mcp, RegDirZ);
-        ASSERT(sh_muon)
+        ana::SortedHits sh_mu = GetSortedHits(vph_mcp, RegDirZ);
+        ASSERT(sh_mu)
 
         resetMuon();
 
-        EndHit = GetHit(sh_muon.end);
-        MuonReg = sh_muon.regs[ana::sec2side[geoDet][sh_muon.secs.back()]];
+        EndHit = GetHit(sh_mu.end);
+        MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
 
-        for (PtrHit const& ph_mu : sh_muon.vph) {
+        for (PtrHit const& ph_mu : sh_mu.vph) {
             ana::Hit hit = GetHit(ph_mu);
             Hits.push_back(hit);
             HitProjection.push_back(
-                sh_muon.regs[ana::tpc2side[geoDet][hit.tpc]].projection(
+                sh_mu.regs[ana::tpc2side[geoDet][hit.tpc]].projection(
                     hit.space, hit.tick * fTick2cm
                 )
             );
@@ -255,10 +259,10 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         // std::vector<float> radii = { 10, 20, 30, 40, 50 };
         // float r2_max = pow(radii.back(), 2);
-        float r2_max = pow(60, 2);
 
         // VecPtrHit shared_hits;
         // float shared_e = 0.F;
+        ana::Hits bary_hits;
         for (PtrHit const& ph_mi : vph_mi) {
             // collection hits
             if (ph_mi->View() != geo::kW) continue;
@@ -304,58 +308,35 @@ void ana::MichelTruth::analyze(art::Event const& e)
             MichelHitSimIDEEnergy.push_back(sim_ide_energy);
 
             // Distance from muon
-            MichelHitDist.push_back(GetDistance(ph_mi, sh_muon.end));
+            MichelHitDist.push_back(GetDistance(ph_mi, sh_mu.end));
 
             // Angle with muon
             float hit_angle = (hit.vec(fTick2cm) - EndHit.vec(fTick2cm)).angle();
             float muon_angle = MuonReg.theta(RegDirZ);
             float da = hit_angle - muon_angle;
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            MichelHitAngle.push_back(da);
+            MichelHitMuonAngle.push_back(da);
+
+            if (GetDistance(ph_mi, sh_mu.end) > 10) continue;
+            bary_hits.push_back(hit);
         }
         // SharedEnergy *= fADC2MeV;
         MichelHitEnergy = MichelHits.energy();
 
+        if (bary_hits.size()) {
+            MichelBary = bary_hits.barycenter(EndHit.section, fTick2cm);
+            MichelBaryMuonAngle = (MichelBary - EndHit.vec(fTick2cm)).angle();
+        }
+
         // MichelSphereTrueEnergy.resize(radii.size(), 0.F);
         // MichelSphereEnergy.resize(radii.size(), 0.F);
         
-        // for (PtrHit const& ph_mi : vph_mi) {
-        //     // collection hits
-        //     if (ph_mi->View() != geo::kW) continue;
-
-        //     // same section of the detector
-        //     if (ana::tpc2sec[geoDet][ph_mi->WireID().TPC] != EndHit.section) continue;
-
-        //     float z = GetSpace(ph_mi->WireID());
-        //     float t = ph_mi->PeakTime() * fTick2cm;
-        //     float dr2 = pow(z-Oz, 2) + pow(t-Ot, 2);
-
-        //     // at less then r cm from muon's end
-        //     if (dr2 > r2_max) continue;
-
-        //     // not from the mother muon
-        //     if (std::find_if(
-        //         vph_mcp.begin(),
-        //         vph_mcp.end(),
-        //         [k=ph_mi.key()](PtrHit const& p) { return p.key() == k; }
-        //     ) != vph_mcp.end()) continue;
-
-        //     for (int i=radii.size()-1; i>=0; i--) {
-        //         float r2 = pow(radii[i], 2);
-        //         if (dr2 > r2) break;
-        //         MichelSphereTrueEnergy[i] += ph_mi->Integral() * fADC2MeV;
-        //     }
-        // }
-
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
             ana::Hit hit = GetHit(ph_ev);
             if (hit.section != EndHit.section) continue;
 
-            float dr2 = pow(hit.space-EndHit.space, 2) + pow((hit.tick-EndHit.tick) * fTick2cm, 2);
-
-            // at less then r cm from muon's end
-            if (dr2 > r2_max) continue;
+            if (GetDistance(ph_ev, sh_mu.end) > 60) continue;
 
             // not from the mother muon
             if (std::find_if(
@@ -407,7 +388,9 @@ void ana::MichelTruth::resetMuon() {
     MichelHitEnergy = -1.F;
     MichelHits.clear();
     MichelHitDist.clear();
-    MichelHitAngle.clear();
+    MichelHitMuonAngle.clear();
+    MichelBary = ana::Vec2{0.F, 0.F};
+    MichelBaryMuonAngle = 100.F;
     MichelHitIsShared.clear();
     MichelHitTIDEEnergy.clear();
     MichelHitEveTIDEEnergy.clear();
