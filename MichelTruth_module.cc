@@ -189,7 +189,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             EventHits.push_back(GetHit(ph_ev));
 
     for (simb::MCParticle const& mcp : *vh_mcp) {
-        if (abs(mcp.PdgCode()) != 13) continue;
+        ASSERT(abs(mcp.PdgCode()) == 13)
 
         IsAnti = mcp.PdgCode() < 0;
         EndProcess = mcp.EndProcess();
@@ -197,17 +197,17 @@ void ana::MichelTruth::analyze(art::Event const& e)
         if (!fKeepTransportation && EndProcess == "Transportation") continue;
 
         VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vph_ev, clockData, false);
-        if (vph_mcp.empty()) continue;
+        ASSERT(vph_mcp.size())
 
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
         ana::SortedHits sh_muon = GetSortedHits(vph_mcp, RegDirZ);
         ASSERT(sh_muon)
 
+        resetMuon();
+
         EndHit = GetHit(sh_muon.end);
         MuonReg = sh_muon.regs[ana::sec2side[geoDet][sh_muon.secs.back()]];
 
-        Hits.clear();
-        HitProjection.clear();
         for (PtrHit const& ph_mu : sh_muon.vph) {
             ana::Hit hit = GetHit(ph_mu);
             Hits.push_back(hit);
@@ -274,7 +274,6 @@ void ana::MichelTruth::analyze(art::Event const& e)
                 // SharedEnergy += ph_mi->Integral();
                 MichelHitIsShared.push_back(true);
 
-
                 // shared is Me + mu energy
 
             } else {
@@ -282,7 +281,6 @@ void ana::MichelTruth::analyze(art::Event const& e)
             }
             ana::Hit hit = GetHit(ph_mi);
             MichelHits.push_back(hit);
-
             
             // G4 Energy Fractions
             float tide_energy = 0.F;
@@ -306,10 +304,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             MichelHitSimIDEEnergy.push_back(sim_ide_energy);
 
             // Distance from muon
-            if (hit.section != EndHit.section)
-                MichelHitDist.push_back(-1.F);
-            else
-                MichelHitDist.push_back(GetDistance(ph_mi, sh_muon.end));
+            MichelHitDist.push_back(GetDistance(ph_mi, sh_muon.end));
 
             // Angle with muon
             float hit_angle = (hit.vec(fTick2cm) - EndHit.vec(fTick2cm)).angle();
