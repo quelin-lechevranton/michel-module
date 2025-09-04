@@ -278,9 +278,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         simb::MCParticle const* mcp_mi = nullptr;
         VecPtrHit vph_mcp_mu, vph_mi;
         if (mcp) {
-            simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
-            VecPtrHit vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+            mcp_mi = GetMichelMCP(mcp);
+            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         }
 
 
