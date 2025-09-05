@@ -56,7 +56,7 @@ private:
     std::vector<float> MichelHitDist;
     std::vector<float> MichelHitMuonAngle;
     ana::Vec2 MichelBary;
-    float MichelBaryMuonAngle;
+    float MichelBaryAngle, MichelBaryMuonAngle;
     std::vector<bool> MichelHitIsShared;
     std::vector<float> MichelHitTIDEEnergy;
     std::vector<float> MichelHitEveTIDEEnergy;
@@ -144,7 +144,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     EndPoint.SetBranches(tMuon, "End");
 
     tMuon->Branch("RegDirZ", &RegDirZ);
-    MuonReg.SetBranches(tMuon, "Reg");
+    MuonReg.SetBranches(tMuon, "");
     // tMuon->Branch("RegM", &RegM);
     // tMuon->Branch("RegP", &RegP);
     // tMuon->Branch("RegR2", &RegR2);
@@ -157,6 +157,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelHitDist", &MichelHitDist);
     tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
     MichelBary.SetBranches(tMuon, "MichelBary");
+    tMuon->Branch("MichelBaryAngle", &MichelBaryAngle);
     tMuon->Branch("MichelBaryMuonAngle", &MichelBaryMuonAngle);
     tMuon->Branch("MichelHitIsShared", &MichelHitIsShared);
     tMuon->Branch("MichelHitTIDEEnergy", &MichelHitTIDEEnergy);
@@ -275,10 +276,10 @@ void ana::MichelTruth::analyze(art::Event const& e)
         // MichelHitEveTIDEEnergy = 0.F;
         // MichelHitSimIDEEnergy = 0.F;
 
-        PtrTrk pt_mu = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
-        MichelTrackLength = pt_mu ? pt_mu->Length() : -1.F;
-        PtrShw ps_mu = ana::mcp2shw(mcp_mi, vps_ev, clockData, fop_shw2hit);
-        MichelShowerLength = ps_mu ? ps_mu->Length() : -1.F;
+        PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+        MichelTrackLength = pt_mi ? pt_mi->Length() : -1.F;
+        PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fop_shw2hit);
+        MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
 
@@ -339,9 +340,9 @@ void ana::MichelTruth::analyze(art::Event const& e)
             MichelHitDist.push_back(GetDistance(ph_mi, sh_mu.end));
 
             // Angle with muon
+            // MichelHitVec.push_back(hit.vec(fTick2cm) - EndHit.vec(fTick2cm));
             float hit_angle = (hit.vec(fTick2cm) - EndHit.vec(fTick2cm)).angle();
-            float muon_angle = MuonReg.theta(RegDirZ);
-            float da = hit_angle - muon_angle;
+            float da = hit_angle - MuonReg.theta(RegDirZ);
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             MichelHitMuonAngle.push_back(da);
 
@@ -353,7 +354,11 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         if (bary_hits.size()) {
             MichelBary = bary_hits.barycenter(EndHit.section, fTick2cm);
-            MichelBaryMuonAngle = (MichelBary - EndHit.vec(fTick2cm)).angle();
+            // MichelBaryVec = (MichelBary - EndHit.vec(fTick2cm));
+            MichelBaryAngle = (MichelBary - EndHit.vec(fTick2cm)).angle();
+            float da = MichelBaryAngle - MuonReg.theta(RegDirZ);
+            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            MichelBaryMuonAngle = da;
         }
 
         // MichelSphereTrueEnergy.resize(radii.size(), 0.F);
@@ -418,6 +423,7 @@ void ana::MichelTruth::resetMuon() {
     MichelHitDist.clear();
     MichelHitMuonAngle.clear();
     MichelBary = ana::Vec2{0.F, 0.F};
+    MichelBaryAngle = 100.F;
     MichelBaryMuonAngle = 100.F;
     MichelHitIsShared.clear();
     MichelHitTIDEEnergy.clear();
