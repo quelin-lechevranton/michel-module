@@ -460,12 +460,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                     // float angle = end_bary.angle();
                     for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                        if (GetDistance(*iph, sh_mu.end) > 30) continue;
+                        float dist = GetDistance(*iph, sh_mu.end);
+                        if (dist > 30) continue;
+
 
                         Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                        if (cosa < cos(30.F * TMath::DegToRad())) continue;
+                        if (dist > 5
+                            && cosa < cos(30.F * TMath::DegToRad())
+                        ) continue;
+
                         BraggConeEnergy += (*iph)->Integral();
                         BraggConeHits.push_back(GetHit(*iph));
 
@@ -497,7 +502,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 MuonTrueEndHit = GetHit(sh_mcp.end);
 
                 if (mcp_mi) {
-                    TrueTagHasMichel = (
+                TrueTagHasMichel = (
                         geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
                         || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
                     ) ? kHasMichelFiducial : (
@@ -542,12 +547,18 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         MichelConeEnergy = 0;
                         for (PtrHit const& ph_mi : vph_mi) {
                             if (ph_mi->View() != geo::kW) continue;
-                            if (GetDistance(ph_mi, sh_mcp.end) > 30) continue;
+                            float dist = GetDistance(ph_mi, sh_mcp.end);
+                            if (dist > 30) continue;
+
+                            if (dist < 5) {
+                                MichelConeEnergy += ph_mi->Integral();
+                                continue;
+                            }
 
                             Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
                             float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                            if (cosa > cos(30.F * TMath::DegToRad())) continue;
+                            if (cosa < cos(30.F * TMath::DegToRad())) continue;
                             MichelConeEnergy += ph_mi->Integral();
                         }
                     }
