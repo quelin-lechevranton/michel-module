@@ -619,12 +619,21 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
         ph->Integral()
     };
 }
+
+// 2D projected distance in cm
 double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2) const {
     Hit h1 = GetHit(ph1), h2 = GetHit(ph2);
     if (h1.section != h2.section) return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
-// ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
+
+// sort hits, get first and last point,
+// points at cathode crossing if any,
+// points at section crossing if any
+// (a section is a set of two adjacent TPCs)
+
+// possible cause of failure:
+// - no section with at least 4 (ana::LinearRegression::nmin) hits 
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     VecPtrHit const& vph_unsorted,
     int dirz,
@@ -704,6 +713,14 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     return sh;
 }
 
+// recluster hits around the muon end,
+// compute local dE/dx along the cluster,
+// search for a peak in dE/dx (Bragg peak)
+
+// possible causes of failure:
+// - the given end is not found in the track hits
+// - there is no enough hits (< 'fRegN') 'fBodyDistance' cm away from the end in the same section to start the clustering
+// - there is no hit 'fNearbyRadius' cm away from the end in the same section
 ana::Bragg ana::MichelAnalyzer::GetBragg(
     VecPtrHit const& vph_trk,
     PtrHit const& ph_end,

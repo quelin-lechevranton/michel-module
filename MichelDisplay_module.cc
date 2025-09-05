@@ -138,6 +138,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
     auto const detProp = asDetProp->DataFor(e,clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
+    // Data Handles
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
     VecPtrHit vph_ev;
@@ -158,6 +159,8 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
+
+    // List of cut names (must be well defined)
     std::vector<char const*> cuts = {
         "None",
         // Form("TrackLength >= %.0f cm", fTrackLengthCut),
@@ -171,14 +174,26 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
     gStyle->SetPalette(pal);
 
+    // Creating canvases for all cuts for hits (2D)...
     std::vector<TCanvas*> hcs;
     for (unsigned ihc=0; ihc<cuts.size(); ihc++) {
         TCanvas* hc = asFile->make<TCanvas>(
             Form("hc%ucut%u", ev, ihc),
-            Form("Hits: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[ihc]),
+            Form("Hits: run:%u, subrun:%u, event:%u, cut:%s", 
+                e.run(), e.subRun(), e.event(),
+                cuts[ihc]
+            ),
             1300,800
         );
-        ana::DrawFrame(hc, int(geoDet), cuts[ihc], Form("%s R:%u SR:%u E:%u", (e.isRealData()?"Data":"Simulation"), e.run(), e.subRun(), e.event()));
+        ana::DrawFrame(
+            hc, int(geoDet),
+            Form("filter: %s", cuts[ihc]),
+            Form("%s %s R:%u SR:%u E:%u", 
+                (geoDet==kPDVD?"PDVD":"PDHD"),
+                (e.isRealData()?"Data":"Simulation"),
+                e.run(), e.subRun(), e.event()
+            )
+        );
         DrawGraph(hc, vph_ev, "p", ms_ev);
 
         for (PtrShw const& ps_ev : vps_ev) {
@@ -190,40 +205,58 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         hcs.push_back(hc);
     }
 
+    // ...and for tracks (3D)
     std::vector<TCanvas*> tcs;
     for (unsigned itc=0; itc<cuts.size(); itc++) {
         TCanvas* tc = asFile->make<TCanvas>(
             Form("tc%ucut%u", ev, itc),
-            Form("Tracks: run:%u, subrun:%u, event:%u, cut:%s", e.run(), e.subRun(), e.event(), cuts[itc]),
+            Form("Tracks: run:%u, subrun:%u, event:%u, cut:%s",
+                e.run(), e.subRun(), e.event(),
+                cuts[itc]
+            ),
             1300,800
         );
         TGraph2D* axes = nullptr;
         if (geoDet == kPDVD) {
             axes = new TGraph2D(2, new double[2]{-400,400}, new double[2]{-10,310}, new double[2]{-400,400});
-            axes->SetTitle(";Y (cm);Z (cm);X (cm)");
+            axes->SetTitle(";Y [cm];Z [cm];X [cm]");
         } else if (geoDet == kPDHD) {
             axes = new TGraph2D(2, new double[2]{-10,470}, new double[2]{-400,400}, new double[2]{-10,610});
-            axes->SetTitle(";Z (cm);X (cm);Y (cm)");
+            axes->SetTitle(";Z [cm];X [cm];Y [cm]");
         }
         tc->cd();
         axes->Draw("ap");
         tcs.push_back(tc);
     }
         
+    // looping over all tracks in the event
     unsigned im=0;
     for (PtrTrk const& pt_ev : vpt_ev) {
         VecPtrHit vph_muon = fmp_trk2hit.at(pt_ev.key());
+        // assert there are hits associated to the track
         ASSERT(vph_muon.size())
 
+        // !!!!!!!!!!!!!!!!!!!!!!!!!
+        // we assume downward muons,
+        // the starting point is the end with higher Y (PDVD) or Z (PDHD)
         bool isUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = isUpright ? pt_ev->Start() : pt_ev->End();
         geo::Point_t End = isUpright ? pt_ev->End() : pt_ev->Start();
+
+        // sort hits, get first and last point,
+        // points at cathode crossing if any,
+        // points at section crossing if any
+        // (a section is a set of two adjacent TPCs)
         ana::SortedHits sh_mu = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
+        // possible cause of failure:
+        // - no section with at least 4 (ana::LinearRegression::nmin) hits 
         ASSERT(sh_mu)
 
 
         im++;
 
+        // helper lambdas to draw track's hits
+        // in case the track passes or fails a cut
         auto DrawFail = [&](std::vector<TCanvas*>::iterator ihc, std::vector<TCanvas*>::iterator itc) -> void {
             Color_t c_fail = vc_fail[im%vc_fail.size()];
             DrawGraph(*ihc, sh_mu.vph, "l", {}, {c_fail, ls_fail.l, ls_fail.w});
@@ -247,6 +280,8 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             }
         };
 
+
+        // cuts
         bool TagTrackLength = pt_ev->Length() >= fTrackLengthCut;
         bool TagEndInVolume = geoHighX.isInsideYZ(End, 20.F);
         bool TagEndInWindow = wireWindow.isInside(sh_mu.end->PeakTime(), 20.F / fTick2cm);
@@ -268,7 +303,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         bool TrueTagHasMichelHits = !vph_mi.empty();
 
-        // unused variables
+        // shush "unused variables" compiler warning
         LOG(TagTrackLength);
         LOG(TagEndInVolume);
         LOG(TagEndInWindow);
@@ -279,6 +314,8 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
 
+        // for each cut, increment the canvas iterators
+        // cuts should be applied in the order they are listed in the "cuts" vector
         DrawPass(ihc, itc);
         ihc++; itc++;
 
@@ -290,6 +327,9 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         ihc++; itc++;
 
+        // recluster hits around the muon end,
+        // compute local dE/dx along the cluster,
+        // search for a peak in dE/dx (Bragg peak)
         ana::Bragg bragg = GetBragg(
             sh_mu.vph,
             sh_mu.end,
@@ -298,13 +338,18 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             fop_hit2trk,
             { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
         );
+        // possible causes of failure:
+        // - the given end is not found in the track hits
+        // - there is no enough hits (< 'fRegN') 'fBodyDistance' cm away from the end in the same section to start the clustering
+        // - there is no hit 'fNearbyRadius' cm away from the end in the same section
 
         if (!LOG(bragg)) {
             DrawFail(ihc, itc);
             continue;
         }
         
-        // Sphere around track end
+        // sphere around track end
+        // excluding hits associated to a track longer than 'fTrackLengthCut'
         VecPtrHit vph_pandora;
         int sec_end = ana::tpc2sec[geoDet][sh_mu.end->WireID().TPC];
         for (PtrHit const& ph_ev : vph_ev) {
@@ -318,21 +363,21 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             vph_pandora.push_back(ph_ev);
         }
 
-        // Bragg end iterator
+        // bragg end iterator
         VecPtrHit::iterator iph_bragg = std::find_if(
             bragg.vph_clu.begin(), bragg.vph_clu.end(),
             [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
         );
         if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
 
-        // Sphere around bragg end
+        // sphere around bragg end
         VecPtrHit vph_bragg;
         for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
             if (GetDistance(*iph, bragg.end) > 20.F) continue;
             vph_bragg.push_back(*iph);
         }
 
-        // Cone around bragg end
+        // cone around bragg end
         VecPtrHit vph_cone;
         Hits bary_hits;
         Vec2 bary;
@@ -375,6 +420,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         ihc++; itc++;
 
+        // if the peak is under threshold: not a bragg peak the muon is not stopping
         if (!LOG(bragg.max_dQdx >= fBraggThreshold * bragg.mip_dQdx)) {
             DrawFail(ihc, itc);
             continue;
