@@ -34,76 +34,88 @@ private:
     float fBraggThreshold; // in MIP
 
     // Output Variables
-    unsigned evRun, evSubRun, evEvent;
+    TTree *tEvent, *tMuon;
 
-    TTree* tEvent;
+    // Event information
+    unsigned evRun, evSubRun, evEvent;
     bool EventIsReal;
     unsigned iEvent=0;
     unsigned EventNMuon;
     std::vector<unsigned> EventiMuon;
-
     ana::Hits EventHits;
 
-
-    TTree* tMuon;
+    // Track information
     unsigned iMuon=0;
 
-    bool TagIsUpright; // Supposition: Muon is downward
-    bool TagCathodeCrossing;
-    bool TagAnodeCrossing;
-    float CutTrackLength;
-    bool TagEndInWindow;
-    bool TagEndInVolumeYZ;
-    int TagHitCathodeCrossing;
-    enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
-    bool TagEndInVolumeX;
-    int TagSortedHitsError;
+    float TrkLength;
+    bool TrkIsUpright; // Supposition: Muon is downward
+    ana::Point MuonEndPoint;
+    bool TrkEndInVolumeYZ;
+    bool TrkCathodeCrossing;
+    bool TrkAnodeCrossing;
+    // bool AgnoTagTrkEndLowN,
+    //      AgnoTagTrkEndBadCC;
 
-    float CutdQdxMax;
+    // Hit from track information
+    bool TrkHitError;
+    int TrkHitCathodeCrossing;
+    enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
+    ana::Hit MuonEndHit;
+    bool TrkHitEndInVolumeX;
+    bool TrkHitEndInWindow;
+    ana::Hits MuonHits;
+    float PandoraSphereEnergy;
+
+    // Bragg information
+    int BraggError;
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
-    int TagBraggError;
+    float MIPdQdx;
+    float BraggdQdx;
+    ana::Hit BraggEndHit;
     ana::Hits BraggMuonHits;
+
+    // Sphere
+    ana::Hits BraggSphereHits;
     std::vector<float> BraggSphereHitMuonAngle;
+    float BraggSphereEnergy;
+    float BraggSphereEnergyTP;
+
+    // Cone
     unsigned NearbyBaryNHit;
     ana::Vec2 NearbyBary;
     float NearbyBaryAngle;
     float NearbyBaryMuonAngle;
+    ana::Hits BraggConeHits;
+    float BraggConeEnergy;
+    float BraggConeEnergyTP;
+    ana::Hits BraggKeyholeHits;
+    float BraggKeyholeEnergy;
+    float BraggKeyholeEnergyTP;
 
-    bool AgnoTagTrkEndLowN,
-         AgnoTagTrkEndBadCC;
 
-    bool TrueTagDownward;
-    int TrueTagPdg;
-    std::string TrueTagEndProcess;
-
-    int TrueTagHasMichel;
-    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
-
-    ana::Hits MuonHits;
-    ana::Hit MuonEndHit;
-    ana::Point MuonEndPoint;
-    ana::Hit MuonTrueEndHit;
+    // Truth information
+    int TruePdg;
+    std::string TrueEndProcess;
     ana::Point MuonTrueEndPoint;
-    ana::Hit BraggEndHit;
+    bool TrueDownward;
+    ana::Hit MuonTrueEndHit;
 
-    float MichelTrueEnergy, MichelHitEnergy;
+    int TrueHasMichel;
+    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
+    float MichelTrueEnergy;
+    ana::Hits MichelHits;
+    std::vector<float> MichelHitMuonAngle;
+    float MichelHitEnergy;
+
     unsigned MichelBaryNHit;
     Vec2 MichelBary;
     float MichelBaryAngle;
     float MichelBaryMuonAngle;
     float MichelConeEnergy;
-    ana::Hits MichelHits;
-    std::vector<float> MichelHitMuonAngle;
-
-    ana::Hits BraggSphereHits, BraggConeHits;
-    float BraggSphereEnergy;
-    float BraggConeEnergy;
-    float BraggSphereEnergyTP, BraggConeEnergyTP;
-    float PandoraSphereEnergy;
+    float MichelKeyholeEnergy;
 
     void resetEvent();
     void resetMuon();
-
     bool IsUpright(recob::Track const& T);
 
     // HitPtrPair GetTrackEndsHits(
@@ -170,7 +182,6 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tEvent->Branch("eventSubRun", &evSubRun);
     tEvent->Branch("eventEvent", &evEvent);
     tEvent->Branch("isReal", &EventIsReal);
-
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NMuon", &EventNMuon);
     tEvent->Branch("iMuon", &EventiMuon);
@@ -178,65 +189,80 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 
     tMuon = asFile->make<TTree>("muon","");
 
+    // Event
     tMuon->Branch("eventRun", &evRun);
     tMuon->Branch("eventSubRun", &evSubRun);
     tMuon->Branch("eventEvent", &evEvent);
     tEvent->Branch("isReal", &EventIsReal);
-
     tMuon->Branch("iEvent", &iEvent);
     tMuon->Branch("iMuon", &iMuon);
     tMuon->Branch("iMuonInEvent", &EventNMuon);
 
-    tMuon->Branch("TagIsUpright", &TagIsUpright);
-    tMuon->Branch("TagCathodeCrossing", &TagCathodeCrossing);
-    tMuon->Branch("TagAnodeCrossing", &TagAnodeCrossing);
-    tMuon->Branch("CutTrackLength", &CutTrackLength);
-    tMuon->Branch("TagEndInWindow", &TagEndInWindow);
-    tMuon->Branch("TagEndInVolumeYZ", &TagEndInVolumeYZ);
-    tMuon->Branch("TagHitCathodeCrossing", &TagHitCathodeCrossing);
-    tMuon->Branch("TagEndInVolumeX", &TagEndInVolumeX);
-    tMuon->Branch("CutdQdxMax", &CutdQdxMax);
-    tMuon->Branch("TagBraggError", &TagBraggError);
-
-    tMuon->Branch("AgnoTagTrkEndLowN", &AgnoTagTrkEndLowN);
-    tMuon->Branch("AgnoTagTrkEndBadCC", &AgnoTagTrkEndBadCC);
-    tMuon->Branch("TagSortedHitsError", &TagSortedHitsError);
-
-    tMuon->Branch("TrueTagPdg", &TrueTagPdg);
-    tMuon->Branch("TrueTagDownward", &TrueTagDownward);
-    tMuon->Branch("TrueTagEndProcess", &TrueTagEndProcess);
-    tMuon->Branch("TrueTagHasMichel", &TrueTagHasMichel);
-
-    MuonHits.SetBranches(tMuon);
-    MuonEndHit.SetBranches(tMuon, "End");
+    // Track
+    tMuon->Branch("TrkLength", &TrkLength);
+    tMuon->Branch("TrkIsUpright", &TrkIsUpright);
     MuonEndPoint.SetBranches(tMuon, "End");
-    MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
-    MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
+    tMuon->Branch("TrkEndInVolumeYZ", &TrkEndInVolumeYZ);
+    tMuon->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
+    tMuon->Branch("TrkAnodeCrossing", &TrkAnodeCrossing);
+    // tMuon->Branch("AgnoTagTrkEndLowN", &AgnoTagTrkEndLowN);
+    // tMuon->Branch("AgnoTagTrkEndBadCC", &AgnoTagTrkEndBadCC);
+
+    // Hit
+    tMuon->Branch("TrkHitError", &TrkHitError);
+    tMuon->Branch("TrkHitCathodeCrossing", &TrkHitCathodeCrossing);
+    MuonEndHit.SetBranches(tMuon, "End");
+    tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
+    tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
+    MuonHits.SetBranches(tMuon);
+    tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
+
+    // Bragg
+    tMuon->Branch("BraggError", &BraggError);
+    tMuon->Branch("MIPdQdx", &MIPdQdx);
+    tMuon->Branch("BraggdQdx", &BraggdQdx);
     BraggEndHit.SetBranches(tMuon, "BraggEnd");
     BraggMuonHits.SetBranches(tMuon, "BraggMuon");
+
+    // Sphere
+    BraggSphereHits.SetBranches(tMuon, "BraggSphere");
     tMuon->Branch("BraggSphereHitMuonAngle", &BraggSphereHitMuonAngle);
+    tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
+    tMuon->Branch("BraggSphereEnergyTP", &BraggSphereEnergyTP); // ADC
+
+    // Cone
     tMuon->Branch("NearbyBaryNHit", &NearbyBaryNHit);
     NearbyBary.SetBranches(tMuon, "NearbyBary");
     tMuon->Branch("NearbyBaryAngle", &NearbyBaryAngle);
     tMuon->Branch("NearbyBaryMuonAngle", &NearbyBaryMuonAngle);
+    BraggConeHits.SetBranches(tMuon, "BraggCone");
+    tMuon->Branch("BraggConeEnergy", &BraggConeEnergy); // ADC
+    tMuon->Branch("BraggConeEnergyTP", &BraggConeEnergyTP); // ADC
+    BraggKeyholeHits.SetBranches(tMuon, "BraggCone");
+    tMuon->Branch("BraggKeyholeEnergy", &BraggKeyholeEnergy); // ADC
+    tMuon->Branch("BraggKeyholeEnergyTP", &BraggKeyholeEnergyTP); // ADC
 
+    // Truth
+    tMuon->Branch("TruePdg", &TruePdg);
+    tMuon->Branch("TrueEndProcess", &TrueEndProcess);
+    MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
+    tMuon->Branch("TrueDownward", &TrueDownward);
+    MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
+
+    tMuon->Branch("TrueHasMichel", &TrueHasMichel);
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
+    MichelHits.SetBranches(tMuon, "Michel");
+    tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
+
     tMuon->Branch("MichelBaryNHit", &MichelBaryNHit);
     MichelBary.SetBranches(tMuon, "MichelBary");
     tMuon->Branch("MichelBaryAngle", &MichelBaryAngle); // rad
     tMuon->Branch("MichelBaryMuonAngle", &MichelBaryMuonAngle); // rad
     tMuon->Branch("MichelConeEnergy", &MichelConeEnergy); // ADC
-    tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
-    tMuon->Branch("BraggConeEnergy", &BraggConeEnergy); // ADC
-    tMuon->Branch("BraggSphereEnergyTP", &BraggSphereEnergyTP); // ADC
-    tMuon->Branch("BraggConeEnergyTP", &BraggConeEnergyTP); // ADC
-    tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
+    tMuon->Branch("MichelKeyholeEnergy", &MichelKeyholeEnergy); // ADC
 
-    MichelHits.SetBranches(tMuon, "Michel");
-    BraggSphereHits.SetBranches(tMuon, "BraggSphere");
-    BraggConeHits.SetBranches(tMuon, "BraggCone");
-    tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
+
 }
 
 void ana::MichelAnalysis::analyze(art::Event const& e) {
@@ -304,16 +330,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
         EventiMuon.push_back(iMuon);
 
-        CutTrackLength = pt_ev->Length();
+        TrkLength = pt_ev->Length();
 
-        TagIsUpright =  IsUpright(*pt_ev);
-        geo::Point_t Start = TagIsUpright ? pt_ev->Start() : pt_ev->End();
-        geo::Point_t End = TagIsUpright ? pt_ev->End() : pt_ev->Start();
+        TrkIsUpright =  IsUpright(*pt_ev);
+        geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
+        geo::Point_t End = TrkIsUpright ? pt_ev->End() : pt_ev->Start();
         MuonEndPoint = ana::Point(End);
 
-        TagEndInVolumeYZ = geoHighX.isInsideYZ(End, fMichelRadius);
+        TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fMichelRadius);
 
-        TagCathodeCrossing = (
+        TrkCathodeCrossing = (
             geoLowX.isInside(Start)
             && geoHighX.isInside(End)
         ) || (
@@ -323,9 +349,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // Anode Crossing: SUPPOSITION: Muon is downward
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius);
         else if (geoDet == kPDHD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
 
 
         
@@ -386,24 +412,23 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // SUPPOSITION: Muon is downward
         int dirz = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirz);
+        TrkHitError = !bool(sh_mu);
 
-        if (sh_mu) {
-            TagSortedHitsError = 0; 
+        if (!TrkHitError) {
             if (sh_mu.is_cc()) {
                 if (GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap)
-                    TagHitCathodeCrossing = kAlignedHitOnBothSides;
+                    TrkHitCathodeCrossing = kAlignedHitOnBothSides;
                 else
-                    TagHitCathodeCrossing = kHitOnBothSides;
+                    TrkHitCathodeCrossing = kHitOnBothSides;
             } else
-                TagHitCathodeCrossing = kNoCC;
-            
-            if (TagHitCathodeCrossing) {
-                float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
-                TagEndInVolumeX = x < (geoHighX.x.max - fMichelRadius);
-            }
+                TrkHitCathodeCrossing = kNoCC;
             
             MuonEndHit = GetHit(sh_mu.end);
-            TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
+            if (TrkHitCathodeCrossing) {
+                float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
+                TrkHitEndInVolumeX = x < (geoHighX.x.max - fMichelRadius);
+            }
+            TrkHitEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             for (PtrHit const& ph_mu : sh_mu.vph)
                 if (ph_mu->View() == geo::kW)
@@ -423,6 +448,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             */
 
             // integrate charges around muon endpoint
+            PandoraSphereEnergy = 0;
             for (PtrHit const& ph_ev : vph_ev) {
                 if (ph_ev->View() != geo::kW) continue;
                 if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
@@ -445,10 +471,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 fop_hit2trk,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
             );
-            TagBraggError = bragg.error;
+            BraggError = bragg.error;
 
-            if (bragg) {
-                CutdQdxMax = bragg.max_dQdx / bragg.mip_dQdx;
+            if (BraggError == kNoError) {
+                MIPdQdx = bragg.mip_dQdx;
+                BraggdQdx = bragg.max_dQdx;
                 BraggEndHit = GetHit(bragg.end);
                 for (PtrHit const& ph_bragg_mu : bragg.vph_clu)
                     BraggMuonHits.push_back(GetHit(ph_bragg_mu));
@@ -462,6 +489,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 float mu_end_angle = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]].theta(dirz);
 
                 // Sphere
+                BraggSphereEnergy = 0;
+                BraggSphereEnergyTP = 0;
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                     if (GetDistance(*iph, bragg.end) > fMichelRadius) continue;
                     // PtrShw ps_hit = fop_hit2shw.at(iph->key());
@@ -497,10 +526,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     NearbyBaryMuonAngle = da;
 
                     // float angle = end_bary.angle();
+                    BraggConeEnergy = 0;
+                    BraggConeEnergyTP = 0;
                     for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                         float dist = GetDistance(*iph, sh_mu.end);
                         if (dist > 30) continue;
-
 
                         Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - h_end.vec(fTick2cm);
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
@@ -508,6 +538,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (dist > 5
                             && cosa < cos(30.F * TMath::DegToRad())
                         ) continue;
+
+                        BraggKeyholeEnergy += (*iph)->Integral();
+                        BraggKeyholeHits.push_back(GetHit(*iph));
+
+                        if (std::find_if(
+                            vph_mi.begin(), vph_mi.end(),
+                            [&iph](PtrHit const& h) -> bool { return h.key() == iph->key(); }
+                        ) != vph_mi.end())
+                            BraggKeyholeEnergyTP += (*iph)->Integral();
+
+                        if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
                         BraggConeEnergy += (*iph)->Integral();
                         BraggConeHits.push_back(GetHit(*iph));
@@ -520,19 +561,19 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     }
                 }
             }
-        } else TagSortedHitsError = 1;
+        }
         
 
         // Truth Information
         if (mcp) {
-            TrueTagPdg = mcp->PdgCode();
-            TrueTagEndProcess = mcp->EndProcess();
+            TruePdg = mcp->PdgCode();
+            TrueEndProcess = mcp->EndProcess();
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
 
             if (geoDet == kPDVD)
-                TrueTagDownward = mcp->Position(0).X() > mcp->EndPosition().X();
+                TrueDownward = mcp->Position(0).X() > mcp->EndPosition().X();
             else if (geoDet == kPDHD)
-                TrueTagDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
+                TrueDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
 
@@ -540,7 +581,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 MuonTrueEndHit = GetHit(sh_mcp.end);
 
                 if (mcp_mi) {
-                TrueTagHasMichel = (
+                    TrueHasMichel = (
                         geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
                         || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
                     ) ? kHasMichelFiducial : (
@@ -593,15 +634,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             float dist = GetDistance(ph_mi, sh_mcp.end);
                             if (dist > 30) continue;
 
-                            if (dist < 5) {
-                                MichelConeEnergy += ph_mi->Integral();
-                                continue;
-                            }
-
                             Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
                             float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
+                            if (dist > 5 
+                                && cosa < cos(30.F * TMath::DegToRad())
+                            ) continue;
+                            
+                            MichelKeyholeEnergy += ph_mi->Integral();
+
                             if (cosa < cos(30.F * TMath::DegToRad())) continue;
+
                             MichelConeEnergy += ph_mi->Integral();
                         }
                     }
@@ -627,52 +670,56 @@ void ana::MichelAnalysis::resetEvent() {
     EventHits.clear();
 }
 void ana::MichelAnalysis::resetMuon() {
-    BraggMuonHits.clear();
-
-    // Muon's End
-    TagSortedHitsError = -1;
-    TagHitCathodeCrossing = -1;
-    TagEndInVolumeX = false;
-    TagEndInWindow = -1;
+    // Hit
+    TrkHitCathodeCrossing = -1;
     MuonEndHit = ana::Hit{};
+    TrkHitEndInVolumeX = false;
+    TrkHitEndInWindow = false;
     MuonHits.clear();
-    PandoraSphereEnergy = 0;
+    PandoraSphereEnergy = -1.F;
 
     // Bragg
-    TagBraggError = -1;
-    CutdQdxMax = -1.F;
+    BraggError = -1;
+    MIPdQdx = -1.F;
+    BraggdQdx = -1.F;
     BraggEndHit = ana::Hit{};
     BraggMuonHits.clear();
     BraggSphereHits.clear();
     BraggSphereHitMuonAngle.clear();
+    BraggSphereEnergy = -1.F;
+    BraggSphereEnergyTP = -1.F;
+
     NearbyBaryNHit = 0;
     NearbyBary = Vec2{0,0};
-    NearbyBaryAngle = -1;
-    NearbyBaryMuonAngle = -1;
+    NearbyBaryAngle = -10.F;
+    NearbyBaryMuonAngle = -10.F;
     BraggConeHits.clear();
-    BraggSphereEnergy = 0;
-    BraggConeEnergy = 0;
-    BraggSphereEnergyTP = 0;
-    BraggConeEnergyTP = 0;
+    BraggConeEnergy = -1.F;
+    BraggConeEnergyTP = -1.F;
+    BraggKeyholeHits.clear();
+    BraggKeyholeEnergy = -1.F;
+    BraggKeyholeEnergyTP = -1.F;
 
     // Muon Truth
-    TrueTagPdg = 0;
-    TrueTagEndProcess = "";
+    TruePdg = 0;
+    TrueEndProcess = "";
     MuonTrueEndPoint = ana::Point{};
-    TrueTagDownward = false;
+    TrueDownward = false;
     MuonTrueEndHit = ana::Hit{};
 
     // Michel Truth
-    TrueTagHasMichel = kNoMichel;
-    MichelTrueEnergy = -1;
+    TrueHasMichel = kNoMichel;
+    MichelTrueEnergy = -1.F;
     MichelHits.clear();
-    MichelHitEnergy = -1;
+    MichelHitMuonAngle.clear();
+    MichelHitEnergy = -1.F;
+
     MichelBaryNHit = 0;
     MichelBary = Vec2{0,0};
-    MichelBaryAngle = -1;
-    MichelBaryMuonAngle = -1;
-    MichelConeEnergy = -1;
-    MichelHitMuonAngle.clear();
+    MichelBaryAngle = -10.F;
+    MichelBaryMuonAngle = -10.F;
+    MichelConeEnergy = -1.F;
+    MichelKeyholeEnergy = -1.F;
 }
 
 bool ana::MichelAnalysis::IsUpright(recob::Track const& T) {
