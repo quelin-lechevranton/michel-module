@@ -63,6 +63,11 @@ private:
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
     int TagBraggError;
     ana::Hits BraggMuonHits;
+    std::vector<float> BraggSphereHitMuonAngle;
+    unsigned NearbyBaryNHit;
+    ana::Vec2 NearbyBary;
+    float NearbyBaryAngle;
+    float NearbyBaryMuonAngle;
 
     bool AgnoTagTrkEndLowN,
          AgnoTagTrkEndBadCC;
@@ -209,6 +214,11 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
     BraggEndHit.SetBranches(tMuon, "BraggEnd");
     BraggMuonHits.SetBranches(tMuon, "BraggMuon");
+    tMuon->Branch("BraggSphereHitMuonAngle", &BraggSphereHitMuonAngle);
+    tMuon->Branch("NearbyBaryNHit", &NearbyBaryNHit);
+    NearbyBary.SetBranches(tMuon, "NearbyBary");
+    tMuon->Branch("NearbyBaryAngle", &NearbyBaryAngle);
+    tMuon->Branch("NearbyBaryMuonAngle", &NearbyBaryMuonAngle);
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
@@ -449,12 +459,19 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 );
                 if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
 
+                float mu_end_angle = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]].theta(dirz);
+
                 // Sphere
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                     if (GetDistance(*iph, bragg.end) > fMichelRadius) continue;
                     // PtrShw ps_hit = fop_hit2shw.at(iph->key());
                     BraggSphereEnergy += (*iph)->Integral();
-                    BraggSphereHits.push_back(GetHit(*iph));
+                    ana::Hit hit = GetHit(*iph);
+                    BraggSphereHits.push_back(hit);
+
+                    float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                    da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                    BraggSphereHitMuonAngle.push_back(da);
 
                     if (std::find_if(
                         vph_mi.begin(), vph_mi.end(),
@@ -469,12 +486,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     if (GetDistance(*iph, sh_mu.end) > 10) continue;
                     bary_hits.push_back(GetHit(*iph));
                 }
-                MichelBaryNHit = bary_hits.size();
-                if (MichelBaryNHit) {
+                NearbyBaryNHit = bary_hits.size();
+                if (NearbyBaryNHit) {
                     Hit h_end = GetHit(bragg.end);
-                    Vec2 bary = bary_hits.barycenter(h_end.section, fTick2cm);
-                    Vec2 end = h_end.vec(fTick2cm);
-                    Vec2 end_bary = bary - end;
+                    NearbyBary = bary_hits.barycenter(h_end.section, fTick2cm);
+                    Vec2 end_bary = NearbyBary - h_end.vec(fTick2cm);
+                    NearbyBaryAngle = end_bary.angle();
+                    float da = NearbyBaryAngle - mu_end_angle;
+                    da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                    NearbyBaryMuonAngle = da;
 
                     // float angle = end_bary.angle();
                     for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
@@ -482,7 +502,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (dist > 30) continue;
 
 
-                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
+                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - h_end.vec(fTick2cm);
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                         if (dist > 5
@@ -556,6 +576,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
                         bary_hits.push_back(GetHit(ph_mi));
                     }
+                    MichelBaryNHit = bary_hits.size();
                     if (bary_hits.size()) {
                         MichelBary = bary_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
                         Vec2 end = MuonTrueEndHit.vec(fTick2cm);
@@ -623,6 +644,11 @@ void ana::MichelAnalysis::resetMuon() {
     BraggEndHit = ana::Hit{};
     BraggMuonHits.clear();
     BraggSphereHits.clear();
+    BraggSphereHitMuonAngle.clear();
+    NearbyBaryNHit = 0;
+    NearbyBary = Vec2{0,0};
+    NearbyBaryAngle = -1;
+    NearbyBaryMuonAngle = -1;
     BraggConeHits.clear();
     BraggSphereEnergy = 0;
     BraggConeEnergy = 0;
