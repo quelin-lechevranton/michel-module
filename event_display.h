@@ -34,6 +34,7 @@ namespace ana {
             pad_margin = {0.1, 0.04, 0.09, 0.06};
             title_offset_x = 1.5;
             title_offset_y = 1.5;
+            
         }
 
         TText* t = new TText();

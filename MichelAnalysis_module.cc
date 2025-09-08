@@ -53,9 +53,10 @@ private:
     bool TagAnodeCrossing;
     float CutTrackLength;
     bool TagEndInWindow;
-    bool TagEndInVolume;
-    bool TagHitCathodeCrossing;
-    bool TagHitGoodCathodeCrossing;
+    bool TagEndInVolumeYZ;
+    int TagHitCathodeCrossing;
+    enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
+    bool TagEndInVolumeX;
     int TagSortedHitsError;
 
     float CutdQdxMax;
@@ -81,6 +82,10 @@ private:
     ana::Hit BraggEndHit;
 
     float MichelTrueEnergy, MichelHitEnergy;
+    unsigned MichelBaryNHit;
+    Vec2 MichelBary;
+    float MichelBaryAngle;
+    float MichelBaryMuonAngle;
     float MichelConeEnergy;
     ana::Hits MichelHits;
     std::vector<float> MichelHitMuonAngle;
@@ -182,9 +187,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TagAnodeCrossing", &TagAnodeCrossing);
     tMuon->Branch("CutTrackLength", &CutTrackLength);
     tMuon->Branch("TagEndInWindow", &TagEndInWindow);
-    tMuon->Branch("TagEndInVolume", &TagEndInVolume);
+    tMuon->Branch("TagEndInVolumeYZ", &TagEndInVolumeYZ);
     tMuon->Branch("TagHitCathodeCrossing", &TagHitCathodeCrossing);
-    tMuon->Branch("TagHitGoodCathodeCrossing", &TagHitGoodCathodeCrossing);
+    tMuon->Branch("TagEndInVolumeX", &TagEndInVolumeX);
     tMuon->Branch("CutdQdxMax", &CutdQdxMax);
     tMuon->Branch("TagBraggError", &TagBraggError);
 
@@ -207,6 +212,10 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
+    tMuon->Branch("MichelBaryNHit", &MichelBaryNHit);
+    MichelBary.SetBranches(tMuon, "MichelBary");
+    tMuon->Branch("MichelBaryAngle", &MichelBaryAngle); // rad
+    tMuon->Branch("MichelBaryMuonAngle", &MichelBaryMuonAngle); // rad
     tMuon->Branch("MichelConeEnergy", &MichelConeEnergy); // ADC
     tMuon->Branch("BraggSphereEnergy", &BraggSphereEnergy); // ADC
     tMuon->Branch("BraggConeEnergy", &BraggConeEnergy); // ADC
@@ -292,7 +301,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         geo::Point_t End = TagIsUpright ? pt_ev->End() : pt_ev->Start();
         MuonEndPoint = ana::Point(End);
 
-        TagEndInVolume = geoHighX.isInsideYZ(End, fMichelRadius);
+        TagEndInVolumeYZ = geoHighX.isInsideYZ(End, fMichelRadius);
 
         TagCathodeCrossing = (
             geoLowX.isInside(Start)
@@ -310,8 +319,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
         
-        /*
-        // Compare to Agnochecks
+        /* COMPARE TO AGNOCHECKS
         std::vector<ana::LinearRegression> reg_side(2);
         std::vector<VecPtrHit> vph_side(2);
         for (PtrHit const& ph_hit : vph_mu) {
@@ -371,16 +379,25 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         if (sh_mu) {
             TagSortedHitsError = 0; 
-            TagHitCathodeCrossing = sh_mu.is_cc();
-            TagHitGoodCathodeCrossing = sh_mu.is_cc() && GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap;
-
+            if (sh_mu.is_cc()) {
+                if (GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap)
+                    TagHitCathodeCrossing = kAlignedHitOnBothSides;
+                else
+                    TagHitCathodeCrossing = kHitOnBothSides;
+            } else
+                TagHitCathodeCrossing = kNoCC;
+            
+            if (TagHitCathodeCrossing) {
+                float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
+                TagEndInVolumeX = x < (geoHighX.x.max - fMichelRadius);
+            }
+            
             MuonEndHit = GetHit(sh_mu.end);
             TagEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
 
             for (PtrHit const& ph_mu : sh_mu.vph)
                 if (ph_mu->View() == geo::kW)
                     MuonHits.push_back(GetHit(ph_mu));
-
 
             /* COMPARE TO AGNOCHECKS
             HitPtrPair ends = GetTrackEndsHits(vph_mu);
@@ -452,7 +469,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     if (GetDistance(*iph, sh_mu.end) > 10) continue;
                     bary_hits.push_back(GetHit(*iph));
                 }
-                if (bary_hits.size()) {
+                MichelBaryNHit = bary_hits.size();
+                if (MichelBaryNHit) {
                     Hit h_end = GetHit(bragg.end);
                     Vec2 bary = bary_hits.barycenter(h_end.section, fTick2cm);
                     Vec2 end = h_end.vec(fTick2cm);
@@ -539,9 +557,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         bary_hits.push_back(GetHit(ph_mi));
                     }
                     if (bary_hits.size()) {
-                        Vec2 bary = bary_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
+                        MichelBary = bary_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
                         Vec2 end = MuonTrueEndHit.vec(fTick2cm);
-                        Vec2 end_bary = bary - end;
+                        Vec2 end_bary = MichelBary - end;
+                        MichelBaryAngle = end_bary.angle();
+                        float da = MichelBaryAngle - mu_end_angle;
+                        da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                        MichelBaryMuonAngle = da;
 
                         // float angle = end_bary.angle();
                         MichelConeEnergy = 0;
@@ -589,7 +611,7 @@ void ana::MichelAnalysis::resetMuon() {
     // Muon's End
     TagSortedHitsError = -1;
     TagHitCathodeCrossing = -1;
-    TagHitGoodCathodeCrossing = -1;
+    TagEndInVolumeX = false;
     TagEndInWindow = -1;
     MuonEndHit = ana::Hit{};
     MuonHits.clear();
@@ -619,6 +641,10 @@ void ana::MichelAnalysis::resetMuon() {
     MichelTrueEnergy = -1;
     MichelHits.clear();
     MichelHitEnergy = -1;
+    MichelBaryNHit = 0;
+    MichelBary = Vec2{0,0};
+    MichelBaryAngle = -1;
+    MichelBaryMuonAngle = -1;
     MichelConeEnergy = -1;
     MichelHitMuonAngle.clear();
 }
