@@ -387,7 +387,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         }
         if (bary_hits.size()) {
             Hit h_end = GetHit(bragg.end);
-            bary = bary_hits.barycenter(h_end.section, fTick2cm);
+            bary = bary_hits.barycenter(fTick2cm);
             Vec2 end = h_end.vec(fTick2cm);
             Vec2 end_bary = bary - end;
 

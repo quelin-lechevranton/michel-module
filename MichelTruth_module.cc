@@ -46,7 +46,7 @@ private:
     ana::Hit EndHit;
     ana::Point EndPoint;
 
-    int MuonRegDirZ;
+    int RegDirZ;
     ana::LinearRegression MuonReg;
 
     float MichelTrueEnergy;
@@ -142,7 +142,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
 
-    tMuon->Branch("RegDirZ", &MuonRegDirZ);
+    tMuon->Branch("RegDirZ", &RegDirZ);
     MuonReg.SetBranches(tMuon, "");
 
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
@@ -222,8 +222,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
         VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vph_ev, clockData, false);
         ASSERT(vph_mcp.size())
 
-        MuonRegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
-        ana::SortedHits sh_mu = GetSortedHits(vph_mcp, MuonRegDirZ);
+        RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
+        ana::SortedHits sh_mu = GetSortedHits(vph_mcp, RegDirZ);
         ASSERT(sh_mu)
 
         resetMuon();
@@ -338,7 +338,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             // Angle with muon
             // MichelHitVec.push_back(hit.vec(fTick2cm) - EndHit.vec(fTick2cm));
             float hit_angle = (hit.vec(fTick2cm) - EndHit.vec(fTick2cm)).angle();
-            float da = hit_angle - MuonReg.theta(MuonRegDirZ);
+            float da = hit_angle - MuonReg.theta(RegDirZ);
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             MichelHitMuonAngle.push_back(da);
 
@@ -349,10 +349,10 @@ void ana::MichelTruth::analyze(art::Event const& e)
         MichelHitEnergy = MichelHits.energy();
 
         if (bary_hits.size()) {
-            MichelBary = bary_hits.barycenter(EndHit.section, fTick2cm);
+            MichelBary = bary_hits.barycenter(fTick2cm);
             // MichelBaryVec = (MichelBary - EndHit.vec(fTick2cm));
             MichelBaryAngle = (MichelBary - EndHit.vec(fTick2cm)).angle();
-            float da = MichelBaryAngle - MuonReg.theta(MuonRegDirZ);
+            float da = MichelBaryAngle - MuonReg.theta(RegDirZ);
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             MichelBaryMuonAngle = da;
         }

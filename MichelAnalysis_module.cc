@@ -503,7 +503,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     ana::Hit hit = GetHit(*iph);
                     BraggSphereHits.push_back(hit);
 
-                    float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
+                    float da = (hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                     BraggSphereHitMuonAngle.push_back(da);
 
@@ -520,9 +520,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     NearbyBaryHits.push_back(GetHit(*iph));
                 }
                 if (NearbyBaryHits.size()) {
-                    Hit h_end = GetHit(bragg.end);
-                    NearbyBary = NearbyBaryHits.barycenter(h_end.section, fTick2cm);
-                    Vec2 end_bary = NearbyBary - h_end.vec(fTick2cm);
+                    Hit end = GetHit(bragg.end);
+                    NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
+                    Vec2 end_bary = NearbyBary - end.vec(fTick2cm);
                     NearbyBaryAngle = end_bary.angle();
                     float da = NearbyBaryAngle - MuonReg.theta(MuonRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -535,7 +535,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         float dist = GetDistance(*iph, sh_mu.end);
                         if (dist > 30) continue;
 
-                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - h_end.vec(fTick2cm);
+                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end.vec(fTick2cm);
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                         if (dist > 5
@@ -622,7 +622,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     }
                     MichelBaryNHit = bary_hits.size();
                     if (bary_hits.size()) {
-                        MichelBary = bary_hits.barycenter(MuonTrueEndHit.section, fTick2cm);
+                        MichelBary = bary_hits.barycenter(fTick2cm);
                         Vec2 end = MuonTrueEndHit.vec(fTick2cm);
                         Vec2 end_bary = MichelBary - end;
                         MichelBaryAngle = end_bary.angle();

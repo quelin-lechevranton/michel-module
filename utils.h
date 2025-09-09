@@ -270,11 +270,10 @@ namespace ana {
             for (float a : adc) e+=a;
             return e;
         }
-        Vec2 barycenter(int section, float tick2cm=1) const {
+        Vec2 barycenter(float tick2cm=1) const {
             float bs=0, bt=0;
             unsigned bn=0;
             for (unsigned i=0; i<N; i++) {
-                if (this->section[i] != section) continue;
                 bs += this->space[i];
                 bt += this->tick[i] * tick2cm;
                 bn++;
