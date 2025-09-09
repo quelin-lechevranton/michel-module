@@ -61,6 +61,8 @@ private:
     int TrkHitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
     ana::Hit MuonEndHit;
+    int MuonRegDirZ;
+    ana::LinearRegression MuonReg;
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
     ana::Hits MuonHits;
@@ -81,7 +83,7 @@ private:
     float BraggSphereEnergyTP;
 
     // Cone
-    unsigned NearbyBaryNHit;
+    ana::Hits NearbyBaryHits;
     ana::Vec2 NearbyBary;
     float NearbyBaryAngle;
     float NearbyBaryMuonAngle;
@@ -212,6 +214,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TrkHitError", &TrkHitError);
     tMuon->Branch("TrkHitCathodeCrossing", &TrkHitCathodeCrossing);
     MuonEndHit.SetBranches(tMuon, "End");
+    tMuon->Branch("RegDirZ", &MuonRegDirZ);
+    MuonReg.SetBranches(tMuon, "");
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
     MuonHits.SetBranches(tMuon);
@@ -231,7 +235,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("BraggSphereEnergyTP", &BraggSphereEnergyTP); // ADC
 
     // Cone
-    tMuon->Branch("NearbyBaryNHit", &NearbyBaryNHit);
+    NearbyBaryHits.SetBranches(tMuon, "NearbyBary");
     NearbyBary.SetBranches(tMuon, "NearbyBary");
     tMuon->Branch("NearbyBaryAngle", &NearbyBaryAngle);
     tMuon->Branch("NearbyBaryMuonAngle", &NearbyBaryMuonAngle);
@@ -410,8 +414,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
         // SUPPOSITION: Muon is downward
-        int dirz = End.Z() > Start.Z() ? 1 : -1;
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirz);
+        MuonRegDirZ = End.Z() > Start.Z() ? 1 : -1;
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu, MuonRegDirZ);
         TrkHitError = !bool(sh_mu);
 
         if (!TrkHitError) {
@@ -424,6 +428,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 TrkHitCathodeCrossing = kNoCC;
             
             MuonEndHit = GetHit(sh_mu.end);
+            MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+
             if (TrkHitCathodeCrossing) {
                 float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
                 TrkHitEndInVolumeX = x < (geoHighX.x.max - fMichelRadius);
@@ -477,16 +483,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 MIPdQdx = bragg.mip_dQdx;
                 BraggdQdx = bragg.max_dQdx;
                 BraggEndHit = GetHit(bragg.end);
-                for (PtrHit const& ph_bragg_mu : bragg.vph_clu)
-                    BraggMuonHits.push_back(GetHit(ph_bragg_mu));
-                    
+
                 VecPtrHit::iterator iph_bragg = std::find_if(
                     bragg.vph_clu.begin(), bragg.vph_clu.end(),
                     [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
                 );
                 if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
 
-                float mu_end_angle = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]].theta(dirz);
+                for (auto iph=bragg.vph_clu.begin(); iph!=iph_bragg; iph++)
+                    BraggMuonHits.push_back(GetHit(*iph));
 
                 // Sphere
                 BraggSphereEnergy = 0;
@@ -498,7 +503,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     ana::Hit hit = GetHit(*iph);
                     BraggSphereHits.push_back(hit);
 
-                    float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                    float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                     BraggSphereHitMuonAngle.push_back(da);
 
@@ -510,18 +515,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
 
                 // Cone
-                Hits bary_hits;
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
                     if (GetDistance(*iph, sh_mu.end) > 10) continue;
-                    bary_hits.push_back(GetHit(*iph));
+                    NearbyBaryHits.push_back(GetHit(*iph));
                 }
-                NearbyBaryNHit = bary_hits.size();
-                if (NearbyBaryNHit) {
+                if (NearbyBaryHits.size()) {
                     Hit h_end = GetHit(bragg.end);
-                    NearbyBary = bary_hits.barycenter(h_end.section, fTick2cm);
+                    NearbyBary = NearbyBaryHits.barycenter(h_end.section, fTick2cm);
                     Vec2 end_bary = NearbyBary - h_end.vec(fTick2cm);
                     NearbyBaryAngle = end_bary.angle();
-                    float da = NearbyBaryAngle - mu_end_angle;
+                    float da = NearbyBaryAngle - MuonReg.theta(MuonRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                     NearbyBaryMuonAngle = da;
 
@@ -673,6 +676,8 @@ void ana::MichelAnalysis::resetMuon() {
     // Hit
     TrkHitCathodeCrossing = -1;
     MuonEndHit = ana::Hit{};
+    MuonRegDirZ = 0;
+    MuonReg = ana::LinearRegression{};
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
     MuonHits.clear();
@@ -689,7 +694,7 @@ void ana::MichelAnalysis::resetMuon() {
     BraggSphereEnergy = -1.F;
     BraggSphereEnergyTP = -1.F;
 
-    NearbyBaryNHit = 0;
+    NearbyBaryHits.clear();
     NearbyBary = Vec2{0,0};
     NearbyBaryAngle = -10.F;
     NearbyBaryMuonAngle = -10.F;
