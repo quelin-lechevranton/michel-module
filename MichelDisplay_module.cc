@@ -58,7 +58,7 @@ private:
 ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelDisplayer{p},
     fLog(p.get<bool>("Log", true)),
-    fTrackLengthCut(p.get<float>("TrackLengthCut", 40.F)), // in cm
+    fTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
     fRegN(p.get<unsigned>("RegN", 6)),
@@ -163,13 +163,16 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
     // List of cut names (must be well defined)
     std::vector<char const*> cuts = {
         "None",
-        // Form("TrackLength >= %.0f cm", fTrackLengthCut),
-        // "EndInVolume (20 cm)",
+        Form("TrkLength >= %.0f cm", fTrackLengthCut),
+        "TrkEndInVolumeYZ",
+        "TrkHitCathodeCrossing",
+        "TrkHitEndInVolumeX (20 cm)",
+        "TrkHitEndInWindow (20 cm)",
         // "CathodeCrossing",
         // "AnodeCrossing (20 cm)",
-        "HasMichelHits",
-        "BraggEndNoError",
-        Form("BraggThreshold %.1f MIP", fBraggThreshold)
+        // "HasMichelHits",
+        // "BraggEndNoError",
+        // Form("BraggThreshold %.1f MIP", fBraggThreshold)
     };
 
     gStyle->SetPalette(pal);
@@ -282,34 +285,49 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
 
         // cuts
-        bool TagTrackLength = pt_ev->Length() >= fTrackLengthCut;
-        bool TagEndInVolume = geoHighX.isInsideYZ(End, 20.F);
-        bool TagEndInWindow = wireWindow.isInside(sh_mu.end->PeakTime(), 20.F / fTick2cm);
-        bool TagCathodeCrossing = (
+        bool TrkLength = pt_ev->Length() >= fTrackLengthCut;
+        bool TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, 20.F);
+        bool TrkCathodeCrossing = (
             geoLowX.isInside(Start)
             && geoHighX.isInside(End)
         ) || (
             geoHighX.isInside(Start)
             && geoLowX.isInside(End)
         );
-        bool TagAnodeCrossing = false;
+        bool TrkAnodeCrossing = false;
         if (geoDet == kPDVD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, 20.);
         else if (geoDet == kPDHD)
-            TagAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, 20.) || geoLowX.isInsideYZ(Start, 20.);
+
+        int TrkHitCathodeCrossing = 0;
+        if (sh_mu.is_cc()) {
+            if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime()) * fTick2cm < 3*fCathodeGap)
+                TrkHitCathodeCrossing = 2;
+            else
+                TrkHitCathodeCrossing = 1;
+        }
+        bool TrkHitEndInVolumeX = false;
+        if (TrkHitCathodeCrossing) {
+            float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
+            TrkHitEndInVolumeX = x < (geoHighX.x.max - 20.F);
+        }
+        bool TrkHitEndInWindow = wireWindow.isInside(sh_mu.end->PeakTime(), 20.F / fTick2cm);
 
         simb::MCParticle const* mcp_mu = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = GetMichelMCP(mcp_mu);
         VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
-        bool TrueTagHasMichelHits = !vph_mi.empty();
+        bool TrueHasMichelHits = !vph_mi.empty();
 
         // shush "unused variables" compiler warning
-        LOG(TagTrackLength);
-        LOG(TagEndInVolume);
-        LOG(TagEndInWindow);
-        LOG(TagCathodeCrossing);
-        LOG(TagAnodeCrossing);
-        LOG(TrueTagHasMichelHits);
+        LOG(TrkLength);
+        LOG(TrkEndInVolumeYZ);
+        LOG(TrkCathodeCrossing);
+        LOG(TrkAnodeCrossing);
+        LOG(TrkHitCathodeCrossing);
+        LOG(TrkHitEndInVolumeX);
+        LOG(TrkHitEndInWindow);
+        LOG(TrueHasMichelHits);
 
         std::vector<TCanvas*>::iterator ihc = hcs.begin();
         std::vector<TCanvas*>::iterator itc = tcs.begin();
@@ -319,13 +337,48 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         ihc++; itc++;
 
-        if (!LOG(TrueTagHasMichelHits)) {
+        if (!LOG(TrkLength)) {
             DrawFail(ihc, itc);
             continue;
         }
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         ihc++; itc++;
+
+        if (!LOG(TrkEndInVolumeYZ)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
+
+        if (!LOG(TrkHitCathodeCrossing)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
+
+        if (!LOG(TrkHitEndInVolumeX)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
+
+        if (!LOG(TrkHitEndInWindow)) {
+            DrawFail(ihc, itc);
+            continue;
+        }
+        DrawPass(ihc, itc);
+        DrawGraph(*ihc, vph_mi, "p", ms_michel);
+        ihc++; itc++;
+
+
+        /*
 
         // recluster hits around the muon end,
         // compute local dE/dx along the cluster,
@@ -436,6 +489,8 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
         m_bary->DrawMarker(bary.space, bary.drift);
         DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
+
+        */
     }
 
     for (TCanvas* hc : hcs)
