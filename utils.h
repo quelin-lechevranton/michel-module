@@ -386,6 +386,96 @@ namespace ana {
         iterator end() const { return iterator(this, N); }
     };
 
+    // reco to truth functions
+    art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+
+    simb::MCParticle const* trk2mcp(
+        PtrTrk const& pt, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
+        std::unordered_map<int, float> map_tid_ene;
+        for (PtrHit const& p_hit : fmp_trk2hit.at(pt.key()))
+            for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
+                map_tid_ene[ide.trackID] += ide.energy;
+
+        float max_ene = -1;
+        int tid_max = 0;
+        for (std::pair<int, float> p : map_tid_ene)
+            if (p.second > max_ene)
+                max_ene = p.second, tid_max = p.first;
+        return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+    }
+
+    PtrTrk mcp2trk(
+        simb::MCParticle const* mcp, 
+        VecPtrTrk const& vp_trk,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_trk2hit
+    ) {
+        std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
+        for (PtrTrk p_trk : vp_trk)
+            map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_trk2hit.at(p_trk.key())).size();
+
+        unsigned max = 0;
+        PtrTrk p_trk_from_mcp;
+        for (std::pair<PtrTrk, unsigned> p : map_trk_nhit)
+            if (p.second > max)
+                max = p.second, p_trk_from_mcp = p.first;
+        return p_trk_from_mcp;
+    }
+    VecPtrTrk mcp2trks(
+        simb::MCParticle const* mcp,
+        VecPtrTrk const& vpt_ev,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_trk2hit
+    ) {
+        if (!mcp) return VecPtrTrk{};
+        VecPtrTrk vpt_mcp;
+        for (PtrTrk pt_ev : vpt_ev) {
+            simb::MCParticle const* mcp_trk = trk2mcp(pt_ev, clockData, fmp_trk2hit);
+            if (mcp_trk && mcp_trk->TrackId() == mcp->TrackId())
+                vpt_mcp.push_back(pt_ev);
+        }
+        return vpt_mcp;
+    }
+    VecPtrHit mcp2hits(
+        simb::MCParticle const* mcp,
+        VecPtrHit const& vph_ev,
+        detinfo::DetectorClocksData const& clockData,
+        bool use_eve
+    ) {
+        if (!mcp) return VecPtrHit{};
+        VecPtrHit vph_mcp;
+        for (PtrHit ph_ev : vph_ev)
+            for (sim::TrackIDE ide : (use_eve
+                ? bt_serv->HitToEveTrackIDEs(clockData, ph_ev)
+                : bt_serv->HitToTrackIDEs(clockData, ph_ev)
+            )) {
+                if (ide.trackID == mcp->TrackId())
+                    vph_mcp.push_back(ph_ev);
+            }
+        return vph_mcp;
+    }
+    PtrShw mcp2shw(
+        simb::MCParticle const* mcp, 
+        VecPtrShw const& vp_shw,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_shw2hit
+    ) {
+        std::unordered_map<PtrShw, unsigned> map_shw_nhit;
+        for (PtrShw ps : vp_shw)
+            map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_shw2hit.at(ps.key())).size();
+
+        unsigned max = 0;
+        PtrShw p_shw_from_mcp;
+        for (std::pair<PtrShw, unsigned> p : map_shw_nhit)
+            if (p.second > max)
+                max = p.second, p_shw_from_mcp = p.first;
+        return p_shw_from_mcp;
+    }
+
+
+
+
     // Analysis Module Subclass
     struct SortedHits {
         // std::vector<VecPtrHit> vph_sec; // sorted hits per section
@@ -426,14 +516,15 @@ namespace ana {
 
         // Utilities
         art::ServiceHandle<art::TFileService> asFile;
-        art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-        art::ServiceHandle<cheat::BackTrackerService> bt_serv;
+        // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+        // art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
         const geo::GeometryCore* asGeo;
         const geo::WireReadoutGeom* asWire;
         const detinfo::DetectorPropertiesService* asDetProp;
         const detinfo::DetectorClocksService* asDetClocks;
-        const detinfo::DetectorClocksData* clockData;
+        // error: taking address of rvalue [-fpermissive]
+        // const detinfo::DetectorClocksData* clockData;
 
         int geoDet;
         enum EnumDet { kPDVD, kPDHD };
@@ -443,21 +534,22 @@ namespace ana {
             tag_hit, tag_clu, tag_trk,
             tag_shw, tag_spt, tag_pfp;
 
-        VecPtrHit vph_ev;
-        VecPtrTrk vpt_ev;
-        VecPtrShw vps_ev;
+        // VecPtrHit vph_ev;
+        // VecPtrTrk vpt_ev;
+        // VecPtrShw vps_ev;
+        // error: taking address of rvalue [-fpermissive]
         // std::unique_ptr<art::FindManyP<recob::Hit>> fmp_trk2hit;
         // std::unique_ptr<art::FindOneP<recob::Track>> fop_hit2trk;
-        art::FindManyP<recob::Hit> *fmp_trk2hit;
-        art::FindOneP<recob::Track> *fop_hit2trk;
-        art::FindManyP<recob::Hit> *fmp_shw2hit;
-        art::FindOneP<recob::Shower> *fop_hit2shw;
+        // art::FindManyP<recob::Hit> *fmp_trk2hit;
+        // art::FindOneP<recob::Track> *fop_hit2trk;
+        // art::FindManyP<recob::Hit> *fmp_shw2hit;
+        // art::FindOneP<recob::Shower> *fop_hit2shw;
 
-        simb::MCParticle const* trk2mcp(PtrTrk const& pt);
-        PtrTrk mcp2trk(simb::MCParticle const* mcp);
-        VecPtrTrk mcp2trks(simb::MCParticle const* mcp);
-        VecPtrHit mcp2hits(simb::MCParticle const* mcp, bool use_eve);
-        PtrShw mcp2shw(simb::MCParticle const* mcp);
+        // simb::MCParticle const* trk2mcp(PtrTrk const& pt);
+        // PtrTrk mcp2trk(simb::MCParticle const* mcp);
+        // VecPtrTrk mcp2trks(simb::MCParticle const* mcp);
+        // VecPtrHit mcp2hits(simb::MCParticle const* mcp, bool use_eve);
+        // PtrShw mcp2shw(simb::MCParticle const* mcp);
 
         Axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
@@ -472,6 +564,8 @@ namespace ana {
             VecPtrHit const& vph_trk,
             PtrHit const& ph_end,
             PtrTrk const& pt,
+            VecPtrHit const& vph_ev,
+            art::FindOneP<recob::Track> const& fop_hit2trk,
             BraggOptions const& opt
         ) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
@@ -516,79 +610,79 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
         exit(1);
     }
 
-    clockData = &asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(*clockData);
+    auto const clockData = asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(clockData);
     // 200 e-/ADC.tick * 23.6 eV/e- * 1e-6 MeV/eV / 0.7 recombination factor
-    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 }    
 
-simb::MCParticle const* ana::MichelAnalyzer::trk2mcp(
-    PtrTrk const& pt
-) {
-    std::unordered_map<int, float> map_tid_ene;
-    for (PtrHit const& p_hit : fmp_trk2hit->at(pt.key()))
-        for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(*clockData, p_hit))
-            map_tid_ene[ide.trackID] += ide.energy;
+// simb::MCParticle const* ana::MichelAnalyzer::trk2mcp(
+//     PtrTrk const& pt
+// ) {
+//     std::unordered_map<int, float> map_tid_ene;
+//     for (PtrHit const& p_hit : fmp_trk2hit->at(pt.key()))
+//         for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(*clockData, p_hit))
+//             map_tid_ene[ide.trackID] += ide.energy;
 
-    float max_ene = -1;
-    int tid_max = 0;
-    for (std::pair<int, float> p : map_tid_ene)
-        if (p.second > max_ene)
-            max_ene = p.second, tid_max = p.first;
-    return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
-}
+//     float max_ene = -1;
+//     int tid_max = 0;
+//     for (std::pair<int, float> p : map_tid_ene)
+//         if (p.second > max_ene)
+//             max_ene = p.second, tid_max = p.first;
+//     return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+// }
 
-PtrTrk ana::MichelAnalyzer::mcp2trk(simb::MCParticle const* mcp) {
-    std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
-    for (PtrTrk p_trk : vpt_ev)
-        map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(*clockData, mcp->TrackId(), fmp_trk2hit->at(p_trk.key())).size();
+// PtrTrk ana::MichelAnalyzer::mcp2trk(simb::MCParticle const* mcp) {
+//     std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
+//     for (PtrTrk p_trk : vpt_ev)
+//         map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(*clockData, mcp->TrackId(), fmp_trk2hit->at(p_trk.key())).size();
 
-    unsigned max = 0;
-    PtrTrk p_trk_from_mcp;
-    for (std::pair<PtrTrk, unsigned> p : map_trk_nhit)
-        if (p.second > max)
-            max = p.second, p_trk_from_mcp = p.first;
-    return p_trk_from_mcp;
-}
-VecPtrTrk ana::MichelAnalyzer::mcp2trks(simb::MCParticle const* mcp) {
-    if (!mcp) return VecPtrTrk{};
-    VecPtrTrk vpt_mcp;
-    for (PtrTrk pt_ev : vpt_ev) {
-        simb::MCParticle const* mcp_trk = trk2mcp(pt_ev);
-        if (mcp_trk && mcp_trk->TrackId() == mcp->TrackId())
-            vpt_mcp.push_back(pt_ev);
-    }
-    return vpt_mcp;
-}
-VecPtrHit ana::MichelAnalyzer::mcp2hits(simb::MCParticle const* mcp, bool use_eve) {
-    if (!mcp) return VecPtrHit{};
-    VecPtrHit vph_mcp;
-    for (PtrHit ph_ev : vph_ev)
-        for (sim::TrackIDE ide : (use_eve
-            ? bt_serv->HitToEveTrackIDEs(*clockData, ph_ev)
-            : bt_serv->HitToTrackIDEs(*clockData, ph_ev)
-        )) {
-            if (ide.trackID == mcp->TrackId())
-                vph_mcp.push_back(ph_ev);
-        }
-    return vph_mcp;
-}
-PtrShw ana::MichelAnalyzer::mcp2shw(simb::MCParticle const* mcp) {
-    std::unordered_map<PtrShw, unsigned> map_shw_nhit;
-    for (PtrShw ps : vps_ev)
-        map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(
-            *clockData, 
-            mcp->TrackId(), 
-            fmp_shw2hit->at(ps.key())
-        ).size();
+//     unsigned max = 0;
+//     PtrTrk p_trk_from_mcp;
+//     for (std::pair<PtrTrk, unsigned> p : map_trk_nhit)
+//         if (p.second > max)
+//             max = p.second, p_trk_from_mcp = p.first;
+//     return p_trk_from_mcp;
+// }
+// VecPtrTrk ana::MichelAnalyzer::mcp2trks(simb::MCParticle const* mcp) {
+//     if (!mcp) return VecPtrTrk{};
+//     VecPtrTrk vpt_mcp;
+//     for (PtrTrk pt_ev : vpt_ev) {
+//         simb::MCParticle const* mcp_trk = trk2mcp(pt_ev);
+//         if (mcp_trk && mcp_trk->TrackId() == mcp->TrackId())
+//             vpt_mcp.push_back(pt_ev);
+//     }
+//     return vpt_mcp;
+// }
+// VecPtrHit ana::MichelAnalyzer::mcp2hits(simb::MCParticle const* mcp, bool use_eve) {
+//     if (!mcp) return VecPtrHit{};
+//     VecPtrHit vph_mcp;
+//     for (PtrHit ph_ev : vph_ev)
+//         for (sim::TrackIDE ide : (use_eve
+//             ? bt_serv->HitToEveTrackIDEs(*clockData, ph_ev)
+//             : bt_serv->HitToTrackIDEs(*clockData, ph_ev)
+//         )) {
+//             if (ide.trackID == mcp->TrackId())
+//                 vph_mcp.push_back(ph_ev);
+//         }
+//     return vph_mcp;
+// }
+// PtrShw ana::MichelAnalyzer::mcp2shw(simb::MCParticle const* mcp) {
+//     std::unordered_map<PtrShw, unsigned> map_shw_nhit;
+//     for (PtrShw ps : vps_ev)
+//         map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(
+//             *clockData, 
+//             mcp->TrackId(), 
+//             fmp_shw2hit->at(ps.key())
+//         ).size();
 
-    unsigned max = 0;
-    PtrShw p_shw_from_mcp;
-    for (std::pair<PtrShw, unsigned> p : map_shw_nhit)
-        if (p.second > max)
-            max = p.second, p_shw_from_mcp = p.first;
-    return p_shw_from_mcp;
-}
+//     unsigned max = 0;
+//     PtrShw p_shw_from_mcp;
+//     for (std::pair<PtrShw, unsigned> p : map_shw_nhit)
+//         if (p.second > max)
+//             max = p.second, p_shw_from_mcp = p.first;
+//     return p_shw_from_mcp;
+// }
 
 
 
@@ -719,6 +813,8 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     VecPtrHit const& vph_trk,
     PtrHit const& ph_end,
     PtrTrk const& pt_mu,
+    VecPtrHit const& vph_ev,
+    art::FindOneP<recob::Track> const& fop_hit2trk,
     ana::BraggOptions const& opt
 ) const {
     ana::Bragg bragg;
@@ -795,7 +891,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         if (GetDistance(ph_ev, ph_end) > opt.nearby_radius) continue;
 
         // check if the hit is in a track
-        PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
         if (pt_hit) {
             // check if the hit is on the body of the track
             if (pt_hit.key() == pt_mu.key()

@@ -153,9 +153,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
-    clockData = &asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(*clockData);
-    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
+    auto const clockData = asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(clockData);
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
     wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
@@ -298,15 +298,16 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 }
 
 void ana::MichelAnalysis::analyze(art::Event const& e) {
-    clockData = &asDetClocks->DataFor(e);
-    auto const detProp = asDetProp->DataFor(e,*clockData);
-    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
+    auto const clockData = asDetClocks->DataFor(e);
+    auto const detProp = asDetProp->DataFor(e,clockData);
+    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
         std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
+    VecPtrHit vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
@@ -314,6 +315,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
+    VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
     // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
@@ -324,8 +326,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     // VecPtrShw vps_ev;
     // art::fill_ptr_vector(vps_ev, vh_shw);
 
-    fmp_trk2hit = &art::FindManyP<recob::Hit>(vh_trk, e, tag_trk);
-    fop_hit2trk = &art::FindOneP<recob::Track>(vh_hit, e, tag_trk);
+    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     // fmp_shw2hit = &art::FindManyP<recob::Hit>(vh_shw, e, tag_shw);
     // fop_hit2shw = &art::FindOneP<recob::Shower>(vh_hit, e, tag_shw);
 
@@ -345,16 +347,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (fLog) std::cout << "e" << iEvent << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
 
-        VecPtrHit vph_mu = fmp_trk2hit->at(pt_ev.key());
+        VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
         ASSERT(vph_mu.size())
 
-        simb::MCParticle const* mcp = trk2mcp(pt_ev);
+        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = nullptr;
         VecPtrHit vph_mcp_mu, vph_mi;
         if (mcp) {
             mcp_mi = GetMichelMCP(mcp);
-            vph_mcp_mu = mcp2hits(mcp, false);
-            vph_mi = mcp2hits(mcp_mi, true);
+            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
         }
 
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
@@ -484,7 +486,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (ph_ev->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_ev);
                 if (hit.section != MuonEndHit.section) continue;
-                PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
                 // if (ps_hit) continue;
@@ -506,7 +508,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             for (PtrHit const& ph_ev : vph_ev) {
                 ana::Hit hit = GetHit(ph_ev);
                 if (hit.section != MuonEndHit.section) continue;
-                PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
                 PandoraBaryHits.push_back(hit);
@@ -525,7 +527,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 for (PtrHit const& ph_ev : vph_ev) {
                     ana::Hit hit = GetHit(ph_ev);
                     if (hit.section != MuonEndHit.section) continue;
-                    PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+                    PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                     if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
 
                     float dist = GetDistance(ph_ev, sh_mu.end);
@@ -573,6 +575,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 // vph_mu,
                 // end,
                 pt_ev,
+                vph_ev,
+                fop_hit2trk,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
             );
             BraggError = bragg.error;
