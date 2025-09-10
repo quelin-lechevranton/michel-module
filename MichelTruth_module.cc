@@ -167,9 +167,9 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
 
 void ana::MichelTruth::analyze(art::Event const& e)
 {
-    auto const clockData = asDetClocks->DataFor(e);
-    auto const detProp = asDetProp->DataFor(e,clockData);
-    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+    clockData = &asDetClocks->DataFor(e);
+    auto const detProp = asDetProp->DataFor(e, *clockData);
+    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
 
@@ -178,7 +178,6 @@ void ana::MichelTruth::analyze(art::Event const& e)
         std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
-    std::vector<art::Ptr<recob::Hit>> vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
@@ -186,18 +185,18 @@ void ana::MichelTruth::analyze(art::Event const& e)
         std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
-    VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
+
     auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
     if (!vh_shw.isValid()) {
         std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
         return;
     }
-    VecPtrShw vps_ev;
     art::fill_ptr_vector(vps_ev, vh_shw);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindManyP<recob::Hit> fop_shw2hit(vh_shw, e, tag_shw);
+    // fmp_trk2hit = &art::FindManyP<recob::Hit>(vh_trk, e, tag_trk);
+    // fop_hit2trk = &art::FindOneP<recob::Track>(vh_hit, e, tag_trk);
+    // fmp_shw2hit = &art::FindManyP<recob::Hit>(vh_shw, e, tag_shw);
 
     EventNMuon = 0;
     EventiMuon.clear();
@@ -219,7 +218,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         if (!fKeepTransportation && EndProcess == "Transportation") continue;
 
-        VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vph_ev, clockData, false);
+        VecPtrHit vph_mcp = mcp2hits(&mcp, false);
         ASSERT(vph_mcp.size())
 
         RegDirZ = (mcp.EndZ() > mcp.Vz() ? 1 : -1);
@@ -230,7 +229,6 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         EndHit = GetHit(sh_mu.end);
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
-
 
         for (PtrHit const& ph_mu : sh_mu.vph) {
             ana::Hit hit = GetHit(ph_mu);
@@ -272,12 +270,12 @@ void ana::MichelTruth::analyze(art::Event const& e)
         // MichelHitEveTIDEEnergy = 0.F;
         // MichelHitSimIDEEnergy = 0.F;
 
-        PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+        PtrTrk pt_mi = mcp2trk(mcp_mi);
         MichelTrackLength = pt_mi ? pt_mi->Length() : -1.F;
-        PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fop_shw2hit);
+        PtrShw ps_mi = mcp2shw(mcp_mi);
         MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
-        VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+        VecPtrHit vph_mi = mcp2hits(mcp_mi, true);
 
         // float Oz = EndHit.space;
         // float Ot = EndHit.tick * fTick2cm;
@@ -315,15 +313,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
             float tide_energy = 0.F;
             float eve_tide_energy = 0.F;
             float sim_ide_energy = 0.F;
-            for (sim::TrackIDE const& ide : bt_serv->HitToTrackIDEs(clockData, ph_mi))
+            for (sim::TrackIDE const& ide : bt_serv->HitToTrackIDEs(*clockData, ph_mi))
                 if (ide.trackID == mcp_mi->TrackId())
                     tide_energy += ide.energy; // MeV
                     // MichelHitTIDEEnergy += ide.energy; // MeV
-            for (sim::TrackIDE const& ide : bt_serv->HitToEveTrackIDEs(clockData, ph_mi))
+            for (sim::TrackIDE const& ide : bt_serv->HitToEveTrackIDEs(*clockData, ph_mi))
                 if (ide.trackID == mcp_mi->TrackId())
                     eve_tide_energy += ide.energy; // MeV
                     // MichelHitEveTIDEEnergy += ide.energy; // MeV
-            for (sim::IDE const* ide : bt_serv->HitToSimIDEs_Ps(clockData, ph_mi))
+            for (sim::IDE const* ide : bt_serv->HitToSimIDEs_Ps(*clockData, ph_mi))
                 if (ide->trackID == mcp_mi->TrackId())
                     sim_ide_energy += ide->energy; // MeV
                     // MichelHitSimIDEEnergy += ide->energy; // MeV
@@ -375,7 +373,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             ) != vph_mcp.end()) continue;
 
             // not from other muons?
-            std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(clockData, ph_ev);
+            std::vector<sim::TrackIDE> hit_ides = bt_serv->HitToTrackIDEs(*clockData, ph_ev);
             std::vector<sim::TrackIDE>::const_iterator source_ide_it = std::max_element(
                 hit_ides.begin(),
                 hit_ides.end(),

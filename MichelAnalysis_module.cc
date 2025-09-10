@@ -69,6 +69,18 @@ private:
     std::vector<float> PandoraSphereHitMuonAngle;
     float PandoraSphereEnergy;
     float PandoraSphereEnergyTP;
+    // Cone
+    ana::Hits PandoraBaryHits;
+    ana::Vec2 PandoraBary;
+    float PandoraBaryAngle;
+    float PandoraBaryMuonAngle;
+    ana::Hits PandoraConeHits;
+    float PandoraConeEnergy;
+    float PandoraConeEnergyTP;
+    ana::Hits PandoraKeyholeHits;
+    float PandoraKeyholeEnergy;
+    float PandoraKeyholeEnergyTP;
+
 
     // Bragg information
     int BraggError;
@@ -112,7 +124,7 @@ private:
     float MichelHitEnergy;
 
     unsigned MichelBaryNHit;
-    Vec2 MichelBary;
+    ana::Vec2 MichelBary;
     float MichelBaryAngle;
     float MichelBaryMuonAngle;
     float MichelConeEnergy;
@@ -141,9 +153,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
-    auto const clockData = asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(clockData);
-    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+    clockData = &asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(*clockData);
+    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
     wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
@@ -224,6 +236,18 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
+    // Cone
+    PandoraBaryHits.SetBranches(tMuon, "PandoraBary");
+    PandoraBary.SetBranches(tMuon, "PandoraBary");
+    tMuon->Branch("PandoraBaryAngle", &PandoraBaryAngle);
+    tMuon->Branch("PandoraBaryMuonAngle", &PandoraBaryMuonAngle);
+    PandoraConeHits.SetBranches(tMuon, "PandoraCone");
+    tMuon->Branch("PandoraConeEnergy", &PandoraConeEnergy); // ADC
+    tMuon->Branch("PandoraConeEnergyTP", &PandoraConeEnergyTP); // ADC
+    PandoraKeyholeHits.SetBranches(tMuon, "PandoraCone");
+    tMuon->Branch("PandoraKeyholeEnergy", &PandoraKeyholeEnergy); // ADC
+    tMuon->Branch("PandoraKeyholeEnergyTP", &PandoraKeyholeEnergyTP); // ADC
+
 
     // Bragg
     tMuon->Branch("BraggError", &BraggError);
@@ -274,16 +298,15 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 }
 
 void ana::MichelAnalysis::analyze(art::Event const& e) {
-    auto const clockData = asDetClocks->DataFor(e);
-    auto const detProp = asDetProp->DataFor(e,clockData);
-    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+    clockData = &asDetClocks->DataFor(e);
+    auto const detProp = asDetProp->DataFor(e,*clockData);
+    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
         std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
-    VecPtrHit vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
@@ -291,7 +314,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
-    VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
     // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
@@ -302,10 +324,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     // VecPtrShw vps_ev;
     // art::fill_ptr_vector(vps_ev, vh_shw);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-    // art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
-    // art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
+    fmp_trk2hit = &art::FindManyP<recob::Hit>(vh_trk, e, tag_trk);
+    fop_hit2trk = &art::FindOneP<recob::Track>(vh_hit, e, tag_trk);
+    // fmp_shw2hit = &art::FindManyP<recob::Hit>(vh_shw, e, tag_shw);
+    // fop_hit2shw = &art::FindOneP<recob::Shower>(vh_hit, e, tag_shw);
 
     resetEvent();
 
@@ -323,16 +345,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (fLog) std::cout << "e" << iEvent << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
 
-        VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
+        VecPtrHit vph_mu = fmp_trk2hit->at(pt_ev.key());
         ASSERT(vph_mu.size())
 
-        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
+        simb::MCParticle const* mcp = trk2mcp(pt_ev);
         simb::MCParticle const* mcp_mi = nullptr;
         VecPtrHit vph_mcp_mu, vph_mi;
         if (mcp) {
             mcp_mi = GetMichelMCP(mcp);
-            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+            vph_mcp_mu = mcp2hits(mcp, false);
+            vph_mi = mcp2hits(mcp_mi, true);
         }
 
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
@@ -360,7 +382,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius);
         else if (geoDet == kPDHD)
             TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
-
 
         
         /* COMPARE TO AGNOCHECKS
@@ -463,7 +484,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (ph_ev->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_ev);
                 if (hit.section != MuonEndHit.section) continue;
-                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+                PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
                 // if (ps_hit) continue;
@@ -481,14 +502,77 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     PandoraSphereEnergyTP = ph_ev->Integral();
             }
 
+            // Cone
+            for (PtrHit const& ph_ev : vph_ev) {
+                ana::Hit hit = GetHit(ph_ev);
+                if (hit.section != MuonEndHit.section) continue;
+                PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+                if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
+                if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
+                PandoraBaryHits.push_back(hit);
+            }
+            if (PandoraBaryHits.size()) {
+                PandoraBary = PandoraBaryHits.barycenter(fTick2cm);
+                ana::Vec2 end_bary = PandoraBary - MuonEndHit.vec(fTick2cm);
+                PandoraBaryAngle = end_bary.angle();
+                float da = PandoraBaryAngle - MuonReg.theta(MuonRegDirZ);
+                da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                PandoraBaryMuonAngle = da;
+
+                // float angle = end_bary.angle();
+                PandoraConeEnergy = 0;
+                PandoraConeEnergyTP = 0;
+                for (PtrHit const& ph_ev : vph_ev) {
+                    ana::Hit hit = GetHit(ph_ev);
+                    if (hit.section != MuonEndHit.section) continue;
+                    PtrTrk pt_hit = fop_hit2trk->at(ph_ev.key());
+                    if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
+
+                    float dist = GetDistance(ph_ev, sh_mu.end);
+                    if (dist > 30) continue;
+
+                    ana::Vec2 end_hit = hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm);
+                    float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
+
+                    if (dist > 5
+                        && cosa < cos(30.F * TMath::DegToRad())
+                    ) continue;
+
+                    PandoraKeyholeEnergy += ph_ev->Integral();
+                    PandoraKeyholeHits.push_back(hit);
+
+                    if (std::find_if(
+                        vph_mi.begin(), vph_mi.end(),
+                        [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+                    ) != vph_mi.end())
+                        PandoraKeyholeEnergyTP += ph_ev->Integral();
+
+                    if (cosa < cos(30.F * TMath::DegToRad())) continue;
+
+                    PandoraConeEnergy += ph_ev->Integral();
+                    PandoraConeHits.push_back(hit);
+
+                    if (std::find_if(
+                        vph_mi.begin(), vph_mi.end(),
+                        [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+                    ) != vph_mi.end())
+                        PandoraConeEnergyTP += ph_ev->Integral();
+                }
+            }
+
+
+
+
+
+
+
+
             ana::Bragg bragg = GetBragg(
                 sh_mu.vph,
                 sh_mu.end,
                 // vph_mu,
                 // end,
                 pt_ev,
-                vph_ev,
-                fop_hit2trk,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
             );
             BraggError = bragg.error;
@@ -530,13 +614,12 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                 // Cone
                 for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                    if (GetDistance(*iph, sh_mu.end) > 10) continue;
+                    if (GetDistance(*iph, bragg.end) > 10) continue;
                     NearbyBaryHits.push_back(GetHit(*iph));
                 }
                 if (NearbyBaryHits.size()) {
-                    Hit end = GetHit(bragg.end);
                     NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
-                    Vec2 end_bary = NearbyBary - end.vec(fTick2cm);
+                    ana::Vec2 end_bary = NearbyBary - BraggEndHit.vec(fTick2cm);
                     NearbyBaryAngle = end_bary.angle();
                     float da = NearbyBaryAngle - MuonReg.theta(MuonRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -546,10 +629,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     BraggConeEnergy = 0;
                     BraggConeEnergyTP = 0;
                     for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                        float dist = GetDistance(*iph, sh_mu.end);
+                        float dist = GetDistance(*iph, bragg.end);
                         if (dist > 30) continue;
 
-                        Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end.vec(fTick2cm);
+                        ana::Hit hit = GetHit(*iph);
+                        ana::Vec2 end_hit = hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm);
                         float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                         if (dist > 5
@@ -557,7 +641,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         ) continue;
 
                         BraggKeyholeEnergy += (*iph)->Integral();
-                        BraggKeyholeHits.push_back(GetHit(*iph));
+                        BraggKeyholeHits.push_back(hit);
 
                         if (std::find_if(
                             vph_mi.begin(), vph_mi.end(),
@@ -568,7 +652,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
                         BraggConeEnergy += (*iph)->Integral();
-                        BraggConeHits.push_back(GetHit(*iph));
+                        BraggConeHits.push_back(hit);
 
                         if (std::find_if(
                             vph_mi.begin(), vph_mi.end(),
@@ -637,7 +721,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     MichelBaryNHit = bary_hits.size();
                     if (bary_hits.size()) {
                         MichelBary = bary_hits.barycenter(fTick2cm);
-                        Vec2 end_bary = MichelBary - MuonTrueEndHit.vec(fTick2cm);
+                        ana::Vec2 end_bary = MichelBary - MuonTrueEndHit.vec(fTick2cm);
                         MichelBaryAngle = end_bary.angle();
                         float da = MichelBaryAngle - mu_end_angle;
                         da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -650,7 +734,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             float dist = GetDistance(ph_mi, sh_mcp.end);
                             if (dist > 30) continue;
 
-                            Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
+                            ana::Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
                             float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                             if (dist > 5 
@@ -697,6 +781,18 @@ void ana::MichelAnalysis::resetMuon() {
     PandoraSphereHitMuonAngle.clear();
     PandoraSphereEnergy = -1.F;
     PandoraSphereEnergyTP = -1.F;
+    // Cone
+    PandoraBaryHits.clear();
+    PandoraBary = ana::Vec2{0,0};
+    PandoraBaryAngle = -10.F;
+    PandoraBaryMuonAngle = -10.F;
+    PandoraConeHits.clear();
+    PandoraConeEnergy = -1.F;
+    PandoraConeEnergyTP = -1.F;
+    PandoraKeyholeHits.clear();
+    PandoraKeyholeEnergy = -1.F;
+    PandoraKeyholeEnergyTP = -1.F;
+
 
     // Bragg
     BraggError = -1;
@@ -710,7 +806,7 @@ void ana::MichelAnalysis::resetMuon() {
     BraggSphereEnergyTP = -1.F;
 
     NearbyBaryHits.clear();
-    NearbyBary = Vec2{0,0};
+    NearbyBary = ana::Vec2{0,0};
     NearbyBaryAngle = -10.F;
     NearbyBaryMuonAngle = -10.F;
     BraggConeHits.clear();
@@ -735,7 +831,7 @@ void ana::MichelAnalysis::resetMuon() {
     MichelHitEnergy = -1.F;
 
     MichelBaryNHit = 0;
-    MichelBary = Vec2{0,0};
+    MichelBary = ana::Vec2{0,0};
     MichelBaryAngle = -10.F;
     MichelBaryMuonAngle = -10.F;
     MichelConeEnergy = -1.F;

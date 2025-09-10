@@ -64,8 +64,8 @@ ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
     fRegN(p.get<unsigned>("RegN", 6)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
-    auto const clockData = asDetClocks->DataForJob();
-    auto const detProp = asDetProp->DataForJob(clockData);
+    clockData = &asDetClocks->DataForJob();
+    auto const detProp = asDetProp->DataForJob(*clockData);
     wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
     switch (geoDet) {
         case kPDVD:
@@ -134,30 +134,26 @@ void ana::MichelDisplay::beginJob() {
 }
 
 void ana::MichelDisplay::analyze(art::Event const& e) {
-    auto const clockData = asDetClocks->DataFor(e);
-    auto const detProp = asDetProp->DataFor(e,clockData);
-    fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+    clockData = &asDetClocks->DataFor(e);
+    auto const detProp = asDetProp->DataFor(e,*clockData);
+    fTick2cm = detinfo::sampling_rate(*clockData) * 1e-3 * detProp.DriftVelocity();
 
     // Data Handles
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) return;
-    VecPtrHit vph_ev;
     art::fill_ptr_vector(vph_ev, vh_hit);
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) return;
-    VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
-    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
-    if (!vh_shw.isValid()) return;
-    VecPtrShw vps_ev;
-    art::fill_ptr_vector(vps_ev, vh_shw);
+    // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    // if (!vh_shw.isValid()) return;
+    // art::fill_ptr_vector(vps_ev, vh_shw);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
-    art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
-    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
+    fmp_trk2hit = &art::FindManyP<recob::Hit>(vh_trk, e, tag_trk);
+    fop_hit2trk = &art::FindOneP<recob::Track>(vh_hit, e, tag_trk);
+    // art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
 
 
     // List of cut names (must be well defined)
@@ -199,11 +195,11 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         );
         DrawGraph(hc, vph_ev, "p", ms_ev);
 
-        for (PtrShw const& ps_ev : vps_ev) {
-            VecPtrHit vph_shw = fmp_shw2hit.at(ps_ev.key());
-            if (!vph_shw.size()) continue;
-            DrawGraph(hc, vph_shw, "p", ms_shw);
-        }
+        // for (PtrShw const& ps_ev : vps_ev) {
+        //     VecPtrHit vph_shw = fmp_shw2hit.at(ps_ev.key());
+        //     if (!vph_shw.size()) continue;
+        //     DrawGraph(hc, vph_shw, "p", ms_shw);
+        // }
 
         hcs.push_back(hc);
     }
@@ -235,7 +231,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
     // looping over all tracks in the event
     unsigned im=0;
     for (PtrTrk const& pt_ev : vpt_ev) {
-        VecPtrHit vph_muon = fmp_trk2hit.at(pt_ev.key());
+        VecPtrHit vph_muon = fmp_trk2hit->at(pt_ev.key());
         // assert there are hits associated to the track
         ASSERT(vph_muon.size())
 
@@ -314,9 +310,9 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         }
         bool TrkHitEndInWindow = wireWindow.isInside(sh_mu.end->PeakTime(), 20.F / fTick2cm);
 
-        simb::MCParticle const* mcp_mu = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
+        simb::MCParticle const* mcp_mu = trk2mcp(pt_ev);
         simb::MCParticle const* mcp_mi = GetMichelMCP(mcp_mu);
-        VecPtrHit vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+        VecPtrHit vph_mi = mcp2hits(mcp_mi, true);
         bool TrueHasMichelHits = !vph_mi.empty();
 
         // shush "unused variables" compiler warning
@@ -387,8 +383,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             sh_mu.vph,
             sh_mu.end,
             pt_ev,
-            vph_ev,
-            fop_hit2trk,
             { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
         );
         // possible causes of failure:
