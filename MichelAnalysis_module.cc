@@ -570,7 +570,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
 
-
+            /* SIMPLE BRAGG
             int error = -1;
             VecPtrHit vph_clu;
             VecPtrHit vph_end;
@@ -645,7 +645,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
             ana::Bragg bragg = {vph_clu, mip_dQdx, max_dQdx, max_hit, error};
-
+            LOG(bragg);
 
             // for now suppose the pandora track always go too far
             // VecPtrHit vph_endnearby;
@@ -660,22 +660,23 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             //     vph_endnearby.push_back(ph_ev);
             // }
 
+            */
 
 
 
 
 
 
-            // ana::Bragg bragg = GetBragg(
-            //     sh_mu.vph,
-            //     sh_mu.end,
-            //     // vph_mu,
-            //     // end,
-            //     pt_ev,
-            //     vph_ev,
-            //     fop_hit2trk,
-            //     { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-            // );
+            ana::Bragg bragg = GetBragg(
+                sh_mu.vph,
+                sh_mu.end,
+                // vph_mu,
+                // end,
+                pt_ev,
+                vph_ev,
+                fop_hit2trk,
+                { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
+            );
             BraggError = bragg.error;
 
             if (BraggError == kNoError) {
