@@ -597,52 +597,53 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 vph_end.push_back(*iph); 
             }
             float mip_dQdx = mip_n ? mip_dQ / mip_dx : -1;
-
-            if (vph_end.size() < fRegN) {
-
-            }
             float max_dQdx = -1;
             PtrHit max_hit;
-            for (auto iph=vph_end.begin()+fRegN; iph!=vph_end.end(); iph++) {
-                VecPtrHit::iterator jph = iph-fRegN;
 
-                double dQ = std::accumulate(
-                    jph, iph, 0.F,
-                    [](double s, PtrHit const& h) -> double { return s + h->Integral(); }
-                ) / fRegN;
+            if (mip_n == 0)
+                error = ana::Bragg::kSmallBody;
+            else if (vph_end.size() <= fRegN)
+                error = ana::Bragg::kNoNearbyHits;
+            else {
+                error = ana::Bragg::kNoError;
+                for (auto iph=vph_end.begin()+fRegN; iph!=vph_end.end(); iph++) {
+                    VecPtrHit::iterator jph = iph-fRegN;
 
-                double dx = 0;
-                for (auto kph=jph; kph!=iph; kph++) {
-                    if (kph == vph_end.begin())
-                        dx += GetDistance(*kph, *(kph+1));
-                    else if (kph == vph_end.end()-1)
-                        dx += GetDistance(*(kph-1), *kph);
-                    else
-                        dx += .5 * (GetDistance(*(kph-1), *kph) + GetDistance(*kph, *(kph+1)));
+                    double dQ = std::accumulate(
+                        jph, iph, 0.F,
+                        [](double s, PtrHit const& h) -> double { return s + h->Integral(); }
+                    ) / fRegN;
+
+                    double dx = 0;
+                    for (auto kph=jph; kph!=iph; kph++) {
+                        if (kph == vph_end.begin())
+                            dx += GetDistance(*kph, *(kph+1));
+                        else if (kph == vph_end.end()-1)
+                            dx += GetDistance(*(kph-1), *kph);
+                        else
+                            dx += .5 * (GetDistance(*(kph-1), *kph) + GetDistance(*kph, *(kph+1)));
+                    }
+                    dx /= fRegN;
+                        
+                    if (dQ/dx > max_dQdx) {
+                        max_dQdx = dQ/dx;
+                        max_hit = *iph;
+                    }
                 }
-                dx /= fRegN;
-                    
-                if (dQ/dx > max_dQdx) {
-                    max_dQdx = dQ/dx;
-                    max_hit = *iph;
+
+                for (PtrHit const& ph_ev : vph_ev) {
+                    if (ph_ev->View() != geo::kW) continue;
+                    if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != MuonEndHit.section) continue;
+                    if (GetDistance(ph_ev, max_hit) > fNearbyRadius) continue;
+                    PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+                    if (pt_hit && (
+                            pt_hit.key() == pt_ev.key()
+                            || pt_hit->Length() > fTrackLengthCut
+                        )
+                    ) continue;
+                    vph_clu.push_back(ph_ev);
                 }
             }
-
-            for (PtrHit const& ph_ev : vph_ev) {
-                if (ph_ev->View() != geo::kW) continue;
-                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != MuonEndHit.section) continue;
-                if (GetDistance(ph_ev, max_hit) > fNearbyRadius) continue;
-                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-                if (pt_hit && (
-                        pt_hit.key() == pt_ev.key()
-                        || pt_hit->Length() > fTrackLengthCut
-                    )
-                ) continue;
-                vph_clu.push_back(ph_ev);
-            }
-
-            if (mip_n == 0) error = ana::Bragg::kSmallBody;
-            else error = ana::Bragg::kNoError;
             ana::Bragg bragg = {vph_clu, mip_dQdx, max_dQdx, max_hit, error};
 
 
