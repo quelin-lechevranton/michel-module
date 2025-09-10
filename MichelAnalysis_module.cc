@@ -509,6 +509,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
             // Cone
             for (PtrHit const& ph_ev : vph_ev) {
+                if (ph_ev->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_ev);
                 if (hit.section != MuonEndHit.section) continue;
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -528,6 +529,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 PandoraConeEnergy = 0;
                 PandoraConeEnergyTP = 0;
                 for (PtrHit const& ph_ev : vph_ev) {
+                    if (ph_ev->View() != geo::kW) continue;
                     ana::Hit hit = GetHit(ph_ev);
                     if (hit.section != MuonEndHit.section) continue;
                     PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -569,19 +571,110 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
 
+            int error = -1;
+            VecPtrHit vph_clu;
+            VecPtrHit vph_end;
+            float mip_dQ = 0;
+            float mip_dx = 0;
+            unsigned mip_n = 0;
+            for (auto iph=sh_mu.vph.begin(); iph!=sh_mu.vph.end(); iph++) {
+                if (ana::tpc2sec[geoDet][(*iph)->WireID().TPC] != MuonEndHit.section) continue;
+                vph_clu.push_back(*iph);                
+                float dist = GetDistance(*iph, sh_mu.end);
+
+                if (dist > 10) {
+                    mip_n++;
+                    mip_dQ += (*iph)->Integral();
+                    if (iph == vph_mu.begin())
+                        mip_dx += GetDistance(*iph, *(iph+1));
+                    else if (iph == vph_mu.end()-1)
+                        mip_dx += GetDistance(*(iph-1), *iph);
+                    else 
+                        mip_dx += .5*(GetDistance(*(iph-1), *iph) + GetDistance(*iph, *(iph+1)));
+                }
+
+                if (dist > 15) continue;
+                vph_end.push_back(*iph); 
+            }
+            float mip_dQdx = mip_n ? mip_dQ / mip_dx : -1;
+
+            if (vph_end.size() < fRegN) {
+
+            }
+            float max_dQdx = -1;
+            PtrHit max_hit;
+            for (auto iph=vph_end.begin()+fRegN; iph!=vph_end.end(); iph++) {
+                VecPtrHit::iterator jph = iph-fRegN;
+
+                double dQ = std::accumulate(
+                    jph, iph, 0.F,
+                    [](double s, PtrHit const& h) -> double { return s + h->Integral(); }
+                ) / fRegN;
+
+                double dx = 0;
+                for (auto kph=jph; kph!=iph; kph++) {
+                    if (kph == vph_end.begin())
+                        dx += GetDistance(*kph, *(kph+1));
+                    else if (kph == vph_end.end()-1)
+                        dx += GetDistance(*(kph-1), *kph);
+                    else
+                        dx += .5 * (GetDistance(*(kph-1), *kph) + GetDistance(*kph, *(kph+1)));
+                }
+                dx /= fRegN;
+                    
+                if (dQ/dx > max_dQdx) {
+                    max_dQdx = dQ/dx;
+                    max_hit = *iph;
+                }
+            }
+
+            for (PtrHit const& ph_ev : vph_ev) {
+                if (ph_ev->View() != geo::kW) continue;
+                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != MuonEndHit.section) continue;
+                if (GetDistance(ph_ev, max_hit) > fNearbyRadius) continue;
+                PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+                if (pt_hit && (
+                        pt_hit.key() == pt_ev.key()
+                        || pt_hit->Length() > fTrackLengthCut
+                    )
+                ) continue;
+                vph_clu.push_back(ph_ev);
+            }
+
+            if (mip_n == 0) error = ana::Bragg::kSmallBody;
+            else error = ana::Bragg::kNoError;
+            ana::Bragg bragg = {vph_clu, mip_dQdx, max_dQdx, max_hit, error};
+
+
+            // for now suppose the pandora track always go too far
+            // VecPtrHit vph_endnearby;
+            // for (PtrHit const& ph_ev : vph_ev) {
+            //     if (ph_ev->View() != geo::kW) continue;
+            //     if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != MuonEndHit.section) continue;
+            //     if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
+            //     if (std::find_if(
+            //         vph_endsec.begin(), vph_endsec.end(),
+            //         [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+            //     ) != vph_endsec.end()) continue;
+            //     vph_endnearby.push_back(ph_ev);
+            // }
 
 
 
-            ana::Bragg bragg = GetBragg(
-                sh_mu.vph,
-                sh_mu.end,
-                // vph_mu,
-                // end,
-                pt_ev,
-                vph_ev,
-                fop_hit2trk,
-                { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-            );
+
+
+
+
+            // ana::Bragg bragg = GetBragg(
+            //     sh_mu.vph,
+            //     sh_mu.end,
+            //     // vph_mu,
+            //     // end,
+            //     pt_ev,
+            //     vph_ev,
+            //     fop_hit2trk,
+            //     { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
+            // );
             BraggError = bragg.error;
 
             if (BraggError == kNoError) {
