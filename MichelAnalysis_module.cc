@@ -66,7 +66,9 @@ private:
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
     ana::Hits MuonHits;
+    std::vector<float> PandoraSphereHitMuonAngle;
     float PandoraSphereEnergy;
+    float PandoraSphereEnergyTP;
 
     // Bragg information
     int BraggError;
@@ -219,7 +221,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
     MuonHits.SetBranches(tMuon);
+    tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
+    tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
 
     // Bragg
     tMuon->Branch("BraggError", &BraggError);
@@ -420,7 +424,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         if (!TrkHitError) {
             if (sh_mu.is_cc()) {
-                if (GetDistance(sh_mu.cc.first, sh_mu.cc.second) < 2 * fCathodeGap)
+                if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
                     TrkHitCathodeCrossing = kAlignedHitOnBothSides;
                 else
                     TrkHitCathodeCrossing = kHitOnBothSides;
@@ -457,14 +461,24 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             PandoraSphereEnergy = 0;
             for (PtrHit const& ph_ev : vph_ev) {
                 if (ph_ev->View() != geo::kW) continue;
-                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC]
-                    != MuonEndHit.section) continue;
+                ana::Hit hit = GetHit(ph_ev);
+                if (hit.section != MuonEndHit.section) continue;
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
                 // if (ps_hit) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
                 PandoraSphereEnergy += ph_ev->Integral();
+
+                float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
+                da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                PandoraSphereHitMuonAngle.push_back(da);
+
+                if (std::find_if(
+                    vph_mi.begin(), vph_mi.end(),
+                    [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+                ) != vph_mi.end()) 
+                    PandoraSphereEnergyTP = ph_ev->Integral();
             }
 
             ana::Bragg bragg = GetBragg(
@@ -623,8 +637,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     MichelBaryNHit = bary_hits.size();
                     if (bary_hits.size()) {
                         MichelBary = bary_hits.barycenter(fTick2cm);
-                        Vec2 end = MuonTrueEndHit.vec(fTick2cm);
-                        Vec2 end_bary = MichelBary - end;
+                        Vec2 end_bary = MichelBary - MuonTrueEndHit.vec(fTick2cm);
                         MichelBaryAngle = end_bary.angle();
                         float da = MichelBaryAngle - mu_end_angle;
                         da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -637,7 +650,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             float dist = GetDistance(ph_mi, sh_mcp.end);
                             if (dist > 30) continue;
 
-                            Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - end;
+                            Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
                             float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                             if (dist > 5 
@@ -681,7 +694,9 @@ void ana::MichelAnalysis::resetMuon() {
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
     MuonHits.clear();
+    PandoraSphereHitMuonAngle.clear();
     PandoraSphereEnergy = -1.F;
+    PandoraSphereEnergyTP = -1.F;
 
     // Bragg
     BraggError = -1;
