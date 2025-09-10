@@ -66,6 +66,7 @@ private:
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
     ana::Hits MuonHits;
+    ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
     float PandoraSphereEnergy;
     float PandoraSphereEnergyTP;
@@ -233,6 +234,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
     MuonHits.SetBranches(tMuon);
+    PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
@@ -492,6 +494,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 // if (ps_hit) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
                 PandoraSphereEnergy += ph_ev->Integral();
+                PandoraSphereHits.push_back(hit);
 
                 float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -782,6 +785,7 @@ void ana::MichelAnalysis::resetMuon() {
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
     MuonHits.clear();
+    PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
     PandoraSphereEnergy = -1.F;
     PandoraSphereEnergyTP = -1.F;
