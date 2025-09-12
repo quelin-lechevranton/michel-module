@@ -514,11 +514,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
             // Cone
             for (PtrHit const& ph_ev : vph_end_sec) {
-                ana::Hit hit = GetHit(ph_ev);
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
-                PandoraBaryHits.push_back(hit);
+                PandoraBaryHits.push_back(GetHit(ph_ev));
             }
             if (PandoraBaryHits.size()) {
                 PandoraBary = PandoraBaryHits.barycenter(fTick2cm);
@@ -810,9 +809,10 @@ void ana::MichelAnalysis::resetMuon() {
 
 
     // Bragg
-    BraggError = -1;
-    MIPdQdx = -1.F;
-    BraggdQdx = -1.F;
+    ana::Bragg bragg;
+    BraggError = bragg.error;
+    MIPdQdx = bragg.mip_dQdx;
+    BraggdQdx = bragg.max_dQdx;
     BraggEndHit = ana::Hit{};
     BraggMuonHits.clear();
     BraggSphereHits.clear();

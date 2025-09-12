@@ -503,7 +503,7 @@ namespace ana {
     struct Bragg {
         VecPtrHit vph_mu={}; // hits of the newly defined muon track
         float mip_dQdx=0; // dQ/dx of the MIP
-        float max_dQdx=0; // maximum dQ/dx of the muon
+        float max_dQdx=-1; // maximum dQ/dx of the muon
         PtrHit end={}; // end of the muon track after bragg algorithm
         enum EnumBraggError { kNoError, kEndNotFound, kSmallBody, kNoNearbyHits };
         int error=-1; // error code of the bragg algorithm
@@ -1000,7 +1000,6 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     }
 
     unsigned const trailing_n = opt.reg_n;
-    bragg.max_dQdx = -1;
     VecPtrHit::iterator iph_max;
     for (auto iph_clu=vph_clu.begin()+trailing_n; iph_clu!=vph_clu.end(); iph_clu++) {
         VecPtrHit::iterator jph_clu = iph_clu-trailing_n;
@@ -1105,7 +1104,6 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
     }
     bragg.mip_dQdx = mip_dQ / mip_dx;
 
-    bragg.max_dQdx = -1;
     VecPtrHit::iterator iph_max;
     unsigned const trailing_n = opt.reg_n;
     for (auto iph=iph_body; iph!=vph_sec_trk.end(); iph++) {
@@ -1119,15 +1117,15 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
         ) / trailing_n;
 
         double dx = 0;
-        for (auto iph=jph; iph!=iph; iph++) {
-            if (iph == vph_sec_trk.begin())
-                dx += GetDistance(*iph, *(iph+1));
-            else if (iph == vph_sec_trk.end()-1)
-                dx += GetDistance(*(iph-1), *iph);
+        for (auto kph=jph; kph!=iph; kph++) {
+            if (kph == vph_sec_trk.begin())
+                dx += GetDistance(*kph, *(kph+1));
+            else if (kph == vph_sec_trk.end()-1)
+                dx += GetDistance(*(kph-1), *kph);
             else
                 dx += .5 * (
-                    GetDistance(*(iph-1), *iph)
-                    + GetDistance(*iph, *(iph+1))
+                    GetDistance(*(kph-1), *kph)
+                    + GetDistance(*kph, *(kph+1))
                 );
         }
         dx /= trailing_n;
