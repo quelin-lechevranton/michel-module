@@ -135,6 +135,9 @@ namespace ana {
         double projection(double x, double y) const {
             return (x + m*(y-p)) / (1 + m*m);
         }
+        double distance(double x, double y) const {
+            return abs(y - (m*x + p)) / sqrt(1 + m*m);
+        }
         double theta(int dirx) {
             return atan2(dirx*cov, dirx*(lp-vary));
         }
@@ -555,6 +558,7 @@ namespace ana {
         double GetSpace(geo::WireID) const;
         Hit GetHit(PtrHit const&) const;
         double GetDistance(PtrHit const&, PtrHit const&) const;
+        double GetDistance(ana::Hit const&, ana::Hit const&) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
@@ -575,6 +579,15 @@ namespace ana {
             PtrTrk const& pt,
             VecPtrHit const& vph_ev,
             art::FindOneP<recob::Track> const& fop_hit2trk,
+            BraggOptions const& opt
+        ) const;
+        Bragg GetLongBragg(
+            VecPtrHit const& vph_trk,
+            PtrHit const& ph_end,
+            PtrTrk const& pt,
+            VecPtrHit const& vph_ev,
+            art::FindOneP<recob::Track> const& fop_hit2trk,
+            ana::LinearRegression const& reg_trk,
             BraggOptions const& opt
         ) const;
     };
@@ -719,6 +732,10 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
 // 2D projected distance in cm
 double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2) const {
     Hit h1 = GetHit(ph1), h2 = GetHit(ph2);
+    if (h1.section != h2.section) return std::numeric_limits<double>::max();
+    return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
+}
+double ana::MichelAnalyzer::GetDistance(ana::Hit const& h1, ana::Hit const& h2) const {
     if (h1.section != h2.section) return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
@@ -1103,6 +1120,144 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
             mip_dx += .5*(GetDistance(*(iph-1), *iph) + GetDistance(*iph, *(iph+1)));
     }
     bragg.mip_dQdx = mip_dQ / mip_dx;
+
+    VecPtrHit::iterator iph_max;
+    unsigned const trailing_n = opt.reg_n;
+    for (auto iph=iph_body; iph!=vph_sec_trk.end(); iph++) {
+        VecPtrHit::iterator jph = iph-trailing_n;
+
+        double dQ = std::accumulate(
+            jph, iph, 0.,
+            [](double sum, PtrHit const& ph) {
+                return sum+ph->Integral();
+            }
+        ) / trailing_n;
+
+        double dx = 0;
+        for (auto kph=jph; kph!=iph; kph++) {
+            if (kph == vph_sec_trk.begin())
+                dx += GetDistance(*kph, *(kph+1));
+            else if (kph == vph_sec_trk.end()-1)
+                dx += GetDistance(*(kph-1), *kph);
+            else
+                dx += .5 * (
+                    GetDistance(*(kph-1), *kph)
+                    + GetDistance(*kph, *(kph+1))
+                );
+        }
+        dx /= trailing_n;
+
+        double dQdx = dQ / dx;
+        if (dQdx > bragg.max_dQdx) {
+            bragg.max_dQdx = dQdx;
+            iph_max = iph;
+        }
+    }
+    bragg.end = *iph_max;
+    bragg.vph_mu.assign(
+        vph_sec_trk.begin(), 
+        iph_max==vph_sec_trk.end() ? vph_sec_trk.end() : iph_max+1
+    );
+    bragg.error = ana::Bragg::kNoError;
+    return bragg;
+}
+
+ana::Bragg ana::MichelAnalyzer::GetLongBragg(
+    VecPtrHit const& vph_trk,
+    PtrHit const& ph_end,
+    PtrTrk const& pt_mu,
+    VecPtrHit const& vph_ev,
+    art::FindOneP<recob::Track> const& fop_hit2trk,
+    ana::LinearRegression const& reg_trk,
+    ana::BraggOptions const& opt
+) const {
+    ana::Bragg bragg;
+    VecPtrHit vph_sec_trk;
+    int sec_end = ana::tpc2sec[geoDet][ph_end->WireID().TPC];
+    for (PtrHit const& ph : vph_trk)
+        if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sec_end)
+            vph_sec_trk.push_back(ph);
+    
+    if (vph_sec_trk.size() < 2
+        || std::find_if(
+            vph_sec_trk.begin(), vph_sec_trk.end(),
+            [key=ph_end.key()](PtrHit const& ph) -> bool {
+                return ph.key() == key;
+            }
+        ) == vph_sec_trk.end()
+    ) {
+        bragg.error = ana::Bragg::kEndNotFound;
+        return bragg;
+    }
+
+    // decreasing dist to end: body->end
+    std::sort(
+        vph_sec_trk.begin(), vph_sec_trk.end(),
+        [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
+            return GetDistance(ph1, ph_end) > GetDistance(ph2, ph_end);
+        }
+    );
+
+    VecPtrHit::iterator iph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& ph) -> bool {
+            return GetDistance(ph, ph_end) <= opt.body_dist;
+        }
+    );
+
+    if (std::distance(vph_sec_trk.begin(), iph_body) < opt.reg_n) {
+        bragg.error = ana::Bragg::kSmallBody;
+        return bragg;
+    }
+
+    float mip_dQ = 0, mip_dx = 0;
+    for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
+        mip_dQ += (*iph)->Integral();
+        if (iph == vph_sec_trk.begin())
+            mip_dx += GetDistance(*iph, *(iph+1));
+        else if (iph == vph_sec_trk.end()-1)
+            mip_dx += GetDistance(*(iph-1), *iph);
+        else 
+            mip_dx += .5*(GetDistance(*(iph-1), *iph) + GetDistance(*iph, *(iph+1)));
+    }
+    bragg.mip_dQdx = mip_dQ / mip_dx;
+
+    VecPtrHit vph_farther;
+    for (PtrHit const& ph_ev : vph_ev) {
+        if (ph_ev->View() != geo::kW) continue;
+        ana::Hit hit = GetHit(ph_ev);
+        if (hit.section != sec_end) continue;
+        if (GetDistance(ph_ev, ph_end) > opt.body_dist) continue;
+
+        if (std::find_if(
+            vph_sec_trk.begin(), vph_sec_trk.end(),
+            [key=ph_ev.key()](PtrHit const& ph) -> bool {
+                return ph.key() == key;
+            }
+        ) != vph_sec_trk.end()) continue;
+
+        if (reg_trk.distance(hit.space, hit.tick * fTick2cm) > 1) continue;
+        vph_farther.push_back(ph_ev);
+    }
+
+    // increasing dist to end: end->farther
+    std::sort(
+        vph_farther.begin(), vph_farther.end(),
+        [&](PtrHit const& ph1, PtrHit const& ph2) -> bool {
+            return GetDistance(ph1, ph_end) < GetDistance(ph2, ph_end);
+        }
+    );
+
+    vph_sec_trk.insert(vph_sec_trk.end(), vph_farther.begin(), vph_farther.end());
+
+    VecPtrHit::iterator iph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& ph) -> bool {
+            return GetDistance(ph, ph_end) <= opt.body_dist;
+        }
+    );
 
     VecPtrHit::iterator iph_max;
     unsigned const trailing_n = opt.reg_n;
