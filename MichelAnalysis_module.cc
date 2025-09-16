@@ -114,6 +114,7 @@ private:
     int TruePdg;
     std::string TrueEndProcess;
     ana::Point MuonTrueEndPoint;
+    float MuonTrueEndEnergy;
     bool TrueDownward;
     ana::Hit MuonTrueEndHit;
 
@@ -280,6 +281,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TruePdg", &TruePdg);
     tMuon->Branch("TrueEndProcess", &TrueEndProcess);
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
+    tMuon->Branch("MuonTrueEndEnergy", &MuonTrueEndEnergy); 
     tMuon->Branch("TrueDownward", &TrueDownward);
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
 
@@ -575,6 +577,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 pt_ev,
                 vph_ev,
                 fop_hit2trk,
+                // MuonReg,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
             );
             BraggError = bragg.error;
@@ -683,6 +686,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             TruePdg = mcp->PdgCode();
             TrueEndProcess = mcp->EndProcess();
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
+            MuonTrueEndEnergy = mcp->EndE() * 1e3; // MeV
 
             if (geoDet == kPDVD)
                 TrueDownward = mcp->Position(0).X() > mcp->EndPosition().X();
@@ -835,6 +839,7 @@ void ana::MichelAnalysis::resetMuon() {
     TruePdg = 0;
     TrueEndProcess = "";
     MuonTrueEndPoint = ana::Point{};
+    MuonTrueEndEnergy = -1.F;
     TrueDownward = false;
     MuonTrueEndHit = ana::Hit{};
 

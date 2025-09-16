@@ -1251,7 +1251,7 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
 
     vph_sec_trk.insert(vph_sec_trk.end(), vph_farther.begin(), vph_farther.end());
 
-    VecPtrHit::iterator iph_body = std::find_if(
+    iph_body = std::find_if(
         vph_sec_trk.begin(),
         vph_sec_trk.end(),
         [&](PtrHit const& ph) -> bool {
