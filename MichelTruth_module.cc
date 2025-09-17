@@ -45,6 +45,9 @@ private:
     ana::LinearRegression MuonReg;
     ana::Point EndPoint;
     float EndEnergy;
+    int HitCathodeCrossing;
+    enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
+    float HitCathodeTick;
     ana::Hits Hits;
     std::vector<float> HitProjection;
     std::vector<float> HitdQdx;
@@ -148,6 +151,8 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
+    tMuon->Branch("HitCathodeCrossing", &HitCathodeCrossing);
+    tMuon->Branch("HitCathodeTick", &HitCathodeTick);
 
     tMuon->Branch("RegDirZ", &RegDirZ);
     MuonReg.SetBranches(tMuon, "");
@@ -242,6 +247,18 @@ void ana::MichelTruth::analyze(art::Event const& e)
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
         EndPoint = ana::Point(mcp.EndPosition().Vect());
         EndEnergy = mcp.EndE() * 1e3; // MeV
+
+        if (sh_mu.is_cc()) {
+            if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
+                HitCathodeCrossing = kAlignedHitOnBothSides;
+            else
+                HitCathodeCrossing = kHitOnBothSides;
+
+            HitCathodeTick = sh_mu.cc.second->PeakTime();
+        } else {
+            HitCathodeCrossing = kNoCC;
+            HitCathodeTick = -1;
+        }
 
         VecPtrHit vph_mu_sec;
         for (PtrHit const& ph_mu : sh_mu.vph) {
