@@ -52,6 +52,7 @@ private:
     int HasMichel;
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
 
+    ana::Point MichelPoint;
     float MichelTrueEnergy;
     float MichelTrackLength, MichelShowerLength;
     ana::Hits MichelHits;
@@ -143,6 +144,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
 
     Hits.SetBranches(tMuon, "");
     tMuon->Branch("HitProjection", &HitProjection);
+    tMuon->Branch("HitdQdx", &HitdQdx);
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
@@ -150,6 +152,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("RegDirZ", &RegDirZ);
     MuonReg.SetBranches(tMuon, "");
 
+    MichelPoint.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelTrackLength", &MichelTrackLength);
@@ -301,6 +304,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             continue;
         }
 
+        MichelPoint = ana::Point(mcp_mi->Position().Vect());
         MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3; // MeV
         MichelHitEnergy = 0.F;
         // MichelHitTIDEEnergy = 0.F;
@@ -448,6 +452,7 @@ void ana::MichelTruth::resetMuon() {
     
     // Michel
     HasMichel = kNoMichel;
+    MichelPoint = ana::Point{};
     MichelTrueEnergy = -1.F;
     MichelHitEnergy = -1.F;
     MichelHits.clear();
