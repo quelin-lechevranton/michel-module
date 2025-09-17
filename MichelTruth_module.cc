@@ -24,6 +24,7 @@ private:
     bool fLog;
     float fMichelRadius;
     bool fKeepTransportation;
+    unsigned fRegN;
 
     // Output Variables
     unsigned evRun, evSubRun, evEvent;
@@ -39,15 +40,17 @@ private:
 
     bool IsAnti;
     std::string EndProcess;
-    int HasMichel;
-    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
-    ana::Hits Hits;
-    std::vector<float> HitProjection;
     ana::Hit EndHit;
-    ana::Point EndPoint;
-
     int RegDirZ;
     ana::LinearRegression MuonReg;
+    ana::Point EndPoint;
+    float EndEnergy;
+    ana::Hits Hits;
+    std::vector<float> HitProjection;
+    std::vector<float> HitdQdx;
+
+    int HasMichel;
+    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
 
     float MichelTrueEnergy;
     float MichelTrackLength, MichelShowerLength;
@@ -78,7 +81,8 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
     fMichelRadius(p.get<float>("MichelRadius", 20.F)),
-    fKeepTransportation(p.get<bool>("KeepTransportation", true))
+    fKeepTransportation(p.get<bool>("KeepTransportation", true)),
+    fRegN(p.get<unsigned>("RegN", 6))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -141,6 +145,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("HitProjection", &HitProjection);
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
+    tMuon->Branch("EndEnergy", &EndEnergy);
 
     tMuon->Branch("RegDirZ", &RegDirZ);
     MuonReg.SetBranches(tMuon, "");
@@ -216,10 +221,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
     for (simb::MCParticle const& mcp : *vh_mcp) {
         ASSERT(abs(mcp.PdgCode()) == 13)
 
-        IsAnti = mcp.PdgCode() < 0;
-        EndProcess = mcp.EndProcess();
-
-        if (!fKeepTransportation && EndProcess == "Transportation") continue;
+        if (!fKeepTransportation && mcp.EndProcess() == "Transportation") continue;
 
         VecPtrHit vph_mcp = ana::mcp2hits(&mcp, vph_ev, clockData, false);
         ASSERT(vph_mcp.size())
@@ -230,9 +232,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         resetMuon();
 
+        EventiMuon.push_back(iMuon);
+        IsAnti = mcp.PdgCode() < 0;
+        EndProcess = mcp.EndProcess();
         EndHit = GetHit(sh_mu.end);
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+        EndPoint = ana::Point(mcp.EndPosition().Vect());
+        EndEnergy = mcp.EndE() * 1e3; // MeV
 
+        VecPtrHit vph_mu_sec;
         for (PtrHit const& ph_mu : sh_mu.vph) {
             ana::Hit hit = GetHit(ph_mu);
             Hits.push_back(hit);
@@ -241,26 +249,52 @@ void ana::MichelTruth::analyze(art::Event const& e)
                     hit.space, hit.tick * fTick2cm
                 )
             );
+            if (hit.section == sh_mu.secs.back()) {
+                vph_mu_sec.push_back(ph_mu);
+            }
         }
+        ASSERT(vph_mu_sec.size() > fRegN)
+        HitdQdx.assign(fRegN, 0.F);
+        for (auto iph=vph_mu_sec.begin()+fRegN; iph!=vph_mu_sec.end(); iph++) {
+            VecPtrHit::iterator jph = iph-fRegN;
 
-        EndPoint = ana::Point(mcp.EndPosition().Vect());
+            double dQ = std::accumulate(
+                jph, iph, 0.,
+                [](double sum, PtrHit const& ph) {
+                    return sum+ph->Integral();
+                }
+            ) / fRegN;
+
+            double dx = 0;
+            for (auto kph=jph; kph!=iph; kph++) {
+                if (kph == vph_mu_sec.begin())
+                    dx += GetDistance(*kph, *(kph+1));
+                else if (kph == vph_mu_sec.end()-1)
+                    dx += GetDistance(*(kph-1), *kph);
+                else
+                    dx += .5 * (
+                        GetDistance(*(kph-1), *kph)
+                        + GetDistance(*kph, *(kph+1))
+                    );
+            }
+            dx /= fRegN;
+
+            HitdQdx.push_back(dQ / dx);
+        }
 
         simb::MCParticle const* mcp_mi = GetMichelMCP(&mcp);
         if (mcp_mi) {
-            HasMichel = (
-                geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
+            if (geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
                 || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
-            ) ? kHasMichelFiducial : (
-                geoHighX.isInside(mcp_mi->Position().Vect())
-                || geoLowX.isInside(mcp_mi->EndPosition().Vect())
-                ? kHasMichelInside
-                : kHasMichelOutside
-            );
-        }
-
-        EventiMuon.push_back(iMuon);
-
-        if (!mcp_mi) {
+            )
+                HasMichel = kHasMichelFiducial;
+            else if (geoHighX.isInside(mcp_mi->Position().Vect())
+                || geoLowX.isInside(mcp_mi->Position().Vect())
+            )
+                HasMichel = kHasMichelInside;
+            else
+                HasMichel = kHasMichelOutside;
+        } else {
             tMuon->Fill();
             iMuon++;
             EventNMuon++;
