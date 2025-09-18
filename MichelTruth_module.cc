@@ -40,12 +40,19 @@ private:
 
     bool IsAnti;
     std::string EndProcess;
-    ana::Hit EndHit;
+    ana::Hit StartHit, EndHit;
     int RegDirZ;
     ana::LinearRegression MuonReg;
     ana::Point EndPoint;
     float EndEnergy;
-    int HitCathodeCrossing;
+
+    int TrackTag;
+    ana::Point TrackStartPoint, TrackEndPoint;
+    float TrackLength;
+    ana::Hit TrackStartHit, TrackEndHit;
+    ana::Hits TrackHits;
+
+    int HitAnodeCrossing, HitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
     float HitCathodeTick;
     ana::Hits Hits;
@@ -78,6 +85,7 @@ private:
 
     void resetMuon();
 
+    bool IsUpright(recob::Track const& T);
     std::string GetParticleName(int pdg);
 };
 
@@ -148,9 +156,20 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     Hits.SetBranches(tMuon, "");
     tMuon->Branch("HitProjection", &HitProjection);
     tMuon->Branch("HitdQdx", &HitdQdx);
+    StartHit.SetBranches(tMuon, "Start");
     EndHit.SetBranches(tMuon, "End");
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
+
+    tMuon->Branch("TrackTag", &TrackTag);
+    TrackStartPoint.SetBranches(tMuon, "TrackStart");
+    TrackEndPoint.SetBranches(tMuon, "TrackEnd");
+    tMuon->Branch("TrackLength", &TrackLength);
+    TrackStartHit.SetBranches(tMuon, "TrackStart");
+    TrackEndHit.SetBranches(tMuon, "TrackEnd");
+    TrackHits.SetBranches(tMuon, "Track");
+
+    tMuon->Branch("HitAnodeCrossing", &HitAnodeCrossing);
     tMuon->Branch("HitCathodeCrossing", &HitCathodeCrossing);
     tMuon->Branch("HitCathodeTick", &HitCathodeTick);
 
@@ -243,10 +262,44 @@ void ana::MichelTruth::analyze(art::Event const& e)
         EventiMuon.push_back(iMuon);
         IsAnti = mcp.PdgCode() < 0;
         EndProcess = mcp.EndProcess();
+        StartHit = GetHit(sh_mu.start);
         EndHit = GetHit(sh_mu.end);
+        ASSERT(sh_mu.start.key() == sh_mu.vph.front().key())
+        ASSERT(sh_mu.end.key() == sh_mu.vph.back().key())
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
         EndPoint = ana::Point(mcp.EndPosition().Vect());
-        EndEnergy = mcp.EndE() * 1e3; // MeV
+        EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
+
+        PtrTrk pt_mu = ana::mcp2trk(&mcp, vpt_ev, clockData, fmp_trk2hit);
+        TrackTag = 0;
+        if (pt_mu) {
+            TrackTag++;
+            if (IsUpright(*pt_mu)) {
+                TrackStartPoint = ana::Point(pt_mu->Start());
+                TrackEndPoint = ana::Point(pt_mu->End());
+            } else {
+                TrackStartPoint = ana::Point(pt_mu->End());
+                TrackEndPoint = ana::Point(pt_mu->Start());
+            }
+            TrackLength = pt_mu->Length();
+            
+            VecPtrHit vph_trk = fmp_trk2hit.at(pt_mu.key());
+            ana::SortedHits sh_trk = GetSortedHits(vph_trk, TrackEndPoint.z > TrackStartPoint.z ? 1 : -1);
+            if (sh_trk) {
+                TrackTag++;
+                TrackStartHit = GetHit(sh_trk.start);
+                TrackEndHit = GetHit(sh_trk.end);
+                for (PtrHit const& ph_trk : sh_trk.vph) {
+                    if (ph_trk->View() != geo::kW) continue;
+                    TrackHits.push_back(GetHit(ph_trk));
+                }
+            }
+        }
+
+        if (geoDet == kPDVD)
+            HitAnodeCrossing = geoHighX.z.isInside(StartHit.space, fMichelRadius) && wireWindow.isInside(StartHit.tick, fMichelRadius/fTick2cm);
+        else if (geoDet == kPDHD)
+            HitAnodeCrossing = false;
 
         if (sh_mu.is_cc()) {
             if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
@@ -464,6 +517,13 @@ void ana::MichelTruth::beginJob() {}
 void ana::MichelTruth::endJob() {}
 
 void ana::MichelTruth::resetMuon() {
+    TrackStartPoint = ana::Point();
+    TrackEndPoint = ana::Point();
+    TrackLength = -1.F;
+    TrackStartHit = ana::Hit();
+    TrackEndHit = ana::Hit();
+    TrackHits.clear();
+
     Hits.clear();
     HitProjection.clear();
     
@@ -485,6 +545,13 @@ void ana::MichelTruth::resetMuon() {
     NearbyHits.clear();
 }
 
+bool ana::MichelTruth::IsUpright(recob::Track const& T) {
+    if (geoDet == kPDVD)
+        return T.Start().X() > T.End().X();
+    if (geoDet == kPDHD)
+        return T.Start().Y() > T.End().Y();
+    return false;
+}
 
 std::string ana::MichelTruth::GetParticleName(int pdg) {
 

@@ -36,10 +36,6 @@ physics: {
                 ["Reco",       "pandora",       "",       "recob::SpacePoint"],
                 ["Reco",       "pandora",       "",       "recob::PFParticle"]
             ]
-
-            ADC2el: 1000
-            MichelRadius: 20.
-            KeepTransportation: false
         }
     }
     ana: [ checks ]
