@@ -557,8 +557,8 @@ namespace ana {
         Axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
         Hit GetHit(PtrHit const&) const;
-        double GetDistance(PtrHit const&, PtrHit const&) const;
-        double GetDistance(ana::Hit const&, ana::Hit const&) const;
+        double GetDistance(PtrHit const&, PtrHit const&, bool) const;
+        double GetDistance(ana::Hit const&, ana::Hit const&, bool) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
@@ -730,13 +730,15 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
 }
 
 // 2D projected distance in cm
-double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2) const {
+double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool different_sections=false) const {
     Hit h1 = GetHit(ph1), h2 = GetHit(ph2);
-    if (h1.section != h2.section) return std::numeric_limits<double>::max();
+    if (!different_sections && (h1.section != h2.section))
+        return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
-double ana::MichelAnalyzer::GetDistance(ana::Hit const& h1, ana::Hit const& h2) const {
-    if (h1.section != h2.section) return std::numeric_limits<double>::max();
+double ana::MichelAnalyzer::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool different_sections=false) const {
+    if (!different_sections && (h1.section != h2.section))
+        return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
 

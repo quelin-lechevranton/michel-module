@@ -22,7 +22,7 @@ private:
 
     // Input Parameters
     bool fLog;
-    float fMichelRadius;
+    float fFiducialCut; // cm
     bool fKeepTransportation;
     unsigned fRegN;
 
@@ -51,6 +51,9 @@ private:
     float TrackLength;
     ana::Hit TrackStartHit, TrackEndHit;
     ana::Hits TrackHits;
+    int TrackHitAnodeCrossing, TrackHitCathodeCrossing;
+    float TrackHitCathodeTick;
+    std::vector<float> TrackHitdQdx;
 
     int HitAnodeCrossing, HitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
@@ -59,10 +62,10 @@ private:
     std::vector<float> HitProjection;
     std::vector<float> HitdQdx;
 
-    int HasMichel;
-    enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
+    bool HasMichel;
+    // enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
 
-    ana::Point MichelPoint;
+    ana::Point MichelStartPoint, MichelEndPoint;
     float MichelTrueEnergy;
     float MichelTrackLength, MichelShowerLength;
     ana::Hits MichelHits;
@@ -92,7 +95,7 @@ private:
 ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", false)),
-    fMichelRadius(p.get<float>("MichelRadius", 20.F)),
+    fFiducialCut(p.get<float>("FiducialCut", 10.F)),
     fKeepTransportation(p.get<bool>("KeepTransportation", true)),
     fRegN(p.get<unsigned>("RegN", 6))
 {
@@ -126,6 +129,17 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     }
     fCathodeGap = geoHighX.x.min - geoLowX.x.max;
 
+    if (fLog) {
+        std::cout << "=== Geometry ===" << std::endl;
+        std::cout << "  Detector: " << (geoDet==kPDVD ? "PDVD" : (geoDet==kPDHD ? "PDHD" : "Unknown")) << std::endl;
+        std::cout << "  Low X: " << geoLowX << std::endl;
+        std::cout << "  High X: " << geoHighX << std::endl;
+        std::cout << "  Wire window: " << wireWindow << " ticks" << std::endl;
+        std::cout << "================" << std::endl;
+    }
+
+
+
     tEvent = asFile->make<TTree>("event","");
 
     tEvent->Branch("eventRun", &evRun);
@@ -151,7 +165,6 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     // tMuon->Branch("SharedEnergy", &SharedEnergy, "SharedEnergy/F");
     // tMuon->Branch("MichelSphereTrueEnergy", &MichelSphereTrueEnergy, "MichelSphereTrueEnergy/F");
     // tMuon->Branch("MichelSphereEnergy", &MichelSphereEnergy, "MichelSphereEnergy/F");
-    tMuon->Branch("HasMichel", &HasMichel);
 
     Hits.SetBranches(tMuon, "");
     tMuon->Branch("HitProjection", &HitProjection);
@@ -168,6 +181,10 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     TrackStartHit.SetBranches(tMuon, "TrackStart");
     TrackEndHit.SetBranches(tMuon, "TrackEnd");
     TrackHits.SetBranches(tMuon, "Track");
+    tMuon->Branch("TrackHitAnodeCrossing", &TrackHitAnodeCrossing);
+    tMuon->Branch("TrackHitCathodeCrossing", &TrackHitCathodeCrossing);
+    tMuon->Branch("TrackHitCathodeTick", &TrackHitCathodeTick);
+    tMuon->Branch("TrackHitdQdx", &TrackHitdQdx);
 
     tMuon->Branch("HitAnodeCrossing", &HitAnodeCrossing);
     tMuon->Branch("HitCathodeCrossing", &HitCathodeCrossing);
@@ -176,7 +193,9 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("RegDirZ", &RegDirZ);
     MuonReg.SetBranches(tMuon, "");
 
-    MichelPoint.SetBranches(tMuon, "Michel");
+    tMuon->Branch("HasMichel", &HasMichel);
+    MichelStartPoint.SetBranches(tMuon, "MichelStart");
+    MichelEndPoint.SetBranches(tMuon, "MichelEnd");
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy);
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelTrackLength", &MichelTrackLength);
@@ -246,7 +265,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             EventHits.push_back(GetHit(ph_ev));
 
     for (simb::MCParticle const& mcp : *vh_mcp) {
-        ASSERT(abs(mcp.PdgCode()) == 13)
+        if (abs(mcp.PdgCode()) != 13) continue;
 
         if (!fKeepTransportation && mcp.EndProcess() == "Transportation") continue;
 
@@ -264,8 +283,6 @@ void ana::MichelTruth::analyze(art::Event const& e)
         EndProcess = mcp.EndProcess();
         StartHit = GetHit(sh_mu.start);
         EndHit = GetHit(sh_mu.end);
-        ASSERT(sh_mu.start.key() == sh_mu.vph.front().key())
-        ASSERT(sh_mu.end.key() == sh_mu.vph.back().key())
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
         EndPoint = ana::Point(mcp.EndPosition().Vect());
         EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
@@ -293,11 +310,76 @@ void ana::MichelTruth::analyze(art::Event const& e)
                     if (ph_trk->View() != geo::kW) continue;
                     TrackHits.push_back(GetHit(ph_trk));
                 }
+
+                if (geoDet == kPDVD)
+                    TrackHitAnodeCrossing = TrackStartHit.section < 4 
+                        && geoHighX.z.isInside(TrackStartHit.space, fFiducialCut)
+                        && wireWindow.isInside(TrackStartHit.tick, fFiducialCut/fTick2cm);
+                else if (geoDet == kPDHD)
+                    TrackHitAnodeCrossing = false;
+
+                if (sh_trk.is_cc()) {
+                    if ((sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
+                        TrackHitCathodeCrossing = kAlignedHitOnBothSides;
+                    else
+                        TrackHitCathodeCrossing = kHitOnBothSides;
+
+                    TrackHitCathodeTick = sh_trk.cc.second->PeakTime();
+                } else {
+                    TrackHitCathodeCrossing = kNoCC;
+                    TrackHitCathodeTick = -1;
+                }
+
+                VecPtrHit vph_trk_sec;
+                for (PtrHit const& ph : sh_trk.vph) {
+                    ana::Hit hit = GetHit(ph);
+                    Hits.push_back(hit);
+                    HitProjection.push_back(
+                        sh_trk.regs[ana::tpc2side[geoDet][hit.tpc]].projection(
+                            hit.space, hit.tick * fTick2cm
+                        )
+                    );
+                    if (hit.section == sh_trk.secs.back()) {
+                        vph_trk_sec.push_back(ph);
+                    }
+                }
+                if (vph_trk_sec.size() > fRegN) {
+                    TrackTag++;
+                    TrackHitdQdx.assign(fRegN, 0.F);
+                    for (auto iph=vph_trk_sec.begin()+fRegN; iph!=vph_trk_sec.end(); iph++) {
+                        VecPtrHit::iterator jph = iph-fRegN;
+
+                        double dQ = std::accumulate(
+                            jph, iph, 0.,
+                            [](double sum, PtrHit const& ph) {
+                                return sum+ph->Integral();
+                            }
+                        ) / fRegN;
+
+                        double dx = 0;
+                        for (auto kph=jph; kph!=iph; kph++) {
+                            if (kph == vph_trk_sec.begin())
+                                dx += GetDistance(*kph, *(kph+1));
+                            else if (kph == vph_trk_sec.end()-1)
+                                dx += GetDistance(*(kph-1), *kph);
+                            else
+                                dx += .5 * (
+                                    GetDistance(*(kph-1), *kph)
+                                    + GetDistance(*kph, *(kph+1))
+                                );
+                        }
+                        dx /= fRegN;
+
+                        TrackHitdQdx.push_back(dQ / dx);
+                    }
+                }
             }
         }
 
         if (geoDet == kPDVD)
-            HitAnodeCrossing = geoHighX.z.isInside(StartHit.space, fMichelRadius) && wireWindow.isInside(StartHit.tick, fMichelRadius/fTick2cm);
+            HitAnodeCrossing = StartHit.section < 4 
+                && geoHighX.z.isInside(StartHit.space, fFiducialCut)
+                && wireWindow.isInside(StartHit.tick, fFiducialCut/fTick2cm);
         else if (geoDet == kPDHD)
             HitAnodeCrossing = false;
 
@@ -356,25 +438,27 @@ void ana::MichelTruth::analyze(art::Event const& e)
         }
 
         simb::MCParticle const* mcp_mi = GetMichelMCP(&mcp);
-        if (mcp_mi) {
-            if (geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
-                || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
-            )
-                HasMichel = kHasMichelFiducial;
-            else if (geoHighX.isInside(mcp_mi->Position().Vect())
-                || geoLowX.isInside(mcp_mi->Position().Vect())
-            )
-                HasMichel = kHasMichelInside;
-            else
-                HasMichel = kHasMichelOutside;
-        } else {
+        if (!mcp_mi) {
             tMuon->Fill();
             iMuon++;
             EventNMuon++;
             continue;
         }
 
-        MichelPoint = ana::Point(mcp_mi->Position().Vect());
+        HasMichel = true;
+        MichelStartPoint = ana::Point(mcp_mi->Position().Vect());
+        MichelEndPoint = ana::Point(mcp_mi->EndPosition().Vect());
+        // if (geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
+        //     || geoLowX.isInside(mcp_mi->Position().Vect(), 20.F)
+        // )
+        //     HasMichel = kHasMichelFiducial;
+        // else if (geoHighX.isInside(mcp_mi->Position().Vect())
+        //     || geoLowX.isInside(mcp_mi->Position().Vect())
+        // )
+        //     HasMichel = kHasMichelInside;
+        // else
+        //     HasMichel = kHasMichelOutside;
+
         MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3; // MeV
         MichelHitEnergy = 0.F;
         // MichelHitTIDEEnergy = 0.F;
@@ -523,13 +607,16 @@ void ana::MichelTruth::resetMuon() {
     TrackStartHit = ana::Hit();
     TrackEndHit = ana::Hit();
     TrackHits.clear();
+    TrackHitdQdx.clear();
 
     Hits.clear();
     HitProjection.clear();
+    HitdQdx.clear();
     
     // Michel
-    HasMichel = kNoMichel;
-    MichelPoint = ana::Point{};
+    HasMichel = false;
+    MichelStartPoint = ana::Point();
+    MichelEndPoint = ana::Point();
     MichelTrueEnergy = -1.F;
     MichelHitEnergy = -1.F;
     MichelHits.clear();
