@@ -394,7 +394,8 @@ namespace ana {
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     simb::MCParticle const* trk2mcp(
-        PtrTrk const& pt, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit) {
+        PtrTrk const& pt, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit
+    ) {
         std::unordered_map<int, float> map_tid_ene;
         for (PtrHit const& p_hit : fmp_trk2hit.at(pt.key()))
             for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))

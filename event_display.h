@@ -15,6 +15,28 @@
 #include <TGraph2D.h>
 
 namespace ana {
+    struct MarkerStyle {
+        Color_t c = kBlack;
+        Style_t m = kFullCircle;
+        Size_t s = 1.;
+    };
+    struct LineStyle {
+        Color_t c = kBlack;
+        Style_t l = kSolid;
+        Width_t w = 1;
+    };
+    void inline SetMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
+        m->SetMarkerColor(ms.c);
+        m->SetMarkerStyle(ms.m);
+        m->SetMarkerSize(ms.s);
+    };
+    void inline SetLineStyle(TAttLine* l, LineStyle const& ls) {
+        l->SetLineColor(ls.c);
+        l->SetLineStyle(ls.l);
+        l->SetLineWidth(ls.w);
+    };
+
+
     inline void DrawFrame(TCanvas* c, int geoDet, char const* left_title="", char const* right_title="") {
         Style_t const font = 43;
         Style_t font_size=0;
@@ -108,26 +130,7 @@ namespace ana {
         }
     }
 
-    struct MarkerStyle {
-        Color_t c = kBlack;
-        Style_t m = kFullCircle;
-        Size_t s = 1.;
-    };
-    struct LineStyle {
-        Color_t c = kBlack;
-        Style_t l = kSolid;
-        Width_t w = 1;
-    };
-    void inline SetMarkerStyle(TAttMarker* m, MarkerStyle const& ms) {
-        m->SetMarkerColor(ms.c);
-        m->SetMarkerStyle(ms.m);
-        m->SetMarkerSize(ms.s);
-    };
-    void inline SetLineStyle(TAttLine* l, LineStyle const& ls) {
-        l->SetLineColor(ls.c);
-        l->SetLineStyle(ls.l);
-        l->SetLineWidth(ls.w);
-    };
+
     class MichelDisplayer : public MichelAnalyzer {
     public:
         MichelDisplayer(fhicl::ParameterSet const& p) : MichelAnalyzer(p) {}

@@ -46,6 +46,11 @@ private:
     ana::Point EndPoint;
     float EndEnergy;
 
+    unsigned TrackN;
+    ana::Points TrackNStart, TrackNEnd;
+    std::vector<float> TrackNLength;
+    std::vector<unsigned> TrackNNHit;
+
     int TrackTag;
     ana::Point TrackStartPoint, TrackEndPoint;
     float TrackLength;
@@ -174,6 +179,12 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
 
+    tMuon->Branch("TrackN", &TrackN);
+    TrackNStart.SetBranches(tMuon, "TrackNStart");
+    TrackNEnd.SetBranches(tMuon, "TrackNEnd");
+    tMuon->Branch("TrackNLength", &TrackNLength);
+    tMuon->Branch("TrackNNHit", &TrackNNHit);
+
     tMuon->Branch("TrackTag", &TrackTag);
     TrackStartPoint.SetBranches(tMuon, "TrackStart");
     TrackEndPoint.SetBranches(tMuon, "TrackEnd");
@@ -287,10 +298,28 @@ void ana::MichelTruth::analyze(art::Event const& e)
         EndPoint = ana::Point(mcp.EndPosition().Vect());
         EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
 
-        PtrTrk pt_mu = ana::mcp2trk(&mcp, vpt_ev, clockData, fmp_trk2hit);
+        VecPtrTrk vpt_mu = ana::mcp2trks(&mcp, vpt_ev, clockData, fmp_trk2hit);
+
         TrackTag = 0;
-        if (pt_mu) {
+        TrackN = vpt_mu.size();
+        if (TrackN > 0) {
             TrackTag++;
+
+            std::sort(
+                vpt_mu.begin(), vpt_mu.end(),
+                [](PtrTrk const& a, PtrTrk const& b) {
+                    return a->Length() > b->Length();
+                }
+            );
+
+            for (auto ipt=vpt_mu.begin()+1; ipt!=vpt_mu.end(); ipt++) {
+                TrackNStart.push_back(ana::Point((*ipt)->Start()));
+                TrackNEnd.push_back(ana::Point((*ipt)->End()));
+                TrackNLength.push_back((*ipt)->Length());
+                TrackNNHit.push_back(fmp_trk2hit.at(ipt->key()).size());
+            }
+
+            PtrTrk pt_mu = vpt_mu.front();
             if (IsUpright(*pt_mu)) {
                 TrackStartPoint = ana::Point(pt_mu->Start());
                 TrackEndPoint = ana::Point(pt_mu->End());
@@ -601,6 +630,11 @@ void ana::MichelTruth::beginJob() {}
 void ana::MichelTruth::endJob() {}
 
 void ana::MichelTruth::resetMuon() {
+    TrackNStart.clear();
+    TrackNEnd.clear();
+    TrackNLength.clear();
+    TrackNNHit.clear();
+
     TrackStartPoint = ana::Point();
     TrackEndPoint = ana::Point();
     TrackLength = -1.F;
