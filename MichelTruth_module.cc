@@ -305,18 +305,25 @@ void ana::MichelTruth::analyze(art::Event const& e)
         if (TrackN > 0) {
             TrackTag++;
 
+            std::vector<float> nhits;
+            std::vector<unsigned> idxs;
+            unsigned idx = 0;
+            for (PtrTrk const& pt_ev : vpt_mu)
+                nhits.push_back(fmp_trk2hit.at(pt_ev.key()).size());
+                idxs.push_back(idx++);
+
             std::sort(
-                vpt_mu.begin(), vpt_mu.end(),
-                [](PtrTrk const& a, PtrTrk const& b) {
-                    return a->Length() > b->Length();
+                idxs.begin(), idxs.end(),
+                [&nhits](unsigned a, unsigned b) {
+                    return nhits[a] > nhits[b];
                 }
             );
 
-            for (auto ipt=vpt_mu.begin()+1; ipt!=vpt_mu.end(); ipt++) {
-                TrackNStart.push_back(ana::Point((*ipt)->Start()));
-                TrackNEnd.push_back(ana::Point((*ipt)->End()));
-                TrackNLength.push_back((*ipt)->Length());
-                TrackNNHit.push_back(fmp_trk2hit.at(ipt->key()).size());
+            for (auto ii = idxs.begin()+1; ii!=idxs.end(); ii++) {
+                TrackNStart.push_back(ana::Point(vpt_mu[*ii]->Start()));
+                TrackNEnd.push_back(ana::Point(vpt_mu[*ii]->End()));
+                TrackNLength.push_back(vpt_mu[*ii]->Length());
+                TrackNNHit.push_back(nhits[*ii]);
             }
 
             PtrTrk pt_mu = vpt_mu.front();
