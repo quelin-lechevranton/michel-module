@@ -66,7 +66,7 @@ private:
 
     int HitAnodeCrossing, HitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
-    float HitCathodeTick;
+    float HitCathodeDeltaTick, HitCathodeTick;
     ana::Hits Hits;
     std::vector<float> HitProjection;
     std::vector<float> HitdQdx;
@@ -205,6 +205,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("TrackHitCathodeTick", &TrackHitCathodeTick);
     tMuon->Branch("TrackHitdQdx", &TrackHitdQdx);
 
+    tMuon->Branch("HitCathodeDeltaTick", &HitCathodeDeltaTick);
     tMuon->Branch("HitAnodeCrossing", &HitAnodeCrossing);
     tMuon->Branch("HitCathodeCrossing", &HitCathodeCrossing);
     tMuon->Branch("HitCathodeTick", &HitCathodeTick);
@@ -442,13 +443,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
             HitAnodeCrossing = false;
 
         if (sh_mu.is_cc()) {
-            if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
+            HitCathodeDeltaTick = sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime();
+            if (HitCathodeDeltaTick*fTick2cm < 3 * fCathodeGap)
                 HitCathodeCrossing = kAlignedHitOnBothSides;
             else
                 HitCathodeCrossing = kHitOnBothSides;
 
             HitCathodeTick = sh_mu.cc.second->PeakTime();
         } else {
+            HitCathodeDeltaTick = 1000;
             HitCathodeCrossing = kNoCC;
             HitCathodeTick = -1;
         }
