@@ -56,6 +56,7 @@ private:
     float TrackLength;
     ana::Hit TrackStartHit, TrackEndHit;
     ana::Hits TrackHits;
+    unsigned TrackHitTP;
     int TrackHitAnodeCrossing, TrackHitCathodeCrossing;
     float TrackHitCathodeTick;
     std::vector<float> TrackHitdQdx;
@@ -192,6 +193,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     TrackStartHit.SetBranches(tMuon, "TrackStart");
     TrackEndHit.SetBranches(tMuon, "TrackEnd");
     TrackHits.SetBranches(tMuon, "Track");
+    tMuon->Branch("TrackHitTP", &TrackHitTP);
     tMuon->Branch("TrackHitAnodeCrossing", &TrackHitAnodeCrossing);
     tMuon->Branch("TrackHitCathodeCrossing", &TrackHitCathodeCrossing);
     tMuon->Branch("TrackHitCathodeTick", &TrackHitCathodeTick);
@@ -308,9 +310,10 @@ void ana::MichelTruth::analyze(art::Event const& e)
             std::vector<float> nhits;
             std::vector<unsigned> idxs;
             unsigned idx = 0;
-            for (PtrTrk const& pt_ev : vpt_mu)
+            for (PtrTrk const& pt_ev : vpt_mu) {
                 nhits.push_back(fmp_trk2hit.at(pt_ev.key()).size());
                 idxs.push_back(idx++);
+            }
 
             std::sort(
                 idxs.begin(), idxs.end(),
@@ -319,10 +322,16 @@ void ana::MichelTruth::analyze(art::Event const& e)
                 }
             );
 
-            for (auto ii = idxs.begin()+1; ii!=idxs.end(); ii++) {
-                TrackNStart.push_back(ana::Point(vpt_mu[*ii]->Start()));
-                TrackNEnd.push_back(ana::Point(vpt_mu[*ii]->End()));
-                TrackNLength.push_back(vpt_mu[*ii]->Length());
+            for (auto ii=idxs.begin()+1; ii!=idxs.end(); ii++) {
+                PtrTrk pt = vpt_mu[*ii];
+                if (IsUpright(*pt)) {
+                    TrackNStart.push_back(ana::Point(pt->Start()));
+                    TrackNEnd.push_back(ana::Point(pt->End()));
+                } else {
+                    TrackNStart.push_back(ana::Point(pt->End()));
+                    TrackNEnd.push_back(ana::Point(pt->Start()));
+                }
+                TrackNLength.push_back(pt->Length());
                 TrackNNHit.push_back(nhits[*ii]);
             }
 
@@ -345,7 +354,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
                 for (PtrHit const& ph_trk : sh_trk.vph) {
                     if (ph_trk->View() != geo::kW) continue;
                     TrackHits.push_back(GetHit(ph_trk));
+
+                    for (PtrHit const& ph_mu : sh_mu.vph) {
+                        if (ph_trk.key() == ph_mu.key()) {
+                            TrackHitTP++;
+                        }
+                    }
                 }
+
+
 
                 if (geoDet == kPDVD)
                     TrackHitAnodeCrossing = TrackStartHit.section < 4 
@@ -641,6 +658,7 @@ void ana::MichelTruth::resetMuon() {
     TrackStartHit = ana::Hit();
     TrackEndHit = ana::Hit();
     TrackHits.clear();
+    TrackHitTP = 0;
     TrackHitdQdx.clear();
 
     Hits.clear();
