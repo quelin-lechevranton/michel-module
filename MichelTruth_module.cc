@@ -51,6 +51,9 @@ private:
     std::vector<float> TrackNLength;
     std::vector<unsigned> TrackNNHit;
 
+    unsigned ShowerN;
+    std::vector<unsigned> ShowerNLength;
+
     int TrackTag;
     ana::Point TrackStartPoint, TrackEndPoint;
     float TrackLength;
@@ -186,6 +189,9 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("TrackNLength", &TrackNLength);
     tMuon->Branch("TrackNNHit", &TrackNNHit);
 
+    tMuon->Branch("ShowerN", &ShowerN);
+    tMuon->Branch("ShowerNLength", &ShowerNLength);
+
     tMuon->Branch("TrackTag", &TrackTag);
     TrackStartPoint.SetBranches(tMuon, "TrackStart");
     TrackEndPoint.SetBranches(tMuon, "TrackEnd");
@@ -301,6 +307,12 @@ void ana::MichelTruth::analyze(art::Event const& e)
         EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
 
         VecPtrTrk vpt_mu = ana::mcp2trks(&mcp, vpt_ev, clockData, fmp_trk2hit);
+        VecPtrShw vps_mu = ana::mcp2shws(&mcp, vps_ev, clockData, fmp_shw2hit);
+
+        ShowerN = vps_mu.size();
+        for (PtrShw const& ps : vps_mu) {
+            ShowerNLength.push_back(ps->Length());
+        }
 
         TrackTag = 0;
         TrackN = vpt_mu.size();
@@ -651,6 +663,7 @@ void ana::MichelTruth::resetMuon() {
     TrackNEnd.clear();
     TrackNLength.clear();
     TrackNNHit.clear();
+    ShowerNLength.clear();
 
     TrackStartPoint = ana::Point();
     TrackEndPoint = ana::Point();

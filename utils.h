@@ -394,7 +394,9 @@ namespace ana {
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     simb::MCParticle const* trk2mcp(
-        PtrTrk const& pt, detinfo::DetectorClocksData const& clockData, art::FindManyP<recob::Hit> const& fmp_trk2hit
+        PtrTrk const& pt,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_trk2hit
     ) {
         std::unordered_map<int, float> map_tid_ene;
         for (PtrHit const& p_hit : fmp_trk2hit.at(pt.key()))
@@ -459,14 +461,32 @@ namespace ana {
             }
         return vph_mcp;
     }
+
+    simb::MCParticle const* shw2mcp(
+        PtrShw const& ps,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_shw2hit
+    ) {
+        std::unordered_map<int, float> map_tid_ene;
+        for (PtrHit const& p_hit : fmp_shw2hit.at(ps.key()))
+            for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
+                map_tid_ene[ide.trackID] += ide.energy;
+
+        float max_ene = -1;
+        int tid_max = 0;
+        for (std::pair<int, float> p : map_tid_ene)
+            if (p.second > max_ene)
+                max_ene = p.second, tid_max = p.first;
+        return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+    }
     PtrShw mcp2shw(
         simb::MCParticle const* mcp, 
-        VecPtrShw const& vp_shw,
+        VecPtrShw const& vps_ev,
         detinfo::DetectorClocksData const& clockData,
         art::FindManyP<recob::Hit> const& fmp_shw2hit
     ) {
         std::unordered_map<PtrShw, unsigned> map_shw_nhit;
-        for (PtrShw ps : vp_shw)
+        for (PtrShw ps : vps_ev)
             map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(clockData, mcp->TrackId(), fmp_shw2hit.at(ps.key())).size();
 
         unsigned max = 0;
@@ -475,6 +495,21 @@ namespace ana {
             if (p.second > max)
                 max = p.second, p_shw_from_mcp = p.first;
         return p_shw_from_mcp;
+    }
+    VecPtrShw mcp2shws(
+        simb::MCParticle const* mcp,
+        VecPtrShw const& vps_ev,
+        detinfo::DetectorClocksData const& clockData,
+        art::FindManyP<recob::Hit> const& fmp_shw2hit
+    ) {
+        if (!mcp) return VecPtrShw{};
+        VecPtrShw vps_mcp;
+        for (PtrShw ps_ev : vps_ev) {
+            simb::MCParticle const* mcp_shw = shw2mcp(ps_ev, clockData, fmp_shw2hit);
+            if (mcp_shw && mcp_shw->TrackId() == mcp->TrackId())
+                vps_mcp.push_back(ps_ev);
+        }
+        return vps_mcp;
     }
 
 
