@@ -444,14 +444,14 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         if (sh_mu.is_cc()) {
             HitCathodeDeltaTick = sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime();
-            if (HitCathodeDeltaTick*fTick2cm < 3 * fCathodeGap)
+            if (abs(HitCathodeDeltaTick)*fTick2cm < 3 * fCathodeGap)
                 HitCathodeCrossing = kAlignedHitOnBothSides;
             else
                 HitCathodeCrossing = kHitOnBothSides;
 
             HitCathodeTick = sh_mu.cc.second->PeakTime();
         } else {
-            HitCathodeDeltaTick = 1000;
+            HitCathodeDeltaTick = 10000;
             HitCathodeCrossing = kNoCC;
             HitCathodeTick = -1;
         }
