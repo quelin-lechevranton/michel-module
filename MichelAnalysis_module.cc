@@ -451,7 +451,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         if (!TrkHitError) {
             if (sh_mu.is_cc()) {
-                if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
+                if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
                     TrkHitCathodeCrossing = kAlignedHitOnBothSides;
                 else
                     TrkHitCathodeCrossing = kHitOnBothSides;

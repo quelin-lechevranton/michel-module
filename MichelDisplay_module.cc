@@ -300,7 +300,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         int TrkHitCathodeCrossing = 0;
         if (sh_mu.is_cc()) {
-            if ((sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime()) * fTick2cm < 3*fCathodeGap)
+            if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime()) * fTick2cm < 3*fCathodeGap)
                 TrkHitCathodeCrossing = 2;
             else
                 TrkHitCathodeCrossing = 1;

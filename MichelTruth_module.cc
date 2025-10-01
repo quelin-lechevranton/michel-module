@@ -43,7 +43,7 @@ private:
     ana::Hit StartHit, EndHit;
     int RegDirZ;
     ana::LinearRegression MuonReg;
-    ana::Point EndPoint;
+    ana::Point StartPoint, EndPoint;
     float EndEnergy;
 
     unsigned TrackN;
@@ -60,6 +60,7 @@ private:
     ana::Hit TrackStartHit, TrackEndHit;
     ana::Hits TrackHits;
     unsigned TrackHitTP;
+    float TrackHitCathodeDeltaTick;
     int TrackHitAnodeCrossing, TrackHitCathodeCrossing;
     float TrackHitCathodeTick;
     std::vector<float> TrackHitdQdx;
@@ -180,6 +181,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("HitdQdx", &HitdQdx);
     StartHit.SetBranches(tMuon, "Start");
     EndHit.SetBranches(tMuon, "End");
+    StartPoint.SetBranches(tMuon, "Start");
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
 
@@ -200,6 +202,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     TrackEndHit.SetBranches(tMuon, "TrackEnd");
     TrackHits.SetBranches(tMuon, "Track");
     tMuon->Branch("TrackHitTP", &TrackHitTP);
+    tMuon->Branch("TrackHitCathodeDeltaTick", &TrackHitCathodeDeltaTick);
     tMuon->Branch("TrackHitAnodeCrossing", &TrackHitAnodeCrossing);
     tMuon->Branch("TrackHitCathodeCrossing", &TrackHitCathodeCrossing);
     tMuon->Branch("TrackHitCathodeTick", &TrackHitCathodeTick);
@@ -304,6 +307,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
         StartHit = GetHit(sh_mu.start);
         EndHit = GetHit(sh_mu.end);
         MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+        StartPoint = ana::Point(mcp.Position().Vect());
         EndPoint = ana::Point(mcp.EndPosition().Vect());
         EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
 
@@ -385,13 +389,15 @@ void ana::MichelTruth::analyze(art::Event const& e)
                     TrackHitAnodeCrossing = false;
 
                 if (sh_trk.is_cc()) {
-                    if ((sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
+                    TrackHitCathodeDeltaTick = sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime();
+                    if (abs(TrackHitCathodeDeltaTick)*fTick2cm < 2 * fCathodeGap)
                         TrackHitCathodeCrossing = kAlignedHitOnBothSides;
                     else
                         TrackHitCathodeCrossing = kHitOnBothSides;
 
                     TrackHitCathodeTick = sh_trk.cc.second->PeakTime();
                 } else {
+                    TrackHitCathodeDeltaTick = 10000;
                     TrackHitCathodeCrossing = kNoCC;
                     TrackHitCathodeTick = -1;
                 }
@@ -444,7 +450,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
         if (sh_mu.is_cc()) {
             HitCathodeDeltaTick = sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime();
-            if (abs(HitCathodeDeltaTick)*fTick2cm < 3 * fCathodeGap)
+            if (abs(HitCathodeDeltaTick)*fTick2cm < 2 * fCathodeGap)
                 HitCathodeCrossing = kAlignedHitOnBothSides;
             else
                 HitCathodeCrossing = kHitOnBothSides;
