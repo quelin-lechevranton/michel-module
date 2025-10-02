@@ -46,24 +46,27 @@ private:
     ana::Point StartPoint, EndPoint;
     float EndEnergy;
 
-    unsigned TrackN;
-    ana::Points TrackNStart, TrackNEnd;
-    std::vector<float> TrackNLength;
-    std::vector<unsigned> TrackNNHit;
+    unsigned TrkN;
+    ana::Points TrkNStart, TrkNEnd;
+    std::vector<float> TrkNLength;
+    std::vector<unsigned> TrkNNHit;
 
     unsigned ShowerN;
     std::vector<unsigned> ShowerNLength;
 
-    int TrackTag;
-    ana::Point TrackStartPoint, TrackEndPoint;
-    float TrackLength;
-    ana::Hit TrackStartHit, TrackEndHit;
-    ana::Hits TrackHits;
-    unsigned TrackHitTP;
-    float TrackHitCathodeDeltaTick;
-    int TrackHitAnodeCrossing, TrackHitCathodeCrossing;
-    float TrackHitCathodeTick;
-    std::vector<float> TrackHitdQdx;
+    int TrkTag;
+    ana::Point TrkStartPoint, TrkEndPoint;
+    float TrkLength;
+    ana::Hit TrkStartHit, TrkEndHit;
+    ana::Hits TrkHits;
+    unsigned TrkHitTP;
+    float TrkHitCathodeDeltaTick;
+    int TrkHitAnodeCrossing, TrkHitCathodeCrossing;
+    float TrkHitCathodeTick;
+    std::vector<float> TrkHitdQdx;
+    ana::Hits TrkNearbyHits;
+    ana::Vec2 TrkNearbyBary;
+    float TrkNearbyBaryMuonAngle;
 
     int HitAnodeCrossing, HitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
@@ -185,28 +188,31 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     EndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("EndEnergy", &EndEnergy);
 
-    tMuon->Branch("TrackN", &TrackN);
-    TrackNStart.SetBranches(tMuon, "TrackNStart");
-    TrackNEnd.SetBranches(tMuon, "TrackNEnd");
-    tMuon->Branch("TrackNLength", &TrackNLength);
-    tMuon->Branch("TrackNNHit", &TrackNNHit);
+    tMuon->Branch("TrackN",&TrkN);
+    TrkNStart.SetBranches(tMuon, "TrackNStart");
+    TrkNEnd.SetBranches(tMuon, "TrackNEnd");
+    tMuon->Branch("TrackNLength",&TrkNLength);
+    tMuon->Branch("TrackNNHit",&TrkNNHit);
 
     tMuon->Branch("ShowerN", &ShowerN);
     tMuon->Branch("ShowerNLength", &ShowerNLength);
 
-    tMuon->Branch("TrackTag", &TrackTag);
-    TrackStartPoint.SetBranches(tMuon, "TrackStart");
-    TrackEndPoint.SetBranches(tMuon, "TrackEnd");
-    tMuon->Branch("TrackLength", &TrackLength);
-    TrackStartHit.SetBranches(tMuon, "TrackStart");
-    TrackEndHit.SetBranches(tMuon, "TrackEnd");
-    TrackHits.SetBranches(tMuon, "Track");
-    tMuon->Branch("TrackHitTP", &TrackHitTP);
-    tMuon->Branch("TrackHitCathodeDeltaTick", &TrackHitCathodeDeltaTick);
-    tMuon->Branch("TrackHitAnodeCrossing", &TrackHitAnodeCrossing);
-    tMuon->Branch("TrackHitCathodeCrossing", &TrackHitCathodeCrossing);
-    tMuon->Branch("TrackHitCathodeTick", &TrackHitCathodeTick);
-    tMuon->Branch("TrackHitdQdx", &TrackHitdQdx);
+    tMuon->Branch("TrackTag",&TrkTag);
+    TrkStartPoint.SetBranches(tMuon, "TrackStart");
+    TrkEndPoint.SetBranches(tMuon, "TrackEnd");
+    tMuon->Branch("TrackLength",&TrkLength);
+    TrkStartHit.SetBranches(tMuon, "TrackStart");
+    TrkEndHit.SetBranches(tMuon, "TrackEnd");
+    TrkHits.SetBranches(tMuon, "Track");
+    tMuon->Branch("TrackHitTP",&TrkHitTP);
+    tMuon->Branch("TrackHitCathodeDeltaTick",&TrkHitCathodeDeltaTick);
+    tMuon->Branch("TrackHitAnodeCrossing",&TrkHitAnodeCrossing);
+    tMuon->Branch("TrackHitCathodeCrossing",&TrkHitCathodeCrossing);
+    tMuon->Branch("TrackHitCathodeTick",&TrkHitCathodeTick);
+    tMuon->Branch("TrackHitdQdx",&TrkHitdQdx);
+    TrkNearbyHits.SetBranches(tMuon, "TrackNearby");
+    TrkNearbyBary.SetBranches(tMuon, "TrackNearbyBary");
+    tMuon->Branch("TrackNearbyBaryMuonAngle", &TrkNearbyBaryMuonAngle);
 
     tMuon->Branch("HitCathodeDeltaTick", &HitCathodeDeltaTick);
     tMuon->Branch("HitAnodeCrossing", &HitAnodeCrossing);
@@ -319,10 +325,10 @@ void ana::MichelTruth::analyze(art::Event const& e)
             ShowerNLength.push_back(ps->Length());
         }
 
-        TrackTag = 0;
-        TrackN = vpt_mu.size();
-        if (TrackN > 0) {
-            TrackTag++;
+        TrkTag = 0;
+        TrkN = vpt_mu.size();
+        if (TrkN > 0) {
+            TrkTag++;
 
             std::vector<float> nhits;
             std::vector<unsigned> idxs;
@@ -342,39 +348,39 @@ void ana::MichelTruth::analyze(art::Event const& e)
             for (auto ii=idxs.begin()+1; ii!=idxs.end(); ii++) {
                 PtrTrk pt = vpt_mu[*ii];
                 if (IsUpright(*pt)) {
-                    TrackNStart.push_back(ana::Point(pt->Start()));
-                    TrackNEnd.push_back(ana::Point(pt->End()));
+                    TrkNStart.push_back(ana::Point(pt->Start()));
+                    TrkNEnd.push_back(ana::Point(pt->End()));
                 } else {
-                    TrackNStart.push_back(ana::Point(pt->End()));
-                    TrackNEnd.push_back(ana::Point(pt->Start()));
+                    TrkNStart.push_back(ana::Point(pt->End()));
+                    TrkNEnd.push_back(ana::Point(pt->Start()));
                 }
-                TrackNLength.push_back(pt->Length());
-                TrackNNHit.push_back(nhits[*ii]);
+                TrkNLength.push_back(pt->Length());
+                TrkNNHit.push_back(nhits[*ii]);
             }
 
             PtrTrk pt_mu = vpt_mu.front();
             if (IsUpright(*pt_mu)) {
-                TrackStartPoint = ana::Point(pt_mu->Start());
-                TrackEndPoint = ana::Point(pt_mu->End());
+                TrkStartPoint = ana::Point(pt_mu->Start());
+                TrkEndPoint = ana::Point(pt_mu->End());
             } else {
-                TrackStartPoint = ana::Point(pt_mu->End());
-                TrackEndPoint = ana::Point(pt_mu->Start());
+                TrkStartPoint = ana::Point(pt_mu->End());
+                TrkEndPoint = ana::Point(pt_mu->Start());
             }
-            TrackLength = pt_mu->Length();
+            TrkLength = pt_mu->Length();
             
             VecPtrHit vph_trk = fmp_trk2hit.at(pt_mu.key());
-            ana::SortedHits sh_trk = GetSortedHits(vph_trk, TrackEndPoint.z > TrackStartPoint.z ? 1 : -1);
+            ana::SortedHits sh_trk = GetSortedHits(vph_trk, TrkEndPoint.z > TrkStartPoint.z ? 1 : -1);
             if (sh_trk) {
-                TrackTag++;
-                TrackStartHit = GetHit(sh_trk.start);
-                TrackEndHit = GetHit(sh_trk.end);
+                TrkTag++;
+                TrkStartHit = GetHit(sh_trk.start);
+                TrkEndHit = GetHit(sh_trk.end);
                 for (PtrHit const& ph_trk : sh_trk.vph) {
                     if (ph_trk->View() != geo::kW) continue;
-                    TrackHits.push_back(GetHit(ph_trk));
+                    TrkHits.push_back(GetHit(ph_trk));
 
                     for (PtrHit const& ph_mu : sh_mu.vph) {
                         if (ph_trk.key() == ph_mu.key()) {
-                            TrackHitTP++;
+                            TrkHitTP++;
                         }
                     }
                 }
@@ -382,24 +388,24 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
 
                 if (geoDet == kPDVD)
-                    TrackHitAnodeCrossing = TrackStartHit.section < 4 
-                        && geoHighX.z.isInside(TrackStartHit.space, fFiducialCut)
-                        && wireWindow.isInside(TrackStartHit.tick, fFiducialCut/fTick2cm);
+                    TrkHitAnodeCrossing = TrkStartHit.section < 4 
+                        && geoHighX.z.isInside(TrkStartHit.space, fFiducialCut)
+                        && wireWindow.isInside(TrkStartHit.tick, fFiducialCut/fTick2cm);
                 else if (geoDet == kPDHD)
-                    TrackHitAnodeCrossing = false;
+                    TrkHitAnodeCrossing = false;
 
                 if (sh_trk.is_cc()) {
-                    TrackHitCathodeDeltaTick = sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime();
-                    if (abs(TrackHitCathodeDeltaTick)*fTick2cm < 2 * fCathodeGap)
-                        TrackHitCathodeCrossing = kAlignedHitOnBothSides;
+                    TrkHitCathodeDeltaTick = sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime();
+                    if (abs(TrkHitCathodeDeltaTick)*fTick2cm < 2 * fCathodeGap)
+                        TrkHitCathodeCrossing = kAlignedHitOnBothSides;
                     else
-                        TrackHitCathodeCrossing = kHitOnBothSides;
+                        TrkHitCathodeCrossing = kHitOnBothSides;
 
-                    TrackHitCathodeTick = sh_trk.cc.second->PeakTime();
+                    TrkHitCathodeTick = sh_trk.cc.second->PeakTime();
                 } else {
-                    TrackHitCathodeDeltaTick = 10000;
-                    TrackHitCathodeCrossing = kNoCC;
-                    TrackHitCathodeTick = -1;
+                    TrkHitCathodeDeltaTick = 10000;
+                    TrkHitCathodeCrossing = kNoCC;
+                    TrkHitCathodeTick = -1;
                 }
 
                 VecPtrHit vph_trk_sec;
@@ -409,8 +415,8 @@ void ana::MichelTruth::analyze(art::Event const& e)
                     }
                 }
                 if (vph_trk_sec.size() > fRegN) {
-                    TrackTag++;
-                    TrackHitdQdx.assign(fRegN, 0.F);
+                    TrkTag++;
+                    TrkHitdQdx.assign(fRegN, 0.F);
                     for (auto iph=vph_trk_sec.begin()+fRegN; iph!=vph_trk_sec.end(); iph++) {
                         VecPtrHit::iterator jph = iph-fRegN;
 
@@ -435,7 +441,32 @@ void ana::MichelTruth::analyze(art::Event const& e)
                         }
                         dx /= fRegN;
 
-                        TrackHitdQdx.push_back(dQ / dx);
+                        TrkHitdQdx.push_back(dQ / dx);
+                    }
+
+
+                    for (PtrHit const& ph_ev : vph_ev) {
+                        if (ph_ev->View() != geo::kW) continue;
+                        ana::Hit hit = GetHit(ph_ev);
+                        if (hit.section != TrkEndHit.section) continue;
+                        if (GetDistance(hit, TrkEndHit) > 10.F) continue;
+
+                        // not from long track
+                        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+                        if (pt_hit && 
+                            (pt_hit.key() == pt_mu.key()
+                            || pt_hit->Length() > 20.F)
+                        ) continue;
+
+                        TrkNearbyHits.push_back(hit);
+                    }
+
+                    if (TrkNearbyHits.size()) {
+                        TrkNearbyBary = TrkNearbyHits.barycenter(fTick2cm);
+                        float da = 
+                            (TrkNearbyBary - TrkEndHit.vec(fTick2cm)).angle() 
+                            - sh_trk.regs[ana::sec2side[geoDet][sh_mu.secs.back()]].theta(RegDirZ);
+                        TrkNearbyBaryMuonAngle = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2*M_PI : da;
                     }
                 }
             }
@@ -613,8 +644,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             // MichelBaryVec = (MichelBary - EndHit.vec(fTick2cm));
             MichelBaryAngle = (MichelBary - EndHit.vec(fTick2cm)).angle();
             float da = MichelBaryAngle - MuonReg.theta(RegDirZ);
-            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            MichelBaryMuonAngle = da;
+            MichelBaryMuonAngle = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2*M_PI : da;
         }
 
         // MichelSphereTrueEnergy.resize(radii.size(), 0.F);
@@ -668,20 +698,23 @@ void ana::MichelTruth::beginJob() {}
 void ana::MichelTruth::endJob() {}
 
 void ana::MichelTruth::resetMuon() {
-    TrackNStart.clear();
-    TrackNEnd.clear();
-    TrackNLength.clear();
-    TrackNNHit.clear();
+    TrkNStart.clear();
+    TrkNEnd.clear();
+    TrkNLength.clear();
+    TrkNNHit.clear();
     ShowerNLength.clear();
 
-    TrackStartPoint = ana::Point();
-    TrackEndPoint = ana::Point();
-    TrackLength = -1.F;
-    TrackStartHit = ana::Hit();
-    TrackEndHit = ana::Hit();
-    TrackHits.clear();
-    TrackHitTP = 0;
-    TrackHitdQdx.clear();
+    TrkStartPoint = ana::Point();
+    TrkEndPoint = ana::Point();
+    TrkLength = -1.F;
+    TrkStartHit = ana::Hit();
+    TrkEndHit = ana::Hit();
+    TrkHits.clear();
+    TrkHitTP = 0;
+    TrkHitdQdx.clear();
+    TrkNearbyHits.clear();
+    TrkNearbyBary = ana::Vec2{0.F, 0.F};
+    TrkNearbyBaryMuonAngle = 100.F;
 
     Hits.clear();
     HitProjection.clear();
