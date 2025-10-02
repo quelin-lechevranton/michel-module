@@ -65,6 +65,8 @@ private:
     float TrkHitCathodeTick;
     std::vector<float> TrkHitdQdx;
     ana::Hits TrkNearbyHits;
+    ana::LinearRegression TrkReg;
+    int TrkRegDirZ;
     ana::Vec2 TrkNearbyBary;
     float TrkNearbyBaryMuonAngle;
 
@@ -211,6 +213,8 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("TrackHitCathodeTick",&TrkHitCathodeTick);
     tMuon->Branch("TrackHitdQdx",&TrkHitdQdx);
     TrkNearbyHits.SetBranches(tMuon, "TrackNearby");
+    TrkReg.SetBranches(tMuon, "Track");
+    tMuon->Branch("TrackRegDirZ", &TrkRegDirZ);
     TrkNearbyBary.SetBranches(tMuon, "TrackNearbyBary");
     tMuon->Branch("TrackNearbyBaryMuonAngle", &TrkNearbyBaryMuonAngle);
 
@@ -461,11 +465,13 @@ void ana::MichelTruth::analyze(art::Event const& e)
                         TrkNearbyHits.push_back(hit);
                     }
 
+                    TrkReg = sh_trk.regs[ana::sec2side[geoDet][sh_trk.secs.back()]];
+                    TrkRegDirZ = (TrkEndPoint.z > TrkStartPoint.z ? 1 : -1);
+
                     if (TrkNearbyHits.size()) {
                         TrkNearbyBary = TrkNearbyHits.barycenter(fTick2cm);
                         float da = 
-                            (TrkNearbyBary - TrkEndHit.vec(fTick2cm)).angle() 
-                            - sh_trk.regs[ana::sec2side[geoDet][sh_mu.secs.back()]].theta(RegDirZ);
+                            (TrkNearbyBary - TrkEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
                         TrkNearbyBaryMuonAngle = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2*M_PI : da;
                     }
                 }
@@ -713,6 +719,8 @@ void ana::MichelTruth::resetMuon() {
     TrkHitTP = 0;
     TrkHitdQdx.clear();
     TrkNearbyHits.clear();
+    TrkReg = ana::LinearRegression();
+    TrkRegDirZ = 0;
     TrkNearbyBary = ana::Vec2{0.F, 0.F};
     TrkNearbyBaryMuonAngle = 100.F;
 
