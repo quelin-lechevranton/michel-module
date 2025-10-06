@@ -903,7 +903,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
     VecPtrHit const& vph,
     unsigned smoothing_length
 ) const {
-    if (vph.size() <= smoothing_length) return;
+    if (vph.size() <= smoothing_length) return std::vector<float>{};
 
     std::vector<float> dQdx(smoothing_length, 0.F);
     for (auto iph=vph.begin()+smoothing_length; iph!=vph.end(); iph++) {

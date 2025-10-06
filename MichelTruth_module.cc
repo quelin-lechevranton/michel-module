@@ -414,7 +414,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
                 VecPtrHit vph_trk_sec;
                 for (PtrHit const& ph : sh_trk.vph) {
-                    if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sh_trk.secs.back()) {
+                    if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sh_trk.end_sec()) {
                         vph_trk_sec.push_back(ph);
                     }
                 }
@@ -481,7 +481,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
                     hit.space, hit.tick * fTick2cm
                 )
             );
-            if (hit.section == sh_mu.secs.back()) {
+            if (hit.section == sh_mu.end_sec()) {
                 vph_mu_sec.push_back(ph_mu);
             }
         }

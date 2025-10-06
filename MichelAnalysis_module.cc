@@ -463,8 +463,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // SUPPOSITION: Muon is downward
         MuonRegDirZ = End.Z() > Start.Z() ? 1 : -1;
         ana::SortedHits sh_mu = GetSortedHits(vph_mu, MuonRegDirZ);
-        TrkHitError = !bool(sh_mu);
+        TrkHitError = !sh_mu;
 
+        LOG(!TrkHitError);
         if (!TrkHitError) {
             if (sh_mu.is_cc()) {
                 if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
@@ -477,6 +478,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             MuonEndHit = GetHit(sh_mu.end);
             MuonReg = sh_mu.end_reg(geoDet);
 
+            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides);
             if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
                 float dx = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
                 TrkHitEndInVolumeX = dx < geoHighX.x.max - fFiducialLength;
@@ -489,7 +491,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ana::Hit hit = GetHit(ph_mu);
                 MuonHits.push_back(hit);
 
-                if (hit.section != sh_mu.secs.back()) continue;
+                if (hit.section != sh_mu.end_sec()) continue;
                 vph_mu_sec.push_back(ph_mu);
             }
                     
@@ -544,6 +546,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
                 PandoraBaryHits.push_back(GetHit(ph_ev));
             }
+
+            LOG(PandoraBaryHits.size());
             if (PandoraBaryHits.size()) {
                 PandoraBary = PandoraBaryHits.barycenter(fTick2cm);
                 ana::Vec2 end_bary = PandoraBary - MuonEndHit.vec(fTick2cm);
@@ -605,6 +609,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             );
             BraggError = bragg.error;
 
+            LOG(BraggError == kNoError);
             if (BraggError == kNoError) {
                 MIPdQdx = bragg.mip_dQdx;
                 BraggdQdx = bragg.max_dQdx;
@@ -659,6 +664,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     if (GetDistance(ph_near, bragg.end) > 10) continue;
                     NearbyBaryHits.push_back(GetHit(ph_near));
                 }
+
+                LOG(NearbyBaryHits.size());
                 if (NearbyBaryHits.size()) {
                     NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
                     ana::Vec2 end_bary = NearbyBary - BraggEndHit.vec(fTick2cm);
@@ -705,6 +712,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         
 
         // Truth Information
+        LOG(mcp);
         if (mcp) {
             TruePdg = mcp->PdgCode();
             TrueEndProcess = mcp->EndProcess();
@@ -720,11 +728,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             MuonTrueRegDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, MuonTrueRegDirZ);
 
+            LOG(sh_mcp);
             if (sh_mcp) {
                 MuonTrueStartHit = GetHit(sh_mcp.start);
                 MuonTrueEndHit = GetHit(sh_mcp.end);
                 MuonTrueReg = sh_mu.end_reg(geoDet);
 
+                LOG(mcp_mi);
                 if (mcp_mi) {
                     TrueHasMichel = (
                         geoHighX.isInside(mcp_mi->Position().Vect(), 20.F)
@@ -762,6 +772,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         bary_hits.push_back(GetHit(ph_mi));
                     }
                     MichelBaryNHit = bary_hits.size();
+
+                    LOG(MichelBaryNHit);
                     if (bary_hits.size()) {
                         MichelBary = bary_hits.barycenter(fTick2cm);
                         ana::Vec2 end_bary = MichelBary - MuonTrueEndHit.vec(fTick2cm);
