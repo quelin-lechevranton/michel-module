@@ -528,8 +528,12 @@ namespace ana {
 
         SortedHits() : vph(0), secs(0), regs(2) {}
         operator bool() const { return !vph.empty(); }
-        bool is_cc() { return cc.first && cc.second; }
-        bool is_sc() { return !sc.empty(); }
+        bool is_cc() const { return cc.first && cc.second; }
+        bool is_sc() const { return !sc.empty(); }
+        int end_sec() const { return secs.back(); }
+        LinearRegression end_reg(int det) const {
+            return regs[ana::sec2side[det][end_sec()]];
+        }
     };
 
     struct BraggOptions {
@@ -600,6 +604,10 @@ namespace ana {
             VecPtrHit const& vph_unsorted,
             int dirz = 1,
             geo::View_t view = geo::kW
+        ) const;
+        std::vector<float> GetdQdx(
+            VecPtrHit const& vph,
+            unsigned smoothing_length
         ) const;
         Bragg GetBragg(
             VecPtrHit const& vph_trk,
@@ -808,7 +816,7 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 // points at cathode crossing if any,
 // points at section crossing if any
 // (a section is a set of two adjacent TPCs)
-
+//
 // possible cause of failure:
 // - no section with at least 4 (ana::LinearRegression::nmin) hits 
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
@@ -890,10 +898,47 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     return sh;
 }
 
+
+std::vector<float> ana::MichelAnalyzer::GetdQdx(
+    VecPtrHit const& vph,
+    unsigned smoothing_length
+) const {
+    if (vph.size() <= smoothing_length) return;
+
+    std::vector<float> dQdx(smoothing_length, 0.F);
+    for (auto iph=vph.begin()+smoothing_length; iph!=vph.end(); iph++) {
+        VecPtrHit::const_iterator jph = iph-smoothing_length;
+
+        double dQ = std::accumulate(
+            jph, iph, 0.,
+            [](double sum, PtrHit const& ph) {
+                return sum+ph->Integral();
+            }
+        ) / smoothing_length;
+
+        double dx = 0;
+        for (auto kph=jph; kph!=iph; kph++) {
+            if (kph == vph.begin())
+                dx += GetDistance(*kph, *(kph+1));
+            else if (kph == vph.end()-1)
+                dx += GetDistance(*(kph-1), *kph);
+            else
+                dx += .5 * (
+                    GetDistance(*(kph-1), *kph)
+                    + GetDistance(*kph, *(kph+1))
+                );
+        }
+        dx /= smoothing_length;
+
+        dQdx.push_back(dQ / dx);
+    }
+    return dQdx;
+}
+
 // recluster hits around the muon end,
 // compute local dE/dx along the cluster,
 // search for a peak in dE/dx (Bragg peak)
-
+//
 // possible causes of failure:
 // - the given end is not found in the track hits
 // - there is no enough hits (< 'fRegN') 'fBodyDistance' cm away from the end in the same section to start the clustering
@@ -1054,43 +1099,50 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
         reg = do_reg(vph_reg);
     }
 
-    unsigned const trailing_n = opt.reg_n;
-    VecPtrHit::iterator iph_max;
-    for (auto iph_clu=vph_clu.begin()+trailing_n; iph_clu!=vph_clu.end(); iph_clu++) {
-        VecPtrHit::iterator jph_clu = iph_clu-trailing_n;
-
-        double dQ = std::accumulate(
-            jph_clu, iph_clu, 0.,
-            [](double sum, PtrHit const& ph) {
-                return sum+ph->Integral();
-            }
-        ) / trailing_n;
-
-        double dx = 0;
-        for (auto iph=jph_clu; iph!=iph_clu; iph++) {
-            if (iph == vph_clu.begin())
-                dx += GetDistance(*iph, *(iph+1));
-            else if (iph == vph_clu.end()-1)
-                dx += GetDistance(*(iph-1), *iph);
-            else
-                dx += .5 * (
-                    GetDistance(*(iph-1), *iph)
-                    + GetDistance(*iph, *(iph+1))
-                );
-        }
-        dx /= trailing_n;
-
-        double dQdx = dQ / dx;
-        // if (dQdx > opt.bragg_threshold * bragg.mip_dQdx) {
-        //     bragg.end = *iph_clu;
-        //     break;
-        // }
-        if (dQdx > bragg.max_dQdx) {
-            bragg.max_dQdx = dQdx;
-            iph_max = iph_clu;
-        }
-    }
+    std::vector<float> clu_dQdx = GetdQdx(vph_clu, opt.reg_n);
+    std::vector<float>::iterator it_max = std::max_element(clu_dQdx.begin(), clu_dQdx.end());
+    VecPtrHit::iterator iph_max = vph_clu.begin() + std::distance(clu_dQdx.begin(), it_max);
     bragg.end = *iph_max;
+    bragg.max_dQdx = *it_max;
+
+    // unsigned const trailing_n = opt.reg_n;
+    // VecPtrHit::iterator iph_max;
+    // for (auto iph_clu=vph_clu.begin()+trailing_n; iph_clu!=vph_clu.end(); iph_clu++) {
+    //     VecPtrHit::iterator jph_clu = iph_clu-trailing_n;
+
+    //     double dQ = std::accumulate(
+    //         jph_clu, iph_clu, 0.,
+    //         [](double sum, PtrHit const& ph) {
+    //             return sum+ph->Integral();
+    //         }
+    //     ) / trailing_n;
+
+    //     double dx = 0;
+    //     for (auto iph=jph_clu; iph!=iph_clu; iph++) {
+    //         if (iph == vph_clu.begin())
+    //             dx += GetDistance(*iph, *(iph+1));
+    //         else if (iph == vph_clu.end()-1)
+    //             dx += GetDistance(*(iph-1), *iph);
+    //         else
+    //             dx += .5 * (
+    //                 GetDistance(*(iph-1), *iph)
+    //                 + GetDistance(*iph, *(iph+1))
+    //             );
+    //     }
+    //     dx /= trailing_n;
+
+    //     double dQdx = dQ / dx;
+    //     // if (dQdx > opt.bragg_threshold * bragg.mip_dQdx) {
+    //     //     bragg.end = *iph_clu;
+    //     //     break;
+    //     // }
+    //     if (dQdx > bragg.max_dQdx) {
+    //         bragg.max_dQdx = dQdx;
+    //         iph_max = iph_clu;
+    //     }
+    // }
+    // bragg.end = *iph_max;
+
     bragg.vph_mu.assign(
         vph_clu.begin(), 
         iph_max==vph_clu.end() ? vph_clu.end() : iph_max+1

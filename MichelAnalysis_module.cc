@@ -27,6 +27,8 @@ private:
     // Input Parameters
     bool fLog;
     float fTrackLengthCut; // in cm
+    float fFiducialLength; // in cm
+    float fBarycenterRadius; // in cm
     float fMichelRadius; // in cm
     float fNearbyRadius; // in cm
     float fBodyDistance; // in cm
@@ -66,6 +68,7 @@ private:
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
     ana::Hits MuonHits;
+    std::vector<float> PandoraMuonHitdQdx;
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
     float PandoraSphereEnergy;
@@ -113,10 +116,14 @@ private:
     // Truth information
     int TruePdg;
     std::string TrueEndProcess;
+    ana::Point MuonTrueStartPoint;
     ana::Point MuonTrueEndPoint;
     float MuonTrueEndEnergy;
     bool TrueDownward;
+    ana::Hit MuonTrueStartHit;
     ana::Hit MuonTrueEndHit;
+    int MuonTrueRegDirZ;
+    ana::LinearRegression MuonTrueReg;
 
     int TrueHasMichel;
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
@@ -149,6 +156,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
+    fFiducialLength(p.get<float>("FiducialLength", 10.F)), // in cm
+    fBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)), // in cm
     fMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
@@ -192,6 +201,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
         << "  LowX Bounds: " << geoLowX << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << fTrackLengthCut << " cm" << std::endl
+        << "  Fiducial Length: " << fFiducialLength << " cm" << std::endl
+        << "  Barycenter Radius: " << fBarycenterRadius << " cm" << std::endl
         << "  Michel Space Radius: " << fMichelRadius << " cm" << std::endl;
 
     tEvent = asFile->make<TTree>("event","");
@@ -234,7 +245,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     MuonReg.SetBranches(tMuon, "");
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
-    MuonHits.SetBranches(tMuon);
+    MuonHits.SetBranches(tMuon, "");
+    tMuon->Branch("HitdQdx", &PandoraMuonHitdQdx);
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
@@ -280,10 +292,14 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // Truth
     tMuon->Branch("TruePdg", &TruePdg);
     tMuon->Branch("TrueEndProcess", &TrueEndProcess);
+    MuonTrueStartPoint.SetBranches(tMuon, "TrueStart");
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
-    tMuon->Branch("MuonTrueEndEnergy", &MuonTrueEndEnergy); 
+    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); 
     tMuon->Branch("TrueDownward", &TrueDownward);
+    MuonTrueStartHit.SetBranches(tMuon, "TrueStart");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
+    tMuon->Branch("TrueRegDirZ", &MuonTrueRegDirZ);
+    MuonTrueReg.SetBranches(tMuon, "True");
 
     tMuon->Branch("TrueHasMichel", &TrueHasMichel);
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
@@ -373,7 +389,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         geo::Point_t End = TrkIsUpright ? pt_ev->End() : pt_ev->Start();
         MuonEndPoint = ana::Point(End);
 
-        TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fMichelRadius);
+        TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fFiducialLength);
 
         TrkCathodeCrossing = (
             geoLowX.isInside(Start)
@@ -385,9 +401,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // Anode Crossing: SUPPOSITION: Muon is downward
         if (geoDet == kPDVD)
-            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fFiducialLength);
         else if (geoDet == kPDHD)
-            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fMichelRadius) || geoLowX.isInsideYZ(Start, fMichelRadius);
+            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fFiducialLength) || geoLowX.isInsideYZ(Start, fFiducialLength);
 
         
         /* COMPARE TO AGNOCHECKS
@@ -459,17 +475,24 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 TrkHitCathodeCrossing = kNoCC;
             
             MuonEndHit = GetHit(sh_mu.end);
-            MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+            MuonReg = sh_mu.end_reg(geoDet);
 
-            if (TrkHitCathodeCrossing) {
-                float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
-                TrkHitEndInVolumeX = x < (geoHighX.x.max - fMichelRadius);
+            if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
+                float dx = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
+                TrkHitEndInVolumeX = dx < geoHighX.x.max - fFiducialLength;
             }
-            TrkHitEndInWindow = wireWindow.isInside(MuonEndHit.tick, fMichelRadius / fTick2cm);
+            TrkHitEndInWindow = wireWindow.isInside(MuonEndHit.tick, fFiducialLength / fTick2cm);
 
-            for (PtrHit const& ph_mu : sh_mu.vph)
-                if (ph_mu->View() == geo::kW)
-                    MuonHits.push_back(GetHit(ph_mu));
+            VecPtrHit vph_mu_sec;
+            for (PtrHit const& ph_mu : sh_mu.vph) {
+                if (ph_mu->View() != geo::kW) continue;
+                ana::Hit hit = GetHit(ph_mu);
+                MuonHits.push_back(hit);
+
+                if (hit.section != sh_mu.secs.back()) continue;
+                vph_mu_sec.push_back(ph_mu);
+            }
+                    
 
             /* COMPARE TO AGNOCHECKS
             HitPtrPair ends = GetTrackEndsHits(vph_mu);
@@ -566,8 +589,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
 
-
-
+            // End dQdx
+            PandoraMuonHitdQdx = GetdQdx(vph_mu_sec, fRegN);
 
             ana::Bragg bragg = GetBragg(
                 sh_mu.vph,
@@ -685,18 +708,22 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (mcp) {
             TruePdg = mcp->PdgCode();
             TrueEndProcess = mcp->EndProcess();
+            MuonTrueStartPoint = ana::Point(mcp->Position().Vect());
             MuonTrueEndPoint = ana::Point(mcp->EndPosition().Vect());
-            MuonTrueEndEnergy = mcp->EndE() * 1e3; // MeV
+            MuonTrueEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
             if (geoDet == kPDVD)
                 TrueDownward = mcp->Position(0).X() > mcp->EndPosition().X();
             else if (geoDet == kPDHD)
                 TrueDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            MuonTrueRegDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, MuonTrueRegDirZ);
 
             if (sh_mcp) {
+                MuonTrueStartHit = GetHit(sh_mcp.start);
                 MuonTrueEndHit = GetHit(sh_mcp.end);
+                MuonTrueReg = sh_mu.end_reg(geoDet);
 
                 if (mcp_mi) {
                     TrueHasMichel = (
@@ -710,8 +737,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     );
                     MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
 
-                    float mu_end_angle = sh_mcp.regs[ana::sec2side[geoDet][sh_mcp.secs.back()]]
-                        .theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
+                    float mu_end_angle = sh_mcp.end_reg(geoDet).theta(MuonTrueRegDirZ);
                     for (PtrHit const& ph_mi : vph_mi) {
                         if (ph_mi->View() != geo::kW) continue;
                         Hit hit = GetHit(ph_mi);
@@ -795,6 +821,7 @@ void ana::MichelAnalysis::resetMuon() {
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
     MuonHits.clear();
+    PandoraMuonHitdQdx.clear();
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
     PandoraSphereEnergy = -1.F;
@@ -838,10 +865,14 @@ void ana::MichelAnalysis::resetMuon() {
     // Muon Truth
     TruePdg = 0;
     TrueEndProcess = "";
+    MuonTrueStartPoint = ana::Point{};
     MuonTrueEndPoint = ana::Point{};
     MuonTrueEndEnergy = -1.F;
     TrueDownward = false;
+    MuonTrueStartHit = ana::Hit{};
     MuonTrueEndHit = ana::Hit{};
+    MuonTrueRegDirZ = 0;
+    MuonTrueReg = ana::LinearRegression{};
 
     // Michel Truth
     TrueHasMichel = kNoMichel;

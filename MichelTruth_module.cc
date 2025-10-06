@@ -316,7 +316,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
         EndProcess = mcp.EndProcess();
         StartHit = GetHit(sh_mu.start);
         EndHit = GetHit(sh_mu.end);
-        MuonReg = sh_mu.regs[ana::sec2side[geoDet][sh_mu.secs.back()]];
+        MuonReg = sh_mu.end_reg(geoDet);
         StartPoint = ana::Point(mcp.Position().Vect());
         EndPoint = ana::Point(mcp.EndPosition().Vect());
         EndEnergy = (mcp.EndE() - mcp.Mass()) * 1e3; // MeV
@@ -420,34 +420,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
                 }
                 if (vph_trk_sec.size() > fRegN) {
                     TrkTag++;
-                    TrkHitdQdx.assign(fRegN, 0.F);
-                    for (auto iph=vph_trk_sec.begin()+fRegN; iph!=vph_trk_sec.end(); iph++) {
-                        VecPtrHit::iterator jph = iph-fRegN;
-
-                        double dQ = std::accumulate(
-                            jph, iph, 0.,
-                            [](double sum, PtrHit const& ph) {
-                                return sum+ph->Integral();
-                            }
-                        ) / fRegN;
-
-                        double dx = 0;
-                        for (auto kph=jph; kph!=iph; kph++) {
-                            if (kph == vph_trk_sec.begin())
-                                dx += GetDistance(*kph, *(kph+1));
-                            else if (kph == vph_trk_sec.end()-1)
-                                dx += GetDistance(*(kph-1), *kph);
-                            else
-                                dx += .5 * (
-                                    GetDistance(*(kph-1), *kph)
-                                    + GetDistance(*kph, *(kph+1))
-                                );
-                        }
-                        dx /= fRegN;
-
-                        TrkHitdQdx.push_back(dQ / dx);
-                    }
-
+                    TrkHitdQdx = GetdQdx(vph_trk_sec, fRegN);
 
                     for (PtrHit const& ph_ev : vph_ev) {
                         if (ph_ev->View() != geo::kW) continue;
@@ -465,7 +438,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
                         TrkNearbyHits.push_back(hit);
                     }
 
-                    TrkReg = sh_trk.regs[ana::sec2side[geoDet][sh_trk.secs.back()]];
+                    TrkReg = sh_trk.end_reg(geoDet);
                     TrkRegDirZ = (TrkEndPoint.z > TrkStartPoint.z ? 1 : -1);
 
                     if (TrkNearbyHits.size()) {
@@ -513,33 +486,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             }
         }
         ASSERT(vph_mu_sec.size() > fRegN)
-        HitdQdx.assign(fRegN, 0.F);
-        for (auto iph=vph_mu_sec.begin()+fRegN; iph!=vph_mu_sec.end(); iph++) {
-            VecPtrHit::iterator jph = iph-fRegN;
-
-            double dQ = std::accumulate(
-                jph, iph, 0.,
-                [](double sum, PtrHit const& ph) {
-                    return sum+ph->Integral();
-                }
-            ) / fRegN;
-
-            double dx = 0;
-            for (auto kph=jph; kph!=iph; kph++) {
-                if (kph == vph_mu_sec.begin())
-                    dx += GetDistance(*kph, *(kph+1));
-                else if (kph == vph_mu_sec.end()-1)
-                    dx += GetDistance(*(kph-1), *kph);
-                else
-                    dx += .5 * (
-                        GetDistance(*(kph-1), *kph)
-                        + GetDistance(*kph, *(kph+1))
-                    );
-            }
-            dx /= fRegN;
-
-            HitdQdx.push_back(dQ / dx);
-        }
+        HitdQdx = GetdQdx(vph_mu_sec, fRegN);
 
         simb::MCParticle const* mcp_mi = GetMichelMCP(&mcp);
         if (!mcp_mi) {
