@@ -51,7 +51,7 @@ private:
 
     float TrkLength;
     bool TrkIsUpright; // Supposition: Muon is downward
-    ana::Point MuonEndPoint;
+    ana::Point TrkEndPoint;
     bool TrkEndInVolumeYZ;
     bool TrkCathodeCrossing;
     bool TrkAnodeCrossing;
@@ -62,13 +62,15 @@ private:
     bool TrkHitError;
     int TrkHitCathodeCrossing;
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
-    ana::Hit MuonEndHit;
-    int MuonRegDirZ;
-    ana::LinearRegression MuonReg;
+    bool TrkHitAnodeCrossing;
+    ana::Hit TrkStartHit, TrkEndHit;
+    float TrkEndHitX;
+    int TrkRegDirZ;
+    ana::LinearRegression TrkReg;
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
-    ana::Hits MuonHits;
-    std::vector<float> PandoraMuonHitdQdx;
+    ana::Hits TrkHits;
+    std::vector<float> PandoraTrkHitdQdx;
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
     float PandoraSphereEnergy;
@@ -230,7 +232,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // Track
     tMuon->Branch("TrkLength", &TrkLength);
     tMuon->Branch("TrkIsUpright", &TrkIsUpright);
-    MuonEndPoint.SetBranches(tMuon, "End");
+    TrkEndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("TrkEndInVolumeYZ", &TrkEndInVolumeYZ);
     tMuon->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
     tMuon->Branch("TrkAnodeCrossing", &TrkAnodeCrossing);
@@ -240,13 +242,16 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // Hit
     tMuon->Branch("TrkHitError", &TrkHitError);
     tMuon->Branch("TrkHitCathodeCrossing", &TrkHitCathodeCrossing);
-    MuonEndHit.SetBranches(tMuon, "End");
-    tMuon->Branch("RegDirZ", &MuonRegDirZ);
-    MuonReg.SetBranches(tMuon, "");
+    tMuon->Branch("TrkHitAnodeCrossing", &TrkHitAnodeCrossing);
+    TrkStartHit.SetBranches(tMuon, "Start");
+    TrkEndHit.SetBranches(tMuon, "End");
+    tMuon->Branch("EndHitX", &TrkEndHitX);
+    tMuon->Branch("RegDirZ", &TrkRegDirZ);
+    TrkReg.SetBranches(tMuon, "");
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
-    MuonHits.SetBranches(tMuon, "");
-    tMuon->Branch("HitdQdx", &PandoraMuonHitdQdx);
+    TrkHits.SetBranches(tMuon, "");
+    tMuon->Branch("HitdQdx", &PandoraTrkHitdQdx);
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
@@ -387,7 +392,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         TrkIsUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
         geo::Point_t End = TrkIsUpright ? pt_ev->End() : pt_ev->Start();
-        MuonEndPoint = ana::Point(End);
+        TrkEndPoint = ana::Point(End);
 
         TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fFiducialLength);
 
@@ -461,12 +466,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
         // SUPPOSITION: Muon is downward
-        MuonRegDirZ = End.Z() > Start.Z() ? 1 : -1;
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu, MuonRegDirZ);
+        TrkRegDirZ = End.Z() > Start.Z() ? 1 : -1;
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
         TrkHitError = !sh_mu;
 
         LOG(!TrkHitError);
         if (!TrkHitError) {
+            TrkStartHit = GetHit(sh_mu.start);
+            TrkEndHit = GetHit(sh_mu.end);
+            TrkReg = sh_mu.end_reg(geoDet);
+            TrkHitEndInWindow = wireWindow.isInside(TrkEndHit.tick, fFiducialLength / fTick2cm);
+
             if (sh_mu.is_cc()) {
                 if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
                     TrkHitCathodeCrossing = kAlignedHitOnBothSides;
@@ -474,22 +484,32 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     TrkHitCathodeCrossing = kHitOnBothSides;
             } else
                 TrkHitCathodeCrossing = kNoCC;
-            
-            MuonEndHit = GetHit(sh_mu.end);
-            MuonReg = sh_mu.end_reg(geoDet);
 
-            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides);
+            /***********************
+             * LOGIC FOR PDVD ONLY *
+             ***********************/
+            if (geoDet == kPDVD)
+                TrkHitAnodeCrossing = TrkStartHit.section < 4 
+                    && geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
+                    && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
+            else if (geoDet == kPDHD)
+                TrkHitAnodeCrossing = false;
+            
+            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides || TrkHitAnodeCrossing);
             if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
-                float dx = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
-                TrkHitEndInVolumeX = dx < geoHighX.x.max - fFiducialLength;
+                TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
+                TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
+            } else if (TrkHitAnodeCrossing) {
+                TrkEndHitX = geoHighX.x.max - abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
+                TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
             }
-            TrkHitEndInWindow = wireWindow.isInside(MuonEndHit.tick, fFiducialLength / fTick2cm);
+            /***********************/
 
             VecPtrHit vph_mu_sec;
             for (PtrHit const& ph_mu : sh_mu.vph) {
                 if (ph_mu->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_mu);
-                MuonHits.push_back(hit);
+                TrkHits.push_back(hit);
 
                 if (hit.section != sh_mu.end_sec()) continue;
                 vph_mu_sec.push_back(ph_mu);
@@ -506,13 +526,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             float fz = GetSpace(ends.first->WireID());
             float sz = GetSpace(ends.second->WireID());
             HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
-            MuonEndHit = GetHit(end);
+            TrkEndHit = GetHit(end);
             */
 
             VecPtrHit vph_end_sec;
             for (PtrHit const& ph_ev : vph_ev) {
                 if (ph_ev->View() != geo::kW) continue;
-                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != MuonEndHit.section) continue;
+                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != TrkEndHit.section) continue;
                 vph_end_sec.push_back(ph_ev);
             }
 
@@ -528,7 +548,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 PandoraSphereEnergy += ph_ev->Integral();
                 PandoraSphereHits.push_back(hit);
 
-                float da = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
+                float da = (hit.vec(fTick2cm) - TrkEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                 PandoraSphereHitMuonAngle.push_back(da);
 
@@ -550,9 +570,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             LOG(PandoraBaryHits.size());
             if (PandoraBaryHits.size()) {
                 PandoraBary = PandoraBaryHits.barycenter(fTick2cm);
-                ana::Vec2 end_bary = PandoraBary - MuonEndHit.vec(fTick2cm);
+                ana::Vec2 end_bary = PandoraBary - TrkEndHit.vec(fTick2cm);
                 PandoraBaryAngle = end_bary.angle();
-                float da = PandoraBaryAngle - MuonReg.theta(MuonRegDirZ);
+                float da = PandoraBaryAngle - TrkReg.theta(TrkRegDirZ);
                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                 PandoraBaryMuonAngle = da;
 
@@ -567,7 +587,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     float dist = GetDistance(ph_ev, sh_mu.end);
                     if (dist > 30) continue;
 
-                    ana::Vec2 end_hit = hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm);
+                    ana::Vec2 end_hit = hit.vec(fTick2cm) - TrkEndHit.vec(fTick2cm);
                     float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
                     if (dist > 5
@@ -594,7 +614,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             }
 
             // End dQdx
-            PandoraMuonHitdQdx = GetdQdx(vph_mu_sec, fRegN);
+            PandoraTrkHitdQdx = GetdQdx(vph_mu_sec, fRegN);
 
             ana::Bragg bragg = GetBragg(
                 sh_mu.vph,
@@ -604,7 +624,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 pt_ev,
                 vph_ev,
                 fop_hit2trk,
-                // MuonReg,
+                // TrkReg,
                 { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
             );
             BraggError = bragg.error;
@@ -648,7 +668,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     ana::Hit hit = GetHit(ph_near);
                     BraggSphereHits.push_back(hit);
 
-                    float da = (hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm)).angle() - MuonReg.theta(MuonRegDirZ);
+                    float da = (hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                     BraggSphereHitMuonAngle.push_back(da);
 
@@ -670,7 +690,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
                     ana::Vec2 end_bary = NearbyBary - BraggEndHit.vec(fTick2cm);
                     NearbyBaryAngle = end_bary.angle();
-                    float da = NearbyBaryAngle - MuonReg.theta(MuonRegDirZ);
+                    float da = NearbyBaryAngle - TrkReg.theta(TrkRegDirZ);
                     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                     NearbyBaryMuonAngle = da;
 
@@ -709,7 +729,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
         }
-        
 
         // Truth Information
         LOG(mcp);
@@ -732,7 +751,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (sh_mcp) {
                 MuonTrueStartHit = GetHit(sh_mcp.start);
                 MuonTrueEndHit = GetHit(sh_mcp.end);
-                MuonTrueReg = sh_mu.end_reg(geoDet);
+                MuonTrueReg = sh_mcp.end_reg(geoDet);
 
                 LOG(mcp_mi);
                 if (mcp_mi) {
@@ -752,11 +771,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (ph_mi->View() != geo::kW) continue;
                         Hit hit = GetHit(ph_mi);
                         MichelHits.push_back(hit);
-                        if (hit.section != MuonEndHit.section) {
+                        if (hit.section != MuonTrueEndHit.section) {
                             MichelHitMuonAngle.push_back(100);
                             continue;
                         }
-                        float mu_hit_angle = (hit.vec(fTick2cm) - MuonEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                        float mu_hit_angle = (hit.vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm)).angle() - mu_end_angle;
                         mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
                             ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
                             : mu_hit_angle;
@@ -827,13 +846,16 @@ void ana::MichelAnalysis::resetEvent() {
 void ana::MichelAnalysis::resetMuon() {
     // Hit
     TrkHitCathodeCrossing = -1;
-    MuonEndHit = ana::Hit{};
-    MuonRegDirZ = 0;
-    MuonReg = ana::LinearRegression{};
+    TrkHitAnodeCrossing = false;
+    TrkStartHit = ana::Hit{};
+    TrkEndHit = ana::Hit{};
+    TrkEndHitX = -500.F;
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
-    MuonHits.clear();
-    PandoraMuonHitdQdx.clear();
+    TrkRegDirZ = 0;
+    TrkReg = ana::LinearRegression{};
+    TrkHits.clear();
+    PandoraTrkHitdQdx.clear();
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
     PandoraSphereEnergy = -1.F;
