@@ -51,7 +51,7 @@ private:
 
     float TrkLength;
     bool TrkIsUpright; // Supposition: Muon is downward
-    ana::Point TrkEndPoint;
+    ana::Point TrkStartPoint, TrkEndPoint;
     bool TrkEndInVolumeYZ;
     bool TrkCathodeCrossing;
     bool TrkAnodeCrossing;
@@ -73,6 +73,7 @@ private:
     std::vector<float> PandoraTrkHitdQdx;
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
+    bool PandoraSphereHasShower;
     float PandoraSphereEnergy;
     float PandoraSphereEnergyTP;
     // Cone
@@ -232,6 +233,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // Track
     tMuon->Branch("TrkLength", &TrkLength);
     tMuon->Branch("TrkIsUpright", &TrkIsUpright);
+    TrkStartPoint.SetBranches(tMuon, "Start");
     TrkEndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("TrkEndInVolumeYZ", &TrkEndInVolumeYZ);
     tMuon->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
@@ -254,6 +256,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("HitdQdx", &PandoraTrkHitdQdx);
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
+    tMuon->Branch("PandoraSphereHasShower", &PandoraSphereHasShower);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
     // Cone
@@ -354,7 +357,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     // fmp_shw2hit = &art::FindManyP<recob::Hit>(vh_shw, e, tag_shw);
-    // fop_hit2shw = &art::FindOneP<recob::Shower>(vh_hit, e, tag_shw);
+    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
 
@@ -392,6 +395,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         TrkIsUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
         geo::Point_t End = TrkIsUpright ? pt_ev->End() : pt_ev->Start();
+        TrkStartPoint = ana::Point(Start);
         TrkEndPoint = ana::Point(End);
 
         TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fFiducialLength);
@@ -560,12 +564,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // integrate charges around muon endpoint
             PandoraSphereEnergy = 0;
             for (PtrHit const& ph_ev : vph_end_sec) {
-                ana::Hit hit = GetHit(ph_ev);
+                if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
+
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
-                // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                // if (ps_hit) continue;
-                if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
+
+                PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
+                if (ps_hit) PandoraSphereHasShower = true;
+
+                ana::Hit hit = GetHit(ph_ev);
                 PandoraSphereEnergy += ph_ev->Integral();
                 PandoraSphereHits.push_back(hit);
 
@@ -879,8 +886,10 @@ void ana::MichelAnalysis::resetMuon() {
     PandoraTrkHitdQdx.clear();
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
+    PandoraSphereHasShower = false;
     PandoraSphereEnergy = -1.F;
     PandoraSphereEnergyTP = -1.F;
+
     // Cone
     PandoraBaryHits.clear();
     PandoraBary = ana::Vec2{0,0};
