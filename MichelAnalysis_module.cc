@@ -485,25 +485,46 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             } else
                 TrkHitCathodeCrossing = kNoCC;
 
-            /***********************
-             * LOGIC FOR PDVD ONLY *
-             ***********************/
+            /* ASSUMS DOWNWARD MUONS FOR PDVD */
             if (geoDet == kPDVD)
                 TrkHitAnodeCrossing = TrkStartHit.section < 4 
                     && geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
                     && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
             else if (geoDet == kPDHD)
-                TrkHitAnodeCrossing = false;
+                TrkHitAnodeCrossing = 
+                    geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
+                    && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
             
-            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides || TrkHitAnodeCrossing);
+            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides);
+            LOG(TrkHitAnodeCrossing);
             if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
-                TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
-                TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
+                if (geoDet == kPDVD) {
+                    TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
+                    TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
+                } else if (geoDet == kPDHD) {
+                    int cc_sec = ana::tpc2sec[geoDet][sh_mu.cc.second->WireID().TPC];
+                    if (cc_sec == 0) {
+                        TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
+                        TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
+                    } else if (cc_sec == 1) {
+                        TrkEndHitX = geoHighX.x.min + abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
+                        TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
+                    }
+                }
             } else if (TrkHitAnodeCrossing) {
-                TrkEndHitX = geoHighX.x.max - abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
-                TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
+                if (geoDet == kPDVD) {
+                    TrkEndHitX = geoHighX.x.max - abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
+                    TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
+                } else if (geoDet == kPDHD) {
+                    if (TrkStartHit.section == 0) {
+                        TrkEndHitX = geoLowX.x.min + abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
+                        TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
+                    } else if (TrkStartHit.section == 1) {
+                        TrkEndHitX = geoHighX.x.max - abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
+                        TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
+                    }
+                }
             }
-            /***********************/
 
             VecPtrHit vph_mu_sec;
             for (PtrHit const& ph_mu : sh_mu.vph) {
