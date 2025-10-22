@@ -133,7 +133,7 @@ namespace ana {
             corr= 1 - 4 * (varx*vary - cov*cov) / pow(varx+vary, 2);
         }
         double projection(double x, double y) const {
-            return (x + m*(y-p)) / (1 + m*m);
+            return (x + m*(y-p)) / sqrt(1 + m*m);
         }
         double distance(double x, double y) const {
             return abs(y - (m*x + p)) / sqrt(1 + m*m);

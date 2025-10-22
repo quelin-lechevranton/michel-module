@@ -74,6 +74,7 @@ private:
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
     bool PandoraSphereHasShower;
+    bool PandoraBaryHasShower;
     float PandoraSphereEnergy;
     float PandoraSphereEnergyTP;
     // Cone
@@ -257,8 +258,10 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     tMuon->Branch("PandoraSphereHasShower", &PandoraSphereHasShower);
+    tMuon->Branch("PandoraBaryHasShower", &PandoraBaryHasShower);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
+
     // Cone
     PandoraBaryHits.SetBranches(tMuon, "PandoraBary");
     PandoraBary.SetBranches(tMuon, "PandoraBary");
@@ -592,6 +595,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
+
+                PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
+                if (ps_hit) PandoraBaryHasShower = true;
+
                 PandoraBaryHits.push_back(GetHit(ph_ev));
             }
 
@@ -887,6 +894,7 @@ void ana::MichelAnalysis::resetMuon() {
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
     PandoraSphereHasShower = false;
+    PandoraBaryHasShower = false;
     PandoraSphereEnergy = -1.F;
     PandoraSphereEnergyTP = -1.F;
 

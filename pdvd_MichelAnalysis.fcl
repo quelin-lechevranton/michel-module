@@ -25,16 +25,16 @@ physics: {
         checks: {
             module_type:    "MichelAnalysis"
             Products:       [
-                ["SingleGen",  "generator",     "",       "simb::MCTruth"],
-                ["G4Stage1",   "largeant",      "",       "simb::MCParticle"],
-                ["G4Stage1",   "largeant",      "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
-                ["Reco",       "wclsdatavd",    "gauss",  "recob::Wire"],
-                ["Reco",       "hitpdune",      "",       "recob::Hit"],
-                ["Reco",       "pandora",       "",       "recob::Cluster"],
-                ["Reco",       "pandoraTrack",  "",       "recob::Track"],
-                ["Reco",       "pandoraShower", "",       "recob::Shower"],
-                ["Reco",       "pandora",       "",       "recob::SpacePoint"],
-                ["Reco",       "pandora",       "",       "recob::PFParticle"]
+                ["SingleGen",  "cosmicgenerator",   "",       "simb::MCTruth"],
+                ["G4Stage1",   "largeant",          "",       "simb::MCParticle"],
+                ["G4Stage1",   "largeant",          "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
+                ["Reco",       "wclsdatavd",        "gauss",  "recob::Wire"],
+                ["Reco",       "hitpdune",          "",       "recob::Hit"],
+                ["Reco",       "pandora",           "",       "recob::Cluster"],
+                ["Reco",       "pandoraTrack",      "",       "recob::Track"],
+                ["Reco",       "pandoraShower",     "",       "recob::Shower"],
+                ["Reco",       "pandora",           "",       "recob::SpacePoint"],
+                ["Reco",       "pandora",           "",       "recob::PFParticle"]
             ]
             Log: false
         }

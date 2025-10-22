@@ -256,6 +256,9 @@ void ana::MichelTruth::analyze(art::Event const& e)
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
     auto const& vh_mcp = e.getValidHandle<std::vector<simb::MCParticle>>(tag_mcp);
+    if (!vh_mcp.isValid()) {
+        std::cout << "\033[1;91m" "No valid simb::MCParticle handle" "\033[0m" << std::endl;
+    }
 
     auto const& vh_hit = e.getValidHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
@@ -285,12 +288,21 @@ void ana::MichelTruth::analyze(art::Event const& e)
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
 
+
     EventNMuon = 0;
     EventiMuon.clear();
 
     evRun = e.run();
     evSubRun = e.subRun();
     evEvent = e.event();
+
+    if (fLog) std::cout << "\033[1;93m" "e" << iEvent
+        << " (" << evRun << ":" << evSubRun << ":" << evEvent << ")"
+        << " #mcp:" << vh_mcp->size()
+        << " #trk:" << vh_trk->size()
+        << " #shw:" << vh_shw->size()
+        << " #hit:" << vh_hit->size()
+        << "\033[0m" << std::endl;
 
     EventHits.clear();
     for (PtrHit ph_ev : vph_ev)
@@ -759,6 +771,9 @@ std::string ana::MichelTruth::GetParticleName(int pdg) {
         case 22: return "γ";
         case 2212: return "p";
         case 2112: return "n";
+        case 111: return "π0";
+        case 211: return "π+";
+        case -211: return "π-";
     }
 
     if (pdg > 1000000000) {
