@@ -132,6 +132,7 @@ private:
     int TrueHasMichel;
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
     float MichelTrueEnergy;
+    float MichelTrackLength, MichelShowerLength;
     ana::Hits MichelHits;
     std::vector<float> MichelHitMuonAngle;
     float MichelHitEnergy;
@@ -314,6 +315,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 
     tMuon->Branch("TrueHasMichel", &TrueHasMichel);
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
+    tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
+    tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
@@ -349,17 +352,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
-    // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
-    // if (!vh_shw.isValid()) {
-    //     std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
-    //     return;
-    // }
-    // VecPtrShw vps_ev;
-    // art::fill_ptr_vector(vps_ev, vh_shw);
+    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    if (!vh_shw.isValid()) {
+        std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
+        return;
+    }
+    VecPtrShw vps_ev;
+    art::fill_ptr_vector(vps_ev, vh_shw);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-    // fmp_shw2hit = &art::FindManyP<recob::Hit>(vh_shw, e, tag_shw);
+    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
@@ -801,6 +804,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     );
                     MichelTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
 
+
+                    PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+                    MichelTrackLength = pt_mi ? pt_mi->Length() : -1.F;
+                    PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+                    MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
+
+
+
                     float mu_end_angle = sh_mcp.end_reg(geoDet).theta(MuonTrueRegDirZ);
                     for (PtrHit const& ph_mi : vph_mi) {
                         if (ph_mi->View() != geo::kW) continue;
@@ -949,6 +960,8 @@ void ana::MichelAnalysis::resetMuon() {
     // Michel Truth
     TrueHasMichel = kNoMichel;
     MichelTrueEnergy = -1.F;
+    MichelTrackLength = -1.F;
+    MichelShowerLength = -1.F;
     MichelHits.clear();
     MichelHitMuonAngle.clear();
     MichelHitEnergy = -1.F;
