@@ -146,7 +146,6 @@ private:
 
     void resetEvent();
     void resetMuon();
-    bool IsUpright(recob::Track const& T);
 
     // HitPtrPair GetTrackEndsHits(
     //     HitPtrVec const& vp_hit,
@@ -973,15 +972,6 @@ void ana::MichelAnalysis::resetMuon() {
     MichelConeEnergy = -1.F;
     MichelKeyholeEnergy = -1.F;
 }
-
-bool ana::MichelAnalysis::IsUpright(recob::Track const& T) {
-    if (geoDet == kPDVD)
-        return T.Start().X() > T.End().X();
-    if (geoDet == kPDHD)
-        return T.Start().Y() > T.End().Y();
-    return false;
-}
-
 
 // HitPtrPair ana::MichelAnalysis::GetTrackEndsHits(
 //     HitPtrVec const& vp_hit,

@@ -588,12 +588,8 @@ namespace ana {
         // art::FindManyP<recob::Hit> *fmp_shw2hit;
         // art::FindOneP<recob::Shower> *fop_hit2shw;
 
-        // simb::MCParticle const* trk2mcp(PtrTrk const& pt);
-        // PtrTrk mcp2trk(simb::MCParticle const* mcp);
-        // VecPtrTrk mcp2trks(simb::MCParticle const* mcp);
-        // VecPtrHit mcp2hits(simb::MCParticle const* mcp, bool use_eve);
-        // PtrShw mcp2shw(simb::MCParticle const* mcp);
-
+        bool IsUpright(recob::Track const& T);
+        std::string GetParticleName(int pdg);
         Axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
         Hit GetHit(PtrHit const&) const;
@@ -681,75 +677,50 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 }    
 
-// simb::MCParticle const* ana::MichelAnalyzer::trk2mcp(
-//     PtrTrk const& pt
-// ) {
-//     std::unordered_map<int, float> map_tid_ene;
-//     for (PtrHit const& p_hit : fmp_trk2hit->at(pt.key()))
-//         for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(*clockData, p_hit))
-//             map_tid_ene[ide.trackID] += ide.energy;
+bool ana::MichelAnalyzer::IsUpright(recob::Track const& T) {
+    if (geoDet == kPDVD)
+        return T.Start().X() > T.End().X();
+    if (geoDet == kPDHD)
+        return T.Start().Y() > T.End().Y();
+    return false;
+}
+std::string ana::MichelAnalyzer::GetParticleName(int pdg) {
+    std::vector<std::string> static periodic_table = { "",
+        "H",                                                                                                  "He", 
+        "Li", "Be",                                                             "B",  "C",  "N",  "O",  "F",  "Ne",
+        "Na", "Mg",                                                             "Al", "Si", "P",  "S",  "Cl", "Ar",
+        "K",  "Ca", "Sc", "Ti", "V",  "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr",
+        "Rb", "Sr", "Y",  "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I",  "Xe"
+    };
 
-//     float max_ene = -1;
-//     int tid_max = 0;
-//     for (std::pair<int, float> p : map_tid_ene)
-//         if (p.second > max_ene)
-//             max_ene = p.second, tid_max = p.first;
-//     return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
-// }
+    switch (pdg) {
+        case 11: return "e-";
+        case -11: return "e+";
+        case 12: return "ve";
+        case -12: return "-ve";
+        case 13: return "µ-";
+        case -13: return "µ+";
+        case 14: return "vµ";
+        case -14: return "-vµ";
+        case 22: return "γ";
+        case 2212: return "p";
+        case 2112: return "n";
+        case 111: return "π0";
+        case 211: return "π+";
+        case -211: return "π-";
+    }
 
-// PtrTrk ana::MichelAnalyzer::mcp2trk(simb::MCParticle const* mcp) {
-//     std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
-//     for (PtrTrk p_trk : vpt_ev)
-//         map_trk_nhit[p_trk] += bt_serv->TrackIdToHits_Ps(*clockData, mcp->TrackId(), fmp_trk2hit->at(p_trk.key())).size();
+    if (pdg > 1000000000) {
+        unsigned ex = pdg % 10;
+        unsigned A = (pdg / 10) % 1000;
+        unsigned Z = (pdg / 10000) % 1000;
+        unsigned L = (pdg / 10000000);
+        if (L==100 && Z && Z < periodic_table.size())
+            return Form("%u%s%s", A, periodic_table[Z].c_str(), ex ? "*" : "");
+    }
 
-//     unsigned max = 0;
-//     PtrTrk p_trk_from_mcp;
-//     for (std::pair<PtrTrk, unsigned> p : map_trk_nhit)
-//         if (p.second > max)
-//             max = p.second, p_trk_from_mcp = p.first;
-//     return p_trk_from_mcp;
-// }
-// VecPtrTrk ana::MichelAnalyzer::mcp2trks(simb::MCParticle const* mcp) {
-//     if (!mcp) return VecPtrTrk{};
-//     VecPtrTrk vpt_mcp;
-//     for (PtrTrk pt_ev : vpt_ev) {
-//         simb::MCParticle const* mcp_trk = trk2mcp(pt_ev);
-//         if (mcp_trk && mcp_trk->TrackId() == mcp->TrackId())
-//             vpt_mcp.push_back(pt_ev);
-//     }
-//     return vpt_mcp;
-// }
-// VecPtrHit ana::MichelAnalyzer::mcp2hits(simb::MCParticle const* mcp, bool use_eve) {
-//     if (!mcp) return VecPtrHit{};
-//     VecPtrHit vph_mcp;
-//     for (PtrHit ph_ev : vph_ev)
-//         for (sim::TrackIDE ide : (use_eve
-//             ? bt_serv->HitToEveTrackIDEs(*clockData, ph_ev)
-//             : bt_serv->HitToTrackIDEs(*clockData, ph_ev)
-//         )) {
-//             if (ide.trackID == mcp->TrackId())
-//                 vph_mcp.push_back(ph_ev);
-//         }
-//     return vph_mcp;
-// }
-// PtrShw ana::MichelAnalyzer::mcp2shw(simb::MCParticle const* mcp) {
-//     std::unordered_map<PtrShw, unsigned> map_shw_nhit;
-//     for (PtrShw ps : vps_ev)
-//         map_shw_nhit[ps] += bt_serv->TrackIdToHits_Ps(
-//             *clockData, 
-//             mcp->TrackId(), 
-//             fmp_shw2hit->at(ps.key())
-//         ).size();
-
-//     unsigned max = 0;
-//     PtrShw p_shw_from_mcp;
-//     for (std::pair<PtrShw, unsigned> p : map_shw_nhit)
-//         if (p.second > max)
-//             max = p.second, p_shw_from_mcp = p.first;
-//     return p_shw_from_mcp;
-// }
-
-
+    return Form("%d", pdg);
+}
 
 ana::Axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
     geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});

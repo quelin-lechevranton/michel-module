@@ -103,8 +103,6 @@ private:
 
     void resetMuon();
 
-    bool IsUpright(recob::Track const& T);
-    std::string GetParticleName(int pdg);
 };
 
 ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
@@ -739,53 +737,6 @@ void ana::MichelTruth::resetMuon() {
     MichelHitEveTIDEEnergy.clear();
     MichelHitSimIDEEnergy.clear();
     NearbyHits.clear();
-}
-
-bool ana::MichelTruth::IsUpright(recob::Track const& T) {
-    if (geoDet == kPDVD)
-        return T.Start().X() > T.End().X();
-    if (geoDet == kPDHD)
-        return T.Start().Y() > T.End().Y();
-    return false;
-}
-
-std::string ana::MichelTruth::GetParticleName(int pdg) {
-
-    std::vector<std::string> periodic_table = { "",
-        "H",                                                                                                  "He", 
-        "Li", "Be",                                                             "B",  "C",  "N",  "O",  "F",  "Ne",
-        "Na", "Mg",                                                             "Al", "Si", "P",  "S",  "Cl", "Ar",
-        "K",  "Ca", "Sc", "Ti", "V",  "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr",
-        "Rb", "Sr", "Y",  "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I",  "Xe"
-    };
-
-    switch (pdg) {
-        case 11: return "e-";
-        case -11: return "e+";
-        case 12: return "ve";
-        case -12: return "-ve";
-        case 13: return "µ-";
-        case -13: return "µ+";
-        case 14: return "vµ";
-        case -14: return "-vµ";
-        case 22: return "γ";
-        case 2212: return "p";
-        case 2112: return "n";
-        case 111: return "π0";
-        case 211: return "π+";
-        case -211: return "π-";
-    }
-
-    if (pdg > 1000000000) {
-        unsigned ex = pdg % 10;
-        unsigned A = (pdg / 10) % 1000;
-        unsigned Z = (pdg / 10000) % 1000;
-        unsigned L = (pdg / 10000000);
-        if (L==100 && Z && Z < periodic_table.size())
-            return Form("%u%s%s", A, periodic_table[Z].c_str(), ex ? "*" : "");
-    }
-
-    return Form("%d", pdg);
 }
 
 DEFINE_ART_MODULE(ana::MichelTruth)
