@@ -130,17 +130,37 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
         std::cout << "\t\tnhits (ana no eve): " << vph2_mi.size() << std::endl;
         std::cout << "\t\tnhits (ana with eve): " << vph3_mi.size() << std::endl;
 
+
+        std::vector<size_t> unseen_keys2, unseen_keys3;
+        for (PtrHit const& ph_mi2 : vph2_mi) { unseen_keys2.push_back(ph_mi2.key()); }
+        for (PtrHit const& ph_mi3 : vph3_mi) { unseen_keys3.push_back(ph_mi3.key()); }
         for (PtrHit const& ph_mi : vph_mi) {
-            for (PtrHit const& ph_mi2 : vph2_mi) {
-                if (ph_mi.key() != ph_mi2.key()) {
-                    std::cout << "\t\t\tmismatch ana no eve: hit key " << ph_mi.key() << std::endl;
-                }
+
+            auto it2 = std::find_if(
+                unseen_keys2.begin(), unseen_keys2.end(),
+                [&ph_mi](size_t key2){ return key2 == ph_mi.key(); }
+            );
+            if (it2 != unseen_keys2.end()) {
+                unseen_keys2.erase(it2);
+            } else {
+                std::cout << "\t\t\tmissing (bt) in (noeve): hit key " << ph_mi.key() << std::endl;
             }
-            for (PtrHit const& ph_mi3 : vph3_mi) {
-                if (ph_mi.key() != ph_mi3.key()) {
-                    std::cout << "\t\t\tmismatch ana with eve: hit key " << ph_mi.key() << std::endl;
-                }
+
+            auto it3 = std::find_if(
+                unseen_keys3.begin(), unseen_keys3.end(),
+                [&ph_mi](size_t key3){ return key3 == ph_mi.key(); }
+            );
+            if (it3 != unseen_keys3.end()) {
+                unseen_keys3.erase(it3);
+            } else {
+                std::cout << "\t\t\tmissing (bt) in (eve): hit key " << ph_mi.key() << std::endl;
             }
+        }
+        for (size_t key2 : unseen_keys2) {
+            std::cout << "\t\t\textra (noeve) hit key " << key2 << std::endl;
+        }
+        for (size_t key3 : unseen_keys3) {
+            std::cout << "\t\t\textra (eve) hit key " << key3 << std::endl;
         }
 
         // for (PtrHit const& ph_ev : vph_ev) {
