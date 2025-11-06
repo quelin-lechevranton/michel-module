@@ -830,7 +830,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                                 return tide.trackID == mcp_mi->TrackId();
                             }
                         );
-                        MichelHitEnergyFrac.push_back(tide_mi != tides.end() ? tide_mi->energyFrac : 0.F);
+                        MichelHitEnergyFrac.push_back(tide_mi != tides.end() ? tide_mi->energyFrac : -1.F);
 
                         if (hit.section != MuonTrueEndHit.section) {
                             MichelHitMuonAngle.push_back(100);
