@@ -447,7 +447,8 @@ namespace ana {
         simb::MCParticle const* mcp,
         VecPtrHit const& vph_ev,
         detinfo::DetectorClocksData const& clockData,
-        bool use_eve
+        bool use_eve,
+        std::vector<float> *energyFracs = nullptr
     ) {
         if (!mcp) return VecPtrHit{};
         VecPtrHit vph_mcp;
@@ -456,8 +457,10 @@ namespace ana {
                 ? bt_serv->HitToEveTrackIDEs(clockData, ph_ev)
                 : bt_serv->HitToTrackIDEs(clockData, ph_ev)
             )) {
-                if (ide.trackID == mcp->TrackId())
+                if (ide.trackID == mcp->TrackId()) {
                     vph_mcp.push_back(ph_ev);
+                    if (energyFracs) energyFracs->push_back(ide.energyFrac);
+                }
             }
         return vph_mcp;
     }

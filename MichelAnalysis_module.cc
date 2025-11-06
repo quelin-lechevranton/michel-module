@@ -390,10 +390,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = nullptr;
         VecPtrHit vph_mcp_mu, vph_mi;
+        std::vector<float> energyFracs_mi;
         if (mcp) {
             mcp_mi = GetMichelMCP(mcp);
             vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true);
+            vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
         }
 
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
@@ -818,19 +819,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
                     float mu_end_angle = sh_mcp.end_reg(geoDet).theta(MuonTrueRegDirZ);
-                    for (PtrHit const& ph_mi : vph_mi) {
+                    // for (PtrHit const& ph_mi : vph_mi) {
+                    for (size_t i=0; i<vph_mi.size(); i++) {
+                        PtrHit const& ph_mi = vph_mi[i];
+                        float energyFrac = energyFracs_mi[i];
+
                         if (ph_mi->View() != geo::kW) continue;
                         Hit hit = GetHit(ph_mi);
                         MichelHits.push_back(hit);
-
-                        std::vector<sim::TrackIDE> tides = bt_serv->HitToTrackIDEs(clockData, ph_mi);
-                        std::vector<sim::TrackIDE>::const_iterator tide_mi = std::find_if(
-                            tides.begin(), tides.end(),
-                            [mcp_mi](sim::TrackIDE const& tide) -> bool {
-                                return tide.trackID == mcp_mi->TrackId();
-                            }
-                        );
-                        MichelHitEnergyFrac.push_back(tide_mi != tides.end() ? tide_mi->energyFrac : -1.F);
+                        MichelHitEnergyFrac.push_back(energyFrac);
 
                         if (hit.section != MuonTrueEndHit.section) {
                             MichelHitMuonAngle.push_back(100);
