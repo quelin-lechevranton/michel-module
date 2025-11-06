@@ -33,6 +33,7 @@ private:
     float fNearbyRadius; // in cm
     float fBodyDistance; // in cm
     unsigned fRegN;
+    bool fBragg;
     float fBraggThreshold; // in MIP
 
     // Output Variables
@@ -134,6 +135,7 @@ private:
     float MichelTrueEnergy;
     float MichelTrackLength, MichelShowerLength;
     ana::Hits MichelHits;
+    std::vector<float> MichelHitEnergyFrac;
     std::vector<float> MichelHitMuonAngle;
     float MichelHitEnergy;
 
@@ -166,6 +168,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
     fRegN(p.get<unsigned>("RegN", 6)),
+    fBragg(p.get<bool>("Bragg", false)),
     fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
 {
     auto const clockData = asDetClocks->DataForJob();
@@ -317,6 +320,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
     tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
     MichelHits.SetBranches(tMuon, "Michel");
+    tMuon->Branch("MichelHitEnergyFrac", &MichelHitEnergyFrac);
     tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
     tMuon->Branch("MichelHitEnergy", &MichelHitEnergy); // ADC
 
@@ -653,118 +657,120 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // End dQdx
             PandoraTrkHitdQdx = GetdQdx(vph_mu_sec, fRegN);
 
-            ana::Bragg bragg = GetBragg(
-                sh_mu.vph,
-                sh_mu.end,
-                // vph_mu,
-                // end,
-                pt_ev,
-                vph_ev,
-                fop_hit2trk,
-                // TrkReg,
-                { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-            );
-            BraggError = bragg.error;
+            if (fBragg) {
+                ana::Bragg bragg = GetBragg(
+                    sh_mu.vph,
+                    sh_mu.end,
+                    // vph_mu,
+                    // end,
+                    pt_ev,
+                    vph_ev,
+                    fop_hit2trk,
+                    // TrkReg,
+                    { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
+                );
+                BraggError = bragg.error;
 
-            LOG(BraggError == kNoError);
-            if (BraggError == kNoError) {
-                MIPdQdx = bragg.mip_dQdx;
-                BraggdQdx = bragg.max_dQdx;
-                BraggEndHit = GetHit(bragg.end);
+                LOG(BraggError == kNoError);
+                if (BraggError == kNoError) {
+                    MIPdQdx = bragg.mip_dQdx;
+                    BraggdQdx = bragg.max_dQdx;
+                    BraggEndHit = GetHit(bragg.end);
 
-                for (PtrHit const& ph_mu : bragg.vph_mu)
-                    BraggMuonHits.push_back(GetHit(ph_mu));
+                    for (PtrHit const& ph_mu : bragg.vph_mu)
+                        BraggMuonHits.push_back(GetHit(ph_mu));
 
-                VecPtrHit vph_near;
-                for (PtrHit const& ph_ev : vph_end_sec) {
-                    if (GetDistance(ph_ev, bragg.end) > fNearbyRadius) continue;
+                    VecPtrHit vph_near;
+                    for (PtrHit const& ph_ev : vph_end_sec) {
+                        if (GetDistance(ph_ev, bragg.end) > fNearbyRadius) continue;
 
-                    // not from mu
-                    if (std::find_if(
-                        bragg.vph_mu.begin(), bragg.vph_mu.end(),
-                        [&ph_ev](PtrHit const& ph) { return ph.key() == ph_ev.key(); }
-                    ) != bragg.vph_mu.end()) continue;
-                    
-                    // not from other long track
-                    PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-                    if (pt_hit
-                        && pt_hit.key() != pt_ev.key()
-                        && pt_hit->Length() > fTrackLengthCut
-                    ) continue;
-
-                    vph_near.push_back(ph_ev);
-                }
-
-                // Sphere
-                BraggSphereEnergy = 0;
-                BraggSphereEnergyTP = 0;
-                for (PtrHit const& ph_near : vph_near) {
-                    if (GetDistance(ph_near, bragg.end) > fMichelRadius) continue;
-                    // PtrShw ps_hit = fop_hit2shw.at(iph->key());
-                    BraggSphereEnergy += ph_near->Integral();
-                    ana::Hit hit = GetHit(ph_near);
-                    BraggSphereHits.push_back(hit);
-
-                    float da = (hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
-                    da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-                    BraggSphereHitMuonAngle.push_back(da);
-
-                    if (std::find_if(
-                        vph_mi.begin(), vph_mi.end(),
-                        [&ph_near](PtrHit const& h) -> bool { return h.key() == ph_near.key(); }
-                    ) != vph_mi.end()) 
-                        BraggSphereEnergyTP = ph_near->Integral();
-                }
-
-                // Cone
-                for (PtrHit const& ph_near : vph_near) {
-                    if (GetDistance(ph_near, bragg.end) > 10) continue;
-                    NearbyBaryHits.push_back(GetHit(ph_near));
-                }
-
-                LOG(NearbyBaryHits.size());
-                if (NearbyBaryHits.size()) {
-                    NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
-                    ana::Vec2 end_bary = NearbyBary - BraggEndHit.vec(fTick2cm);
-                    NearbyBaryAngle = end_bary.angle();
-                    float da = NearbyBaryAngle - TrkReg.theta(TrkRegDirZ);
-                    da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-                    NearbyBaryMuonAngle = da;
-
-                    // float angle = end_bary.angle();
-                    BraggConeEnergy = 0;
-                    BraggConeEnergyTP = 0;
-                    for (PtrHit const& ph_near : vph_near) {
-                        float dist = GetDistance(ph_near, bragg.end);
-                        if (dist > 30) continue;
-
-                        ana::Hit hit = GetHit(ph_near);
-                        ana::Vec2 end_hit = hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm);
-                        float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
-
-                        if (dist > 5
-                            && cosa < cos(30.F * TMath::DegToRad())
+                        // not from mu
+                        if (std::find_if(
+                            bragg.vph_mu.begin(), bragg.vph_mu.end(),
+                            [&ph_ev](PtrHit const& ph) { return ph.key() == ph_ev.key(); }
+                        ) != bragg.vph_mu.end()) continue;
+                        
+                        // not from other long track
+                        PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+                        if (pt_hit
+                            && pt_hit.key() != pt_ev.key()
+                            && pt_hit->Length() > fTrackLengthCut
                         ) continue;
 
-                        bool tp = std::find_if(
+                        vph_near.push_back(ph_ev);
+                    }
+
+                    // Sphere
+                    BraggSphereEnergy = 0;
+                    BraggSphereEnergyTP = 0;
+                    for (PtrHit const& ph_near : vph_near) {
+                        if (GetDistance(ph_near, bragg.end) > fMichelRadius) continue;
+                        // PtrShw ps_hit = fop_hit2shw.at(iph->key());
+                        BraggSphereEnergy += ph_near->Integral();
+                        ana::Hit hit = GetHit(ph_near);
+                        BraggSphereHits.push_back(hit);
+
+                        float da = (hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
+                        da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                        BraggSphereHitMuonAngle.push_back(da);
+
+                        if (std::find_if(
                             vph_mi.begin(), vph_mi.end(),
                             [&ph_near](PtrHit const& h) -> bool { return h.key() == ph_near.key(); }
-                        ) != vph_mi.end();
+                        ) != vph_mi.end()) 
+                            BraggSphereEnergyTP = ph_near->Integral();
+                    }
 
-                        BraggKeyholeEnergy += ph_near->Integral();
-                        BraggKeyholeHits.push_back(hit);
+                    // Cone
+                    for (PtrHit const& ph_near : vph_near) {
+                        if (GetDistance(ph_near, bragg.end) > 10) continue;
+                        NearbyBaryHits.push_back(GetHit(ph_near));
+                    }
 
-                        if (tp) BraggKeyholeEnergyTP += ph_near->Integral();
+                    LOG(NearbyBaryHits.size());
+                    if (NearbyBaryHits.size()) {
+                        NearbyBary = NearbyBaryHits.barycenter(fTick2cm);
+                        ana::Vec2 end_bary = NearbyBary - BraggEndHit.vec(fTick2cm);
+                        NearbyBaryAngle = end_bary.angle();
+                        float da = NearbyBaryAngle - TrkReg.theta(TrkRegDirZ);
+                        da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                        NearbyBaryMuonAngle = da;
 
-                        if (cosa < cos(30.F * TMath::DegToRad())) continue;
+                        // float angle = end_bary.angle();
+                        BraggConeEnergy = 0;
+                        BraggConeEnergyTP = 0;
+                        for (PtrHit const& ph_near : vph_near) {
+                            float dist = GetDistance(ph_near, bragg.end);
+                            if (dist > 30) continue;
 
-                        BraggConeEnergy += ph_near->Integral();
-                        BraggConeHits.push_back(hit);
+                            ana::Hit hit = GetHit(ph_near);
+                            ana::Vec2 end_hit = hit.vec(fTick2cm) - BraggEndHit.vec(fTick2cm);
+                            float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                        if (tp) BraggConeEnergyTP += ph_near->Integral();
+                            if (dist > 5
+                                && cosa < cos(30.F * TMath::DegToRad())
+                            ) continue;
+
+                            bool tp = std::find_if(
+                                vph_mi.begin(), vph_mi.end(),
+                                [&ph_near](PtrHit const& h) -> bool { return h.key() == ph_near.key(); }
+                            ) != vph_mi.end();
+
+                            BraggKeyholeEnergy += ph_near->Integral();
+                            BraggKeyholeHits.push_back(hit);
+
+                            if (tp) BraggKeyholeEnergyTP += ph_near->Integral();
+
+                            if (cosa < cos(30.F * TMath::DegToRad())) continue;
+
+                            BraggConeEnergy += ph_near->Integral();
+                            BraggConeHits.push_back(hit);
+
+                            if (tp) BraggConeEnergyTP += ph_near->Integral();
+                        }
                     }
                 }
-            }
+            }   
         }
 
         // Truth Information
@@ -816,15 +822,25 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (ph_mi->View() != geo::kW) continue;
                         Hit hit = GetHit(ph_mi);
                         MichelHits.push_back(hit);
+
+                        std::vector<sim::TrackIDE> tides = bt_serv->HitToTrackIDEs(clockData, ph_mi);
+                        std::vector<sim::TrackIDE>::const_iterator tide_mi = std::find_if(
+                            tides.begin(), tides.end(),
+                            [mcp_mi](sim::TrackIDE const& tide) -> bool {
+                                return tide.trackID == mcp_mi->TrackId();
+                            }
+                        );
+                        MichelHitEnergyFrac.push_back(tide_mi != tides.end() ? tide_mi->energyFrac : 0.F);
+
                         if (hit.section != MuonTrueEndHit.section) {
                             MichelHitMuonAngle.push_back(100);
-                            continue;
+                        } else {
+                            float mu_hit_angle = (hit.vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                            mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
+                                ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
+                                : mu_hit_angle;
+                            MichelHitMuonAngle.push_back(mu_hit_angle);
                         }
-                        float mu_hit_angle = (hit.vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm)).angle() - mu_end_angle;
-                        mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
-                            ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
-                            : mu_hit_angle;
-                        MichelHitMuonAngle.push_back(mu_hit_angle);
                     }
                     MichelHitEnergy = MichelHits.energy();
 
@@ -962,6 +978,7 @@ void ana::MichelAnalysis::resetMuon() {
     MichelTrackLength = -1.F;
     MichelShowerLength = -1.F;
     MichelHits.clear();
+    MichelHitEnergyFrac.clear();
     MichelHitMuonAngle.clear();
     MichelHitEnergy = -1.F;
 
