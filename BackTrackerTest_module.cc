@@ -130,6 +130,14 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
         std::cout << "\t\tnhits (ana no eve): " << vph2_mi.size() << std::endl;
         std::cout << "\t\tnhits (ana with eve): " << vph3_mi.size() << std::endl;
 
+        std :: cout << "\t\t\tbt_serv hits:" << std::endl;
+        for (PtrHit const& ph_mi : vph_mi) {
+            std::cout << "\t\t\t\thit key " << ph_mi.key() << "\tADC: " << ph_mi->HitSummedADC() << "\tMeV: " << ph_mi->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
+            for (sim::TrackIDE tide : bt_serv->HitToTrackIDEs(clockData, ph_mi)) {
+                std::cout << "\t\t\t\t\tide trackID: " << tide.trackID << "\tenergy: " << tide.energy << "\tenergyFrac: " << tide.energyFrac << std::endl;
+            }
+        }
+
 
         VecPtrHit unseen_ph2, unseen_ph3;
         for (PtrHit const& ph_mi2 : vph2_mi) { unseen_ph2.push_back(ph_mi2); }
@@ -157,12 +165,12 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
             }
         }
         for (PtrHit ph2 : unseen_ph2) {
-            std::cout << "\t\t\textra (noeve) hit key " << ph2.key() << "\tADC: " << ph2->HitSummedADC() << " MeV: " << ph2->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
+            std::cout << "\t\t\textra (noeve) hit key " << ph2.key() << "\tADC: " << ph2->HitSummedADC() << "\tMeV: " << ph2->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
             for(int tid : bt_serv->HitToTrackIds(clockData, *ph2)) {
                 std::cout << "\t\t\t\ttrackID: " << tid << std::endl;
             }
             for (sim::TrackIDE tide : bt_serv->HitToTrackIDEs(clockData, ph2)) {
-                std::cout << "\t\t\t\tide trackID: " << tide.trackID << "\tenergy: " << tide.energy << std::endl;
+                std::cout << "\t\t\t\tide trackID: " << tide.trackID << "\tenergy: " << tide.energy << "\tenergyFrac: " << tide.energyFrac << std::endl;
             }
         }
         for (PtrHit ph3 : unseen_ph3) {
