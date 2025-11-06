@@ -119,6 +119,7 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
             << "mi#" << n_mi++
             << " (" << GetParticleName(mcp_mi->PdgCode()) << ")"
             << "\ttrackID: " << mcp_mi->TrackId()
+            << "\tfrom muon trackID: " << mcp.TrackId()
             << std::endl;
 
         VecPtrHit vph_mi = bt_serv->TrackIdToHits_Ps(clockData, mcp_mi->TrackId(), vph_ev);
@@ -134,7 +135,16 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
         for (PtrHit const& ph_mi : vph_mi) {
             std::cout << "\t\t\t\thit key " << ph_mi.key() << "\tADC: " << ph_mi->HitSummedADC() << "\tMeV: " << ph_mi->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
             for (sim::TrackIDE tide : bt_serv->HitToTrackIDEs(clockData, ph_mi)) {
-                std::cout << "\t\t\t\t\tide trackID: " << tide.trackID << "\tenergy: " << tide.energy << "\tenergyFrac: " << tide.energyFrac << std::endl;
+                std::stringstream tid;
+                if (tide.trackID == mcp_mi->TrackId()) {
+                    tid << "\033[1;36m" << tide.trackID << "\033[0m";
+                } else if (tide.trackID == mcp.TrackId()) {
+                    tid << "\033[1;33m" << tide.trackID << "\033[0m";
+                } else {
+                    tid << tide.trackID;
+                }
+                std::string tid_s; tid >> tid_s;
+                std::cout << "\t\t\t\t\tide trackID: " << tid_s << "\tenergy: " << tide.energy << "\tenergyFrac: " << tide.energyFrac << std::endl;
             }
         }
 
