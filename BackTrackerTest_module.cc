@@ -134,6 +134,7 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
         std :: cout << "\t\t\tbt_serv hits:" << std::endl;
         for (PtrHit const& ph_mi : vph_mi) {
             std::cout << "\t\t\t\thit key " << ph_mi.key() << "\tADC: " << ph_mi->HitSummedADC() << "\tMeV: " << ph_mi->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
+            float sumFrac = 0.F;
             for (sim::TrackIDE tide : bt_serv->HitToTrackIDEs(clockData, ph_mi)) {
                 std::stringstream tid;
                 if (tide.trackID == mcp_mi->TrackId()) {
@@ -145,6 +146,10 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
                 }
                 std::string tid_s; tid >> tid_s;
                 std::cout << "\t\t\t\t\tide trackID: " << tid_s << "\tenergy: " << tide.energy << "\tenergyFrac: " << tide.energyFrac << std::endl;
+                sumFrac += tide.energyFrac;
+            }
+            if (sumFrac != 0.F && abs(1.F - sumFrac) > 1e-3) {
+                std::cout << "\t\t\t\t\t\033[1;91msumFrac=" << sumFrac << "\033[0m" << std::endl;
             }
         }
 
