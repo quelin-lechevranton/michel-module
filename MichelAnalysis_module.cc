@@ -520,7 +520,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
                     }
                 }
-            } else if (TrkHitAnodeCrossing) {
+            } else if (TrkHitCathodeCrossing == kNoCC && TrkHitAnodeCrossing) {
                 if (geoDet == kPDVD) {
                     TrkEndHitX = geoHighX.x.max - abs(TrkEndHit.tick - TrkStartHit.tick) * fTick2cm;
                     TrkHitEndInVolumeX = geoHighX.x.isInside(TrkEndHitX, fFiducialLength);
@@ -575,7 +575,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
 
                 PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                if (ps_hit) PandoraSphereHasShower = true;
+                PandoraSphereHasShower = bool(ps_hit);
 
                 ana::Hit hit = GetHit(ph_ev);
                 PandoraSphereEnergy += ph_ev->Integral();

@@ -131,36 +131,42 @@ void ana::BackTrackerTest::analyze(art::Event const& e)
         std::cout << "\t\tnhits (ana with eve): " << vph3_mi.size() << std::endl;
 
 
-        std::vector<size_t> unseen_keys2, unseen_keys3;
-        for (PtrHit const& ph_mi2 : vph2_mi) { unseen_keys2.push_back(ph_mi2.key()); }
-        for (PtrHit const& ph_mi3 : vph3_mi) { unseen_keys3.push_back(ph_mi3.key()); }
+        VecPtrHit unseen_ph2, unseen_ph3;
+        for (PtrHit const& ph_mi2 : vph2_mi) { unseen_ph2.push_back(ph_mi2); }
+        for (PtrHit const& ph_mi3 : vph3_mi) { unseen_ph3.push_back(ph_mi3); }
         for (PtrHit const& ph_mi : vph_mi) {
 
             auto it2 = std::find_if(
-                unseen_keys2.begin(), unseen_keys2.end(),
-                [&ph_mi](size_t key2){ return key2 == ph_mi.key(); }
+                unseen_ph2.begin(), unseen_ph2.end(),
+                [&ph_mi](PtrHit ph2){ return ph2.key() == ph_mi.key(); }
             );
-            if (it2 != unseen_keys2.end()) {
-                unseen_keys2.erase(it2);
+            if (it2 != unseen_ph2.end()) {
+                unseen_ph2.erase(it2);
             } else {
                 std::cout << "\t\t\tmissing (bt) in (noeve): hit key " << ph_mi.key() << std::endl;
             }
 
             auto it3 = std::find_if(
-                unseen_keys3.begin(), unseen_keys3.end(),
-                [&ph_mi](size_t key3){ return key3 == ph_mi.key(); }
+                unseen_ph3.begin(), unseen_ph3.end(),
+                [&ph_mi](PtrHit ph3){ return ph3.key() == ph_mi.key(); }
             );
-            if (it3 != unseen_keys3.end()) {
-                unseen_keys3.erase(it3);
+            if (it3 != unseen_ph3.end()) {
+                unseen_ph3.erase(it3);
             } else {
                 std::cout << "\t\t\tmissing (bt) in (eve): hit key " << ph_mi.key() << std::endl;
             }
         }
-        for (size_t key2 : unseen_keys2) {
-            std::cout << "\t\t\textra (noeve) hit key " << key2 << std::endl;
+        for (PtrHit ph2 : unseen_ph2) {
+            std::cout << "\t\t\textra (noeve) hit key " << ph2.key() << "\tADC: " << ph2->HitSummedADC() << " MeV: " << ph2->HitSummedADC()*(200 * 23.6 * 1e-6 / 0.7) << std::endl;
+            for(int tid : bt_serv->HitToTrackIds(clockData, *ph2)) {
+                std::cout << "\t\t\t\ttrackID: " << tid << std::endl;
+            }
+            for (sim::TrackIDE tide : bt_serv->HitToTrackIDEs(clockData, ph2)) {
+                std::cout << "\t\t\t\tide trackID: " << tide.trackID << "\tenergy: " << tide.energy << std::endl;
+            }
         }
-        for (size_t key3 : unseen_keys3) {
-            std::cout << "\t\t\textra (eve) hit key " << key3 << std::endl;
+        for (PtrHit ph3 : unseen_ph3) {
+            std::cout << "\t\t\textra (eve) hit key " << ph3.key() << std::endl;
         }
 
         // for (PtrHit const& ph_ev : vph_ev) {
