@@ -74,8 +74,8 @@ private:
     std::vector<float> PandoraTrkHitdQdx;
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
-    bool PandoraSphereHasShower;
-    bool PandoraBaryHasShower;
+    // bool PandoraSphereHasShower;
+    // bool PandoraBaryHasShower;
     float PandoraSphereEnergy;
     float PandoraSphereEnergyTP;
     // Cone
@@ -117,7 +117,6 @@ private:
     float BraggKeyholeEnergy;
     float BraggKeyholeEnergyTP;
 
-
     // Truth information
     int TruePdg;
     std::string TrueEndProcess;
@@ -133,7 +132,8 @@ private:
     int TrueHasMichel;
     enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
     float MichelTrueEnergy;
-    float MichelTrackLength, MichelShowerLength;
+    float MichelTrackLength;
+    // float MichelShowerLength;
     ana::Hits MichelHits;
     std::vector<float> MichelHitEnergyFrac;
     std::vector<float> MichelHitMuonAngle;
@@ -260,8 +260,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("HitdQdx", &PandoraTrkHitdQdx);
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
-    tMuon->Branch("PandoraSphereHasShower", &PandoraSphereHasShower);
-    tMuon->Branch("PandoraBaryHasShower", &PandoraBaryHasShower);
+    // tMuon->Branch("PandoraSphereHasShower", &PandoraSphereHasShower);
+    // tMuon->Branch("PandoraBaryHasShower", &PandoraBaryHasShower);
     tMuon->Branch("PandoraSphereEnergy", &PandoraSphereEnergy); // ADC
     tMuon->Branch("PandoraSphereEnergyTP", &PandoraSphereEnergyTP); // ADC
 
@@ -318,7 +318,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TrueHasMichel", &TrueHasMichel);
     tMuon->Branch("MichelTrueEnergy", &MichelTrueEnergy); // MeV
     tMuon->Branch("MichelTrackLength", &MichelTrackLength); // cm
-    tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
+    // tMuon->Branch("MichelShowerLength", &MichelShowerLength); // cm
     MichelHits.SetBranches(tMuon, "Michel");
     tMuon->Branch("MichelHitEnergyFrac", &MichelHitEnergyFrac);
     tMuon->Branch("MichelHitMuonAngle", &MichelHitMuonAngle);
@@ -355,18 +355,18 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
-    auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
-    if (!vh_shw.isValid()) {
-        std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
-        return;
-    }
-    VecPtrShw vps_ev;
-    art::fill_ptr_vector(vps_ev, vh_shw);
+    // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
+    // if (!vh_shw.isValid()) {
+    //     std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
+    //     return;
+    // }
+    // VecPtrShw vps_ev;
+    // art::fill_ptr_vector(vps_ev, vh_shw);
 
     art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-    art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
-    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
+    // art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
+    // art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
 
@@ -550,7 +550,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 vph_mu_sec.push_back(ph_mu);
             }
                     
-
             /* COMPARE TO AGNOCHECKS
             HitPtrPair ends = GetTrackEndsHits(vph_mu);
             if (!LOG(ends.first && ends.second)) continue;
@@ -579,8 +578,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
 
-                PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                PandoraSphereHasShower = bool(ps_hit);
+                // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
+                // PandoraSphereHasShower = bool(ps_hit);
 
                 ana::Hit hit = GetHit(ph_ev);
                 PandoraSphereEnergy += ph_ev->Integral();
@@ -603,8 +602,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
 
-                PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                if (ps_hit) PandoraBaryHasShower = true;
+                // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
+                // if (ps_hit) PandoraBaryHasShower = true;
 
                 PandoraBaryHits.push_back(GetHit(ph_ev));
             }
@@ -813,8 +812,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                     PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
                     MichelTrackLength = pt_mi ? pt_mi->Length() : -1.F;
-                    PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
-                    MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
+                    // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+                    // MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
 
 
@@ -916,8 +915,8 @@ void ana::MichelAnalysis::resetMuon() {
     PandoraTrkHitdQdx.clear();
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
-    PandoraSphereHasShower = false;
-    PandoraBaryHasShower = false;
+    // PandoraSphereHasShower = false;
+    // PandoraBaryHasShower = false;
     PandoraSphereEnergy = -1.F;
     PandoraSphereEnergyTP = -1.F;
 
@@ -973,7 +972,7 @@ void ana::MichelAnalysis::resetMuon() {
     TrueHasMichel = kNoMichel;
     MichelTrueEnergy = -1.F;
     MichelTrackLength = -1.F;
-    MichelShowerLength = -1.F;
+    // MichelShowerLength = -1.F;
     MichelHits.clear();
     MichelHitEnergyFrac.clear();
     MichelHitMuonAngle.clear();
