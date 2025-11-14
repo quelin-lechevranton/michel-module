@@ -883,7 +883,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 std::vector<float> ana::MichelAnalyzer::GetdQdx(
     VecPtrHit const& vph,
     unsigned smoothing_length,
-    unsigned *i_max = nullptr
+    unsigned *i_max
 ) const {
     if (vph.size() <= smoothing_length) return std::vector<float>{};
 
@@ -1250,7 +1250,7 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
     art::FindOneP<recob::Track> const& fop_hit2trk,
     ana::LinearRegression const& reg_trk,
     ana::BraggOptions const& opt
-) const {
+) const {    
     ana::Bragg bragg;
     VecPtrHit vph_sec_trk;
     int sec_end = ana::tpc2sec[geoDet][ph_end->WireID().TPC];
@@ -1293,7 +1293,7 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->ROISummedADC();
+        mip_dQ += (*iph)->Integral();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1329,22 +1329,52 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
         }
     );
 
-    VecPtrHit vph_tail(vph_sec_trk.end()-opt.reg_n, vph_sec_trk.end());
-    vph_tail.insert(
-        vph_tail.end(), 
-        vph_farther.begin(), 
-        vph_farther.size() >= opt.reg_n 
-            ? vph_farther.begin()+opt.reg_n
-            : vph_farther.end()
+    vph_sec_trk.insert(vph_sec_trk.end(), vph_farther.begin(), vph_farther.end());
+
+    iph_body = std::find_if(
+        vph_sec_trk.begin(),
+        vph_sec_trk.end(),
+        [&](PtrHit const& ph) -> bool {
+            return GetDistance(ph, ph_end) <= opt.body_dist;
+        }
     );
 
-    unsigned i_max=-1;
-    std::vector<float> dQdx = GetdQdx(vph_tail, opt.reg_n, &i_max);
+    VecPtrHit::iterator iph_max;
+    unsigned const trailing_n = opt.reg_n;
+    for (auto iph=iph_body; iph!=vph_sec_trk.end(); iph++) {
+        VecPtrHit::iterator jph = iph-trailing_n;
 
-    bragg.end = vph_tail[i_max];
+        double dQ = std::accumulate(
+            jph, iph, 0.,
+            [](double sum, PtrHit const& ph) {
+                return sum+ph->Integral();
+            }
+        ) / trailing_n;
+
+        double dx = 0;
+        for (auto kph=jph; kph!=iph; kph++) {
+            if (kph == vph_sec_trk.begin())
+                dx += GetDistance(*kph, *(kph+1));
+            else if (kph == vph_sec_trk.end()-1)
+                dx += GetDistance(*(kph-1), *kph);
+            else
+                dx += .5 * (
+                    GetDistance(*(kph-1), *kph)
+                    + GetDistance(*kph, *(kph+1))
+                );
+        }
+        dx /= trailing_n;
+
+        double dQdx = dQ / dx;
+        if (dQdx > bragg.max_dQdx) {
+            bragg.max_dQdx = dQdx;
+            iph_max = iph;
+        }
+    }
+    bragg.end = *iph_max;
     bragg.vph_mu.assign(
-        vph_tail.begin(), 
-        i_max==vph_tail.size()-1 ? vph_tail.end() : vph_tail.begin() + (i_max+1)
+        vph_sec_trk.begin(), 
+        iph_max==vph_sec_trk.end() ? vph_sec_trk.end() : iph_max+1
     );
     bragg.error = ana::Bragg::kNoError;
     return bragg;
@@ -1363,17 +1393,17 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
         if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sh_trk.end_sec())
             vph_sec_trk.push_back(ph);
 
-    // if (vph_sec_trk.size() < 2
-    //     || std::find_if(
-    //         vph_sec_trk.begin(), vph_sec_trk.end(),
-    //         [key=sh_trk.end.key()](PtrHit const& ph) -> bool {
-    //             return ph.key() == key;
-    //         }
-    //     ) == vph_sec_trk.end()
-    // ) {
-    //     bragg.error = ana::Bragg::kEndNotFound;
-    //     return bragg;
-    // }
+    if (vph_sec_trk.size() < 2
+        || std::find_if(
+            vph_sec_trk.begin(), vph_sec_trk.end(),
+            [key=sh_trk.end.key()](PtrHit const& ph) -> bool {
+                return ph.key() == key;
+            }
+        ) == vph_sec_trk.end()
+    ) {
+        bragg.error = ana::Bragg::kEndNotFound;
+        return bragg;
+    }
     
     // decreasing dist to end: body->end
     std::sort(
@@ -1434,5 +1464,23 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
         }
     );
 
-    vph_sec_trk.insert(vph_sec_trk.end(), vph_farther.begin(), vph_farther.end());
+    VecPtrHit vph_tail(vph_sec_trk.end()-opt.reg_n, vph_sec_trk.end());
+    vph_tail.insert(
+        vph_tail.end(), 
+        vph_farther.begin(), 
+        vph_farther.size() >= opt.reg_n 
+            ? vph_farther.begin()+opt.reg_n
+            : vph_farther.end()
+    );
+
+    unsigned i_max=-1;
+    std::vector<float> dQdx = GetdQdx(vph_tail, opt.reg_n, &i_max);
+
+    bragg.end = vph_tail[i_max];
+    bragg.vph_mu.assign(
+        vph_tail.begin(), 
+        i_max==vph_tail.size()-1 ? vph_tail.end() : vph_tail.begin() + (i_max+1)
+    );
+    bragg.error = ana::Bragg::kNoError;
+    return bragg;
 }

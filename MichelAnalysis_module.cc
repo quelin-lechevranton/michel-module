@@ -107,16 +107,16 @@ private:
     float BraggSphereEnergyTP;
 
     // Cone
-    ana::Hits NearbyBaryHits;
-    ana::Vec2 NearbyBary;
-    float NearbyBaryAngle;
-    float NearbyBaryMuonAngle;
-    ana::Hits BraggConeHits;
-    float BraggConeEnergy;
-    float BraggConeEnergyTP;
-    ana::Hits BraggKeyholeHits;
-    float BraggKeyholeEnergy;
-    float BraggKeyholeEnergyTP;
+    ana::Hits   NearbyBaryHits;
+    ana::Vec2   NearbyBary;
+    float       NearbyBaryAngle;
+    float       NearbyBaryMuonAngle;
+    ana::Hits   BraggConeHits;
+    float       BraggConeEnergy;
+    float       BraggConeEnergyTP;
+    ana::Hits   BraggKeyholeHits;
+    float       BraggKeyholeEnergy;
+    float       BraggKeyholeEnergyTP;
 
     // Truth information
     int TruePdg;
