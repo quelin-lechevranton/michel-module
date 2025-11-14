@@ -2,15 +2,6 @@
 
 namespace ana {
     class MichelAnalysis;
-    struct StructKeep {
-        bool smallTracks,
-             trackFitError,
-             verticalTracks,
-             outYZ,
-             outT,
-             noCrossing,
-             outX;
-    };
 }
 
 // using HitPtr = art::Ptr<recob::Hit>;
@@ -35,7 +26,7 @@ private:
 
     // Input Parameters
     bool fLog;
-    StructKeep fKeep;
+    bool fKeepAll;
     float fTrackLengthCut; // in cm
     float fFiducialLength; // in cm
     float fBarycenterRadius; // in cm
@@ -171,7 +162,7 @@ private:
 ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
-    fKeep(p.get<StructKeep>("Keep", { true, true, true, true, true, true, true })),
+    fKeepAll(p.get<bool>("KeepAll", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
     fFiducialLength(p.get<float>("FiducialLength", 10.F)), // in cm
     fBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)), // in cm
@@ -412,6 +403,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         EventiMuon.push_back(iMuon);
 
         TrkLength = pt_ev->Length();
+        if (!fKeepAll && TrkLength < fTrackLengthCut) continue;
 
         TrkIsUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
@@ -420,6 +412,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         TrkEndPoint = ana::Point(End);
 
         TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fFiducialLength);
+
+        if (!fKeepAll && !TrkEndInVolumeYZ) continue;
 
         TrkCathodeCrossing = (
             geoLowX.isInside(Start)
@@ -495,12 +489,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
         TrkHitError = !sh_mu;
 
+        if (!fKeepAll && TrkHitError) continue;
+
         LOG(!TrkHitError);
         if (!TrkHitError) {
             TrkStartHit = GetHit(sh_mu.start);
             TrkEndHit = GetHit(sh_mu.end);
             TrkReg = sh_mu.end_reg(geoDet);
             TrkHitEndInWindow = wireWindow.isInside(TrkEndHit.tick, fFiducialLength / fTick2cm);
+
+            if (!fKeepAll && TrkReg.r2 < 0.4) continue;
+            if (!fKeepAll && !TrkHitEndInWindow) continue;
 
             if (sh_mu.is_cc()) {
                 if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * fCathodeGap)
@@ -520,6 +519,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
                     && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
             
+            if (!fKeepAll && (!TrkHitAnodeCrossing && !TrkHitCathodeCrossing)) continue;
+
             LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides);
             LOG(TrkHitAnodeCrossing);
             if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
@@ -550,6 +551,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     }
                 }
             }
+
+            if (!fKeepAll && !TrkEndHitX) continue;
 
             VecPtrHit vph_mu_sec;
             for (PtrHit const& ph_mu : sh_mu.vph) {
