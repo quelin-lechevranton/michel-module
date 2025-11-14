@@ -2,6 +2,15 @@
 
 namespace ana {
     class MichelAnalysis;
+    struct StructKeep {
+        bool smallTracks,
+             trackFitError,
+             verticalTracks,
+             outYZ,
+             outT,
+             noCrossing,
+             outX;
+    };
 }
 
 // using HitPtr = art::Ptr<recob::Hit>;
@@ -26,6 +35,7 @@ private:
 
     // Input Parameters
     bool fLog;
+    StructKeep fKeep;
     float fTrackLengthCut; // in cm
     float fFiducialLength; // in cm
     float fBarycenterRadius; // in cm
@@ -161,6 +171,7 @@ private:
 ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
+    fKeep(p.get<StructKeep>("Keep", { true, true, true, true, true, true, true })),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
     fFiducialLength(p.get<float>("FiducialLength", 10.F)), // in cm
     fBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)), // in cm
