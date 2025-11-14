@@ -37,6 +37,8 @@ physics: {
             ]
             Log: false
             Bragg: false
+            BodyDistance: 10
+            TrackLengthCut: 30
         }
     }
     ana: [ checks ]
