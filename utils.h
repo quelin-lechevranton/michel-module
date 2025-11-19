@@ -1481,6 +1481,7 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
         vph_tail.begin(), 
         i_max==vph_tail.size()-1 ? vph_tail.end() : vph_tail.begin() + (i_max+1)
     );
+    bragg.max_dQdx = dQdx[i_max];
     bragg.error = ana::Bragg::kNoError;
     return bragg;
 }

@@ -552,7 +552,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
 
-            if (!fKeepAll && !TrkEndHitX) continue;
+            if (!fKeepAll && !TrkHitEndInVolumeX) continue;
 
             VecPtrHit vph_mu_sec;
             for (PtrHit const& ph_mu : sh_mu.vph) {
