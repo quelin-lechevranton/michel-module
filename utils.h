@@ -750,7 +750,7 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
         float(GetSpace(wid)),
         ph->Channel(),
         ph->PeakTime(),
-        ph->ROISummedADC()
+        ph->Integral()
     };
 }
 
@@ -895,7 +895,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
         float dQ = std::accumulate(
             jph, iph, 0.,
             [](float sum, PtrHit const& ph) {
-                return sum+ph->ROISummedADC();
+                return sum+ph->Integral();
             }
         ) / smoothing_length;
 
@@ -992,7 +992,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     float mip_dQ = 0;
     float mip_dx = 0;
     for (auto iph=iph_body; iph!=jph_body; iph++) {
-        mip_dQ += (*iph)->ROISummedADC();
+        mip_dQ += (*iph)->Integral();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1103,7 +1103,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     //     double dQ = std::accumulate(
     //         jph_clu, iph_clu, 0.,
     //         [](double sum, PtrHit const& ph) {
-    //             return sum+ph->ROISummedADC();
+    //             return sum+ph->Integral();
     //         }
     //     ) / trailing_n;
 
@@ -1191,7 +1191,7 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->ROISummedADC();
+        mip_dQ += (*iph)->Integral();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1209,7 +1209,7 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
         double dQ = std::accumulate(
             jph, iph, 0.,
             [](double sum, PtrHit const& ph) {
-                return sum+ph->ROISummedADC();
+                return sum+ph->Integral();
             }
         ) / trailing_n;
 
@@ -1428,7 +1428,7 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->ROISummedADC();
+        mip_dQ += (*iph)->Integral();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
