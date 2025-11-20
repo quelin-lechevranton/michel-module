@@ -52,6 +52,7 @@ private:
     unsigned iMuon=0;
 
     float TrkLength;
+    float TrkChi2, TrkChi2PerNdof;
     bool TrkIsUpright; // Supposition: Muon is downward
     ana::Point TrkStartPoint, TrkEndPoint;
     bool TrkEndInVolumeYZ;
@@ -238,6 +239,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
 
     // Track
     tMuon->Branch("TrkLength", &TrkLength);
+    tMuon->Branch("TrkChi2", &TrkChi2);
+    tMuon->Branch("TrkChi2PerNdof", &TrkChi2PerNdof);
     tMuon->Branch("TrkIsUpright", &TrkIsUpright);
     TrkStartPoint.SetBranches(tMuon, "Start");
     TrkEndPoint.SetBranches(tMuon, "End");
@@ -403,7 +406,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         EventiMuon.push_back(iMuon);
 
         TrkLength = pt_ev->Length();
+        TrkChi2 = pt_ev->Chi2();
+        TrkChi2PerNdof = pt_ev->Chi2PerNdof();
         if (!fKeepAll && TrkLength < fTrackLengthCut) continue;
+
 
         TrkIsUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
