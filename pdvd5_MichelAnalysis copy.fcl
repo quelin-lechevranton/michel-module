@@ -39,6 +39,7 @@ physics: {
             Bragg: false
             BodyDistance: 10
             TrackLengthCut: 30
+            FiducialLength: 20
         }
     }
     ana: [ checks ]

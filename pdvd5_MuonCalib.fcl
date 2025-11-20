@@ -1,10 +1,10 @@
 #include "services_dune.fcl"
 #include "services_protodunevd.fcl"
 
-process_name: RunMichelAnalysis
+process_name: RunMuonCalib
 
 services: {
-    TFileService: { fileName: "pdvd_MichelAnalysis.root" }
+    TFileService: { fileName: "pdvd_MuonCalib.root" }
     TimeTracker: {}
     RandomNumberGenerator: {}
     WireReadout:                @local::dune_wire_readout
@@ -22,7 +22,7 @@ source: {
 physics: {
     analyzers: {
         checks: {
-            module_type:    "MichelAnalysis"
+            module_type:    "MuonCalib"
             Products:       [
                 ["SingleGen",  "cosmicgenerator", "",             "simb::MCTruth"],
                 ["G4Stage1",   "largeant",        "",             "simb::MCParticle"],
@@ -36,8 +36,6 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
             Log: false
-            KeepAll: false
-            Bragg: false
             FiducialLength: 20
         }
     }
@@ -49,5 +47,5 @@ physics: {
 # services.DetectorClocksService.TriggerOffsetTPC:  2500
 # services.DetectorClocksService.ClockSpeedTPC: 2
 # services.DetectorPropertiesService.Efield: [0.450,3.125, 5e-1, 3.125]
-services.DetectorPropertiesService.NumberTimeSamples: 8000
-services.DetectorPropertiesService.ReadOutWindowSize: 8000
+# services.DetectorPropertiesService.NumberTimeSamples: 10000
+# services.DetectorPropertiesService.ReadOutWindowSize: 10000

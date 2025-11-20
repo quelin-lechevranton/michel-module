@@ -537,6 +537,9 @@ namespace ana {
         LinearRegression end_reg(int det) const {
             return regs[ana::sec2side[det][end_sec()]];
         }
+
+        size_t bot_index=0;
+        VecPtrHit::iterator bot() { return vph.begin() + bot_index; }
     };
 
     struct BraggOptions {
@@ -606,6 +609,12 @@ namespace ana {
         ) const;
         std::vector<float> GetdQdx(
             VecPtrHit const& vph,
+            unsigned smoothing_length,
+            unsigned *i_max = nullptr
+        ) const;
+        std::vector<float> GetdQdx(
+            VecPtrHit::const_iterator first,
+            VecPtrHit::const_iterator last,
             unsigned smoothing_length,
             unsigned *i_max = nullptr
         ) const;
@@ -872,9 +881,14 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         }
     }
 
-    for (int sec : sh.secs)
+    sh.bot_index = 0;
+    for (int sec : sh.secs) {
+        if (ana::sec2side[geoDet][sec] == 0) 
+            sh.bot_index += vph_sec[sec].size();
+
         for (PtrHit const& ph : vph_sec[sec])
             sh.vph.push_back(ph);
+    }
 
     return sh;
 }
@@ -918,6 +932,52 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
         if (i_max && dQdx > max) {
             max = dQdx;
             *i_max = std::distance(vph.begin(), iph);
+        }
+
+        dQdxs.push_back(dQ / dx);
+    }
+    return dQdxs;
+}
+
+std::vector<float> ana::MichelAnalyzer::GetdQdx(
+    VecPtrHit::const_iterator first,
+    VecPtrHit::const_iterator last,
+    unsigned smoothing_length,
+    unsigned *i_max
+) const {
+    if (std::distance(first, last) <= smoothing_length) return std::vector<float>{};
+
+    float max = -1;
+    std::vector<float> dQdxs(smoothing_length, 0.F);
+    for (auto iph=first+smoothing_length; iph!=last; iph++) {
+        VecPtrHit::const_iterator jph = iph-smoothing_length;
+
+        float dQ = std::accumulate(
+            jph, iph, 0.,
+            [](float sum, PtrHit const& ph) {
+                return sum+ph->Integral();
+            }
+        ) / smoothing_length;
+
+        float dx = 0;
+        for (auto kph=jph; kph!=iph; kph++) {
+            if (kph == first)
+                dx += GetDistance(*kph, *(kph+1));
+            else if (kph == last-1)
+                dx += GetDistance(*(kph-1), *kph);
+            else
+                dx += .5 * (
+                    GetDistance(*(kph-1), *kph)
+                    + GetDistance(*kph, *(kph+1))
+                );
+        }
+        dx /= smoothing_length;
+
+        float dQdx = dQ / dx;
+
+        if (i_max && dQdx > max) {
+            max = dQdx;
+            *i_max = std::distance(first, iph);
         }
 
         dQdxs.push_back(dQ / dx);
