@@ -901,6 +901,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 ) const {
     if (vph.size() <= smoothing_length) return std::vector<float>{};
 
+    *i_max = vph.size();
     float max = -1;
     std::vector<float> dQdxs(smoothing_length, 0.F);
     for (auto iph=vph.begin()+smoothing_length; iph!=vph.end(); iph++) {
@@ -936,6 +937,9 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 
         dQdxs.push_back(dQ / dx);
     }
+    for (unsigned i=0; i<smoothing_length; i++)
+        dQdxs[i] = dQdxs[smoothing_length];
+
     return dQdxs;
 }
 
@@ -947,6 +951,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 ) const {
     if (std::distance(first, last) <= smoothing_length) return std::vector<float>{};
 
+    *i_max = std::distance(first, last);
     float max = -1;
     std::vector<float> dQdxs(smoothing_length, 0.F);
     for (auto iph=first+smoothing_length; iph!=last; iph++) {
@@ -982,6 +987,9 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 
         dQdxs.push_back(dQ / dx);
     }
+    for (unsigned i=0; i<smoothing_length; i++)
+        dQdxs[i] = dQdxs[smoothing_length];
+
     return dQdxs;
 }
 
@@ -1481,7 +1489,8 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
         }
     );
 
-    if (std::distance(vph_sec_trk.begin(), iph_body) < opt.reg_n) {
+    if (vph_sec_trk.size() < 2 * opt.reg_n
+        || std::distance(vph_sec_trk.begin(), iph_body) < opt.reg_n) {
         bragg.error = ana::Bragg::kSmallBody;
         return bragg;
     }
@@ -1524,7 +1533,7 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
         }
     );
 
-    VecPtrHit vph_tail(vph_sec_trk.end()-opt.reg_n, vph_sec_trk.end());
+    VecPtrHit vph_tail(vph_sec_trk.end()-(2 * opt.reg_n), vph_sec_trk.end());
     vph_tail.insert(
         vph_tail.end(), 
         vph_farther.begin(), 
@@ -1533,14 +1542,13 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
             : vph_farther.end()
     );
 
-    unsigned i_max=-1;
+    unsigned i_max=0;
     std::vector<float> dQdx = GetdQdx(vph_tail, opt.reg_n, &i_max);
 
     bragg.end = vph_tail[i_max];
-    bragg.vph_mu.assign(
-        vph_tail.begin(), 
-        i_max==vph_tail.size()-1 ? vph_tail.end() : vph_tail.begin() + (i_max+1)
-    );
+    bragg.vph_mu.clear();
+    for (unsigned i=0; i<=i_max; i++)
+        bragg.vph_mu.push_back(vph_tail[i]);
     bragg.max_dQdx = dQdx[i_max];
     bragg.error = ana::Bragg::kNoError;
     return bragg;

@@ -408,6 +408,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         TrkLength = pt_ev->Length();
         TrkChi2 = pt_ev->Chi2();
         TrkChi2PerNdof = pt_ev->Chi2PerNdof();
+        LOG(TrkLength >= fTrackLengthCut);
         if (!fKeepAll && TrkLength < fTrackLengthCut) continue;
 
 
@@ -419,6 +420,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         TrkEndInVolumeYZ = geoHighX.isInsideYZ(End, fFiducialLength);
 
+        LOG(TrkEndInVolumeYZ);
         if (!fKeepAll && !TrkEndInVolumeYZ) continue;
 
         TrkCathodeCrossing = (
@@ -495,16 +497,18 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
         TrkHitError = !sh_mu;
 
-        if (!fKeepAll && TrkHitError) continue;
 
         LOG(!TrkHitError);
+        if (!fKeepAll && TrkHitError) continue;
         if (!TrkHitError) {
             TrkStartHit = GetHit(sh_mu.start);
             TrkEndHit = GetHit(sh_mu.end);
             TrkReg = sh_mu.end_reg(geoDet);
             TrkHitEndInWindow = wireWindow.isInside(TrkEndHit.tick, fFiducialLength / fTick2cm);
 
+            LOG(TrkReg.r2 >= 0.4);
             if (!fKeepAll && TrkReg.r2 < 0.4) continue;
+            LOG(TrkHitEndInWindow);
             if (!fKeepAll && !TrkHitEndInWindow) continue;
 
             if (sh_mu.is_cc()) {
@@ -525,9 +529,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
                     && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
             
+            LOG(TrkHitCathodeCrossing != kNoCC || TrkHitAnodeCrossing);
             if (!fKeepAll && (!TrkHitAnodeCrossing && !TrkHitCathodeCrossing)) continue;
 
-            LOG(TrkHitCathodeCrossing == kAlignedHitOnBothSides);
+            LOG(TrkHitCathodeCrossing != kAlignedHitOnBothSides);
             LOG(TrkHitAnodeCrossing);
             if (TrkHitCathodeCrossing == kAlignedHitOnBothSides) {
                 if (geoDet == kPDVD) {
@@ -558,6 +563,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
 
+            LOG(TrkHitEndInVolumeX);
             if (!fKeepAll && !TrkHitEndInVolumeX) continue;
 
             VecPtrHit vph_mu_sec;
@@ -677,6 +683,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // End dQdx
             PandoraTrkHitdQdx = GetdQdx(vph_mu_sec, fRegN);
 
+            LOG(!PandoraTrkHitdQdx.empty());
             if (!fKeepAll && PandoraTrkHitdQdx.empty()) continue;
 
             if (fBragg) {
@@ -700,6 +707,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 );
                 BraggError = bragg.error;
 
+                LOG(BraggError != kNoError);
                 if (!fKeepAll && BraggError != kNoError) continue;
 
                 LOG(BraggError == kNoError);
