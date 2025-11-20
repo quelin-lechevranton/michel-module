@@ -759,7 +759,7 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
         float(GetSpace(wid)),
         ph->Channel(),
         ph->PeakTime(),
-        ph->Integral()
+        ph->ROISummedADC()
     };
 }
 
@@ -909,7 +909,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
         float dQ = std::accumulate(
             jph, iph, 0.,
             [](float sum, PtrHit const& ph) {
-                return sum+ph->Integral();
+                return sum+ph->ROISummedADC();
             }
         ) / smoothing_length;
 
@@ -955,7 +955,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
         float dQ = std::accumulate(
             jph, iph, 0.,
             [](float sum, PtrHit const& ph) {
-                return sum+ph->Integral();
+                return sum+ph->ROISummedADC();
             }
         ) / smoothing_length;
 
@@ -1052,7 +1052,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     float mip_dQ = 0;
     float mip_dx = 0;
     for (auto iph=iph_body; iph!=jph_body; iph++) {
-        mip_dQ += (*iph)->Integral();
+        mip_dQ += (*iph)->ROISummedADC();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1163,7 +1163,7 @@ ana::Bragg ana::MichelAnalyzer::GetBragg(
     //     double dQ = std::accumulate(
     //         jph_clu, iph_clu, 0.,
     //         [](double sum, PtrHit const& ph) {
-    //             return sum+ph->Integral();
+    //             return sum+ph->ROISummedADC();
     //         }
     //     ) / trailing_n;
 
@@ -1251,7 +1251,7 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->Integral();
+        mip_dQ += (*iph)->ROISummedADC();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1269,7 +1269,7 @@ ana::Bragg ana::MichelAnalyzer::GetSmallBragg(
         double dQ = std::accumulate(
             jph, iph, 0.,
             [](double sum, PtrHit const& ph) {
-                return sum+ph->Integral();
+                return sum+ph->ROISummedADC();
             }
         ) / trailing_n;
 
@@ -1353,7 +1353,7 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->Integral();
+        mip_dQ += (*iph)->ROISummedADC();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)
@@ -1407,7 +1407,7 @@ ana::Bragg ana::MichelAnalyzer::GetLongBragg(
         double dQ = std::accumulate(
             jph, iph, 0.,
             [](double sum, PtrHit const& ph) {
-                return sum+ph->Integral();
+                return sum+ph->ROISummedADC();
             }
         ) / trailing_n;
 
@@ -1488,7 +1488,7 @@ ana::Bragg ana::MichelAnalyzer::GetNearBragg(
 
     float mip_dQ = 0, mip_dx = 0;
     for (auto iph=vph_sec_trk.begin(); iph!=iph_body; iph++) {
-        mip_dQ += (*iph)->Integral();
+        mip_dQ += (*iph)->ROISummedADC();
         if (iph == vph_sec_trk.begin())
             mip_dx += GetDistance(*iph, *(iph+1));
         else if (iph == vph_sec_trk.end()-1)

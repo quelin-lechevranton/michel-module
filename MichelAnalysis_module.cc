@@ -596,7 +596,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 // PandoraSphereHasShower = bool(ps_hit);
 
                 ana::Hit hit = GetHit(ph_ev);
-                PandoraSphereEnergy += ph_ev->Integral();
+                PandoraSphereEnergy += ph_ev->ROISummedADC();
                 PandoraSphereHits.push_back(hit);
 
                 float da = (hit.vec(fTick2cm) - TrkEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
@@ -607,7 +607,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     vph_mi.begin(), vph_mi.end(),
                     [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                 ) != vph_mi.end()) 
-                    PandoraSphereEnergyTP = ph_ev->Integral();
+                    PandoraSphereEnergyTP = ph_ev->ROISummedADC();
             }
 
             // Cone
@@ -654,17 +654,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                     ) != vph_mi.end();
 
-                    PandoraKeyholeEnergy += ph_ev->Integral();
+                    PandoraKeyholeEnergy += ph_ev->ROISummedADC();
                     PandoraKeyholeHits.push_back(hit);
 
-                    if (tp) PandoraKeyholeEnergyTP += ph_ev->Integral();
+                    if (tp) PandoraKeyholeEnergyTP += ph_ev->ROISummedADC();
 
                     if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
-                    PandoraConeEnergy += ph_ev->Integral();
+                    PandoraConeEnergy += ph_ev->ROISummedADC();
                     PandoraConeHits.push_back(hit);
 
-                    if (tp) PandoraConeEnergyTP += ph_ev->Integral();
+                    if (tp) PandoraConeEnergyTP += ph_ev->ROISummedADC();
                 }
             }
 
@@ -717,7 +717,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         // BraggSphereHasShower = bool(ps_hit);
 
                         ana::Hit hit = GetHit(ph_ev);
-                        BraggSphereEnergy += ph_ev->Integral();
+                        BraggSphereEnergy += ph_ev->ROISummedADC();
                         BraggSphereHits.push_back(hit);
 
                         float da = (hit.vec(fTick2cm) - TrkEndHit.vec(fTick2cm)).angle() - TrkReg.theta(TrkRegDirZ);
@@ -728,7 +728,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             vph_mi.begin(), vph_mi.end(),
                             [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
                         ) != vph_mi.end()) 
-                            BraggSphereEnergyTP = ph_ev->Integral();
+                            BraggSphereEnergyTP = ph_ev->ROISummedADC();
                     }
                     
 
@@ -758,7 +758,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     // for (PtrHit const& ph_near : vph_near) {
                     //     if (GetDistance(ph_near, bragg.end) > fMichelRadius) continue;
                     //     // PtrShw ps_hit = fop_hit2shw.at(iph->key());
-                    //     BraggSphereEnergy += ph_near->Integral();
+                    //     BraggSphereEnergy += ph_near->ROISummedADC();
                     //     ana::Hit hit = GetHit(ph_near);
                     //     BraggSphereHits.push_back(hit);
 
@@ -770,7 +770,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     //         vph_mi.begin(), vph_mi.end(),
                     //         [&ph_near](PtrHit const& h) -> bool { return h.key() == ph_near.key(); }
                     //     ) != vph_mi.end()) 
-                    //         BraggSphereEnergyTP = ph_near->Integral();
+                    //         BraggSphereEnergyTP = ph_near->ROISummedADC();
                     // }
 
                     // // Cone
@@ -808,17 +808,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     //             [&ph_near](PtrHit const& h) -> bool { return h.key() == ph_near.key(); }
                     //         ) != vph_mi.end();
 
-                    //         BraggKeyholeEnergy += ph_near->Integral();
+                    //         BraggKeyholeEnergy += ph_near->ROISummedADC();
                     //         BraggKeyholeHits.push_back(hit);
 
-                    //         if (tp) BraggKeyholeEnergyTP += ph_near->Integral();
+                    //         if (tp) BraggKeyholeEnergyTP += ph_near->ROISummedADC();
 
                     //         if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
-                    //         BraggConeEnergy += ph_near->Integral();
+                    //         BraggConeEnergy += ph_near->ROISummedADC();
                     //         BraggConeHits.push_back(hit);
 
-                    //         if (tp) BraggConeEnergyTP += ph_near->Integral();
+                    //         if (tp) BraggConeEnergyTP += ph_near->ROISummedADC();
                     //     }
                     // }
                 }
@@ -924,11 +924,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                                 && cosa < cos(30.F * TMath::DegToRad())
                             ) continue;
                             
-                            MichelKeyholeEnergy += ph_mi->Integral();
+                            MichelKeyholeEnergy += ph_mi->ROISummedADC();
 
                             if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
-                            MichelConeEnergy += ph_mi->Integral();
+                            MichelConeEnergy += ph_mi->ROISummedADC();
                         }
                     }
                 }
