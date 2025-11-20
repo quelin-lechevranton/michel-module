@@ -202,6 +202,8 @@ void ana::MuonCalib::analyze(art::Event const& e) {
     track_content.clear();
 
     for (PtrTrk pt_ev : vpt_ev) {
+        if (fLog) std::cout << "e" << iEvent << "t" << pt_ev->ID() << "\r" << std::flush;
+
         track_content["total"]++;
         resetTrack();
 
@@ -224,7 +226,7 @@ void ana::MuonCalib::analyze(art::Event const& e) {
         TrkChi2 = pt_ev->Chi2();
         TrkChi2PerNdof = pt_ev->Chi2PerNdof();
 
-        ASSERT(TrkReg.r2 < 0.4)
+        ASSERT(TrkReg.r2 > 0.4)
         track_content["r2 > 0.4"]++;
 
         TopHitdQdx = GetdQdx(sh_trk.vph.begin(), sh_trk.bot(), 6);
@@ -293,12 +295,13 @@ void ana::MuonCalib::analyze(art::Event const& e) {
     iEvent++;
 }
 
+void ana::MuonCalib::beginJob() {}
 void ana::MuonCalib::endJob() {
     std::cout << "\033[1;93m" "Track Selection Summary:" "\033[0m" << std::endl;
     std::cout << "  Total Tracks: " << track_content["total"] << std::endl;
     std::cout << "  With Hits: " << track_content["with hits"] << std::endl;
     std::cout << "  >4 Hits in One Section: " << track_content[">4 hits in one section"] << std::endl;
-    std::cout << "  r2 < 0.4: " << track_content["r2 > 0.4"] << std::endl;
+    std::cout << "  r2 > 0.4: " << track_content["r2 > 0.4"] << std::endl;
     std::cout << "  Anode Crossing: " << track_content["a. anode crossing"] << std::endl;
     std::cout << "  Cathode Crossing: " << track_content["b. cathode crossing"] << std::endl;
     std::cout << "  Cathode + Bottom Anode Crossing: " << track_content["c. cathode + bot anode crossing"] << std::endl;
@@ -339,3 +342,5 @@ void ana::MuonCalib::resetTrack() {
     MuonTrueEndEnergy = -1.F;
     TrueDownward = false;
 }
+
+DEFINE_ART_MODULE(ana::MuonCalib)
