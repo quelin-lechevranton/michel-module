@@ -901,7 +901,6 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 ) const {
     if (vph.size() <= smoothing_length) return std::vector<float>{};
 
-    *i_max = vph.size();
     float max = -1;
     std::vector<float> dQdxs(smoothing_length, 0.F);
     for (auto iph=vph.begin()+smoothing_length; iph!=vph.end(); iph++) {
@@ -951,7 +950,6 @@ std::vector<float> ana::MichelAnalyzer::GetdQdx(
 ) const {
     if (std::distance(first, last) <= smoothing_length) return std::vector<float>{};
 
-    *i_max = std::distance(first, last);
     float max = -1;
     std::vector<float> dQdxs(smoothing_length, 0.F);
     for (auto iph=first+smoothing_length; iph!=last; iph++) {
