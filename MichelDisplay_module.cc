@@ -26,7 +26,6 @@ private:
     float fNearbyRadius; // cm
     float fBodyDistance; // cm
     unsigned fRegN;
-    float fBraggThreshold; // in MIP dE/dx
 
     unsigned ev=0;
 
@@ -41,8 +40,6 @@ private:
         ms_pass = {vc_pass.front(), kFullCircle},
         ms_fail = {vc_fail.front(), kFullCircle},
         ms_back = {kGray, kFullCircle, 0.5},
-        ms_bragg = {kAzure+10, kFourSquaresX},
-        ms_clu = {ms_bragg.c, kMultiply, 1},
         ms_michel = {kGreen-8, kOpenDoubleDiamond},
         ms_shw = {kYellow+2, kOpenCircle, 0.5};
 
@@ -50,9 +47,6 @@ private:
         ls_pass = {vc_pass.front(), kSolid, 2},
         ls_fail = {vc_fail.front(), kSolid, 2},
         ls_back = {kGray, kSolid, 1};
-
-    bool IsUpright(recob::Track const& T);
-    enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
 };
 
 ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
@@ -61,8 +55,7 @@ ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
     fTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
-    fRegN(p.get<unsigned>("RegN", 6)),
-    fBraggThreshold(p.get<float>("BraggThreshold", 1.7)) // in MIP dE/dx
+    fRegN(p.get<unsigned>("RegN", 6))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -169,8 +162,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         // "CathodeCrossing",
         // "AnodeCrossing (20 cm)",
         // "HasMichelHits",
-        // "BraggEndNoError",
-        // Form("BraggThreshold %.1f MIP", fBraggThreshold)
     };
 
     gStyle->SetPalette(pal);
@@ -374,119 +365,6 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         DrawPass(ihc, itc);
         DrawGraph(*ihc, vph_mi, "p", ms_michel);
         ihc++; itc++;
-
-
-        /*
-
-        // recluster hits around the muon end,
-        // compute local dE/dx along the cluster,
-        // search for a peak in dE/dx (Bragg peak)
-        ana::Bragg bragg = GetBragg(
-            sh_mu.vph,
-            sh_mu.end,
-            pt_ev,
-            { fBodyDistance, fRegN, fTrackLengthCut, fNearbyRadius }
-        );
-        // possible causes of failure:
-        // - the given end is not found in the track hits
-        // - there is no enough hits (< 'fRegN') 'fBodyDistance' cm away from the end in the same section to start the clustering
-        // - there is no hit 'fNearbyRadius' cm away from the end in the same section
-
-        if (!LOG(bragg)) {
-            DrawFail(ihc, itc);
-            continue;
-        }
-        
-        // sphere around track end
-        // excluding hits associated to a track longer than 'fTrackLengthCut'
-        VecPtrHit vph_pandora;
-        int sec_end = ana::tpc2sec[geoDet][sh_mu.end->WireID().TPC];
-        for (PtrHit const& ph_ev : vph_ev) {
-            if (ph_ev->View() != geo::kW) continue;
-            if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != sec_end) continue;
-            PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-            // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-            // if (ps_hit) continue;
-            if (GetDistance(ph_ev, sh_mu.end) > 20.F) continue;
-            if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
-            vph_pandora.push_back(ph_ev);
-        }
-
-        // bragg end iterator
-        VecPtrHit::iterator iph_bragg = std::find_if(
-            bragg.vph_clu.begin(), bragg.vph_clu.end(),
-            [&](PtrHit const& h) -> bool { return h.key() == bragg.end.key(); }
-        );
-        if (iph_bragg != bragg.vph_clu.end()) iph_bragg++;
-
-        // sphere around bragg end
-        VecPtrHit vph_bragg;
-        for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-            if (GetDistance(*iph, bragg.end) > 20.F) continue;
-            vph_bragg.push_back(*iph);
-        }
-
-        // cone around bragg end
-        VecPtrHit vph_cone;
-        Hits bary_hits;
-        Vec2 bary;
-        for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-            if (GetDistance(*iph, bragg.end) > 10) continue;
-            bary_hits.push_back(GetHit(*iph));
-        }
-        if (bary_hits.size()) {
-            Hit h_end = GetHit(bragg.end);
-            bary = bary_hits.barycenter(fTick2cm);
-            Vec2 end = h_end.vec(fTick2cm);
-            Vec2 end_bary = bary - end;
-
-            // float angle = end_bary.angle();
-            for (auto iph=iph_bragg; iph!=bragg.vph_clu.end(); iph++) {
-                if (GetDistance(*iph, bragg.end) > 30) continue;
-
-                Vec2 end_hit = GetHit(*iph).vec(fTick2cm) - end;
-                float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
-
-                if (cosa < cos(30.F * TMath::DegToRad())) continue;
-                vph_cone.push_back(*iph);
-            }
-        }
-
-
-        DrawPass(ihc, itc);
-        DrawGraph(*ihc, vph_mi, "p", ms_michel);
-        DrawMarker(*ihc, bragg.end, ms_bragg);
-
-        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
-        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
-        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
-
-        TMarker *m_bary = new TMarker();
-        SetMarkerStyle(m_bary, {kMagenta, kOpenFourTrianglesX, 2});
-        (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
-        m_bary->DrawMarker(bary.space, bary.drift);
-        DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
-
-        ihc++; itc++;
-
-        // if the peak is under threshold: not a bragg peak the muon is not stopping
-        if (!LOG(bragg.max_dQdx >= fBraggThreshold * bragg.mip_dQdx)) {
-            DrawFail(ihc, itc);
-            continue;
-        }
-        DrawPass(ihc, itc);
-        DrawGraph(*ihc, vph_mi, "p", ms_michel);
-        DrawMarker(*ihc, bragg.end, ms_bragg);
-
-        DrawGraph(*ihc, bragg.vph_clu, "l", {}, {ms_clu.c, kDashed, 1} );
-        DrawGraph(*ihc, vph_bragg, "p", {kRed, kOpenCircle, .5});
-        DrawGraph(*ihc, vph_pandora, "p", {kOrange, kOpenCircle, 1.5});
-
-        (*ihc)->cd(ana::tpc2sec[geoDet][bragg.end->WireID().TPC]+1);
-        m_bary->DrawMarker(bary.space, bary.drift);
-        DrawGraph(*ihc, vph_cone, "p", {kMagenta, kOpenTriangleUp, 2});
-
-        */
     }
 
     for (TCanvas* hc : hcs)
@@ -498,13 +376,5 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 }
 
 void ana::MichelDisplay::endJob() {}
-
-bool ana::MichelDisplay::IsUpright(recob::Track const& T) {
-    if (geoDet == kPDVD)
-        return T.Start().X() > T.End().X();
-    if (geoDet == kPDHD)
-        return T.Start().Y() > T.End().Y();
-    return false;
-}
 
 DEFINE_ART_MODULE(ana::MichelDisplay)

@@ -35,8 +35,10 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::SpacePoint"],
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
-            Log: false
-            Bragg: false
+            Log: true
+            KeepAll: true
+            Cone: true
+            Bragg: true
             BodyDistance: 10
             TrackLengthCut: 30
             FiducialLength: 20
