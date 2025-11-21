@@ -539,7 +539,9 @@ namespace ana {
         }
 
         size_t bot_index=0;
-        VecPtrHit::iterator bot() { return vph.begin() + bot_index; }
+        size_t endsec_index=0;
+        VecPtrHit::iterator bot_it() { return vph.begin() + bot_index; }
+        VecPtrHit::iterator endsec_it() { return vph.begin() + endsec_index; }
     };
 
     class MichelAnalyzer {
@@ -835,8 +837,10 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
     sh.bot_index = 0;
     for (int sec : sh.secs) {
-        if (ana::sec2side[geoDet][sec] == 0) 
+        if (ana::sec2side[geoDet][sec] == 1) 
             sh.bot_index += vph_sec[sec].size();
+        if (sec == sh.secs.back())
+            sh.endsec_index = sh.vph.size();
 
         for (PtrHit const& ph : vph_sec[sec])
             sh.vph.push_back(ph);
