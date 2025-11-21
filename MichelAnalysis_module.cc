@@ -747,14 +747,33 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     else break;
                 }
 
-                unsigned i_dQdx_max;
-                std::vector<float> bragg_dQdx = GetdQdx(vph_mu_tail, fRegN, &i_dQdx_max);
+                // unsigned i_dQdx_max;
+                // std::vector<float> bragg_dQdx = GetdQdx(vph_mu_tail, fRegN, &i_dQdx_max);
 
-                for (unsigned i=0; i<=i_dQdx_max; i++) {
-                    vph_mu_bragg.push_back(vph_mu_tail[i]);
-                }
+                // BraggdQdx = bragg_dQdx[i_dQdx_max];
+                // for (unsigned i=0; i<=i_dQdx_max; i++) {
+                //     vph_mu_bragg.push_back(vph_mu_tail[i]);
+                // }
 
-                BraggdQdx = bragg_dQdx[i_dQdx_max];
+                VecPtrHit::iterator it_dQ_max = std::max_element(
+                    vph_mu_tail.begin(), vph_mu_tail.end(),
+                    [&](PtrHit const& a, PtrHit const& b) -> bool {
+                        return a->ROISummedADC() < b->ROISummedADC();
+                    }
+                );
+
+                MIPdQdx = std::accumulate(
+                    sh_mu.endsec_it(), sh_mu.vph.end() - fBraggN, 0.F,
+                    [&](float sum, PtrHit const& ph) -> float {
+                        return sum + ph->ROISummedADC();
+                    }
+                ) / (sh_mu.vph.end() - fBraggN - sh_mu.endsec_it());
+                BraggdQdx = (*it_dQ_max)->ROISummedADC();
+                for (VecPtrHit::iterator it=vph_mu_tail.begin(); it!=it_dQ_max+1; ++it) 
+                    vph_mu_bragg.push_back(*it);
+
+
+
                 BraggEndHit = GetHit(vph_mu_bragg.back());
                 for (PtrHit const& ph_mu : vph_mu_bragg) 
                     BraggMuonHits.push_back(GetHit(ph_mu));
