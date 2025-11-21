@@ -566,14 +566,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             LOG(TrkHitEndInVolumeX);
             if (!fKeepAll && !TrkHitEndInVolumeX) continue;
 
-            VecPtrHit vph_mu_sec;
+            VecPtrHit vph_mu_endsec;
             for (PtrHit const& ph_mu : sh_mu.vph) {
                 if (ph_mu->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_mu);
                 TrkHits.push_back(hit);
 
                 if (hit.section != sh_mu.end_sec()) continue;
-                vph_mu_sec.push_back(ph_mu);
+                vph_mu_endsec.push_back(ph_mu);
             }
                     
             /* COMPARE TO AGNOCHECKS
@@ -589,16 +589,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             TrkEndHit = GetHit(end);
             */
 
-            VecPtrHit vph_end_sec;
-            for (PtrHit const& ph_ev : vph_ev) {
-                if (ph_ev->View() != geo::kW) continue;
-                if (ana::tpc2sec[geoDet][ph_ev->WireID().TPC] != TrkEndHit.section) continue;
-                vph_end_sec.push_back(ph_ev);
-            }
-
             // integrate charges around muon endpoint
             PandoraSphereEnergy = 0;
-            for (PtrHit const& ph_ev : vph_end_sec) {
+            for (PtrHit const& ph_ev : vph_mu_endsec) {
                 if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
 
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -623,7 +616,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             }
 
             // Cone
-            for (PtrHit const& ph_ev : vph_end_sec) {
+            for (PtrHit const& ph_ev : vph_mu_endsec) {
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
                 if (GetDistance(ph_ev, sh_mu.end) > 10) continue;
@@ -646,7 +639,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 // float angle = end_bary.angle();
                 PandoraConeEnergy = 0;
                 PandoraConeEnergyTP = 0;
-                for (PtrHit const& ph_ev : vph_end_sec) {
+                for (PtrHit const& ph_ev : vph_mu_endsec) {
                     ana::Hit hit = GetHit(ph_ev);
                     PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                     if (pt_hit && pt_hit->Length() > fTrackLengthCut) continue;
@@ -681,7 +674,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             }
 
             // End dQdx
-            PandoraTrkHitdQdx = GetdQdx(vph_mu_sec, fRegN);
+            PandoraTrkHitdQdx = GetdQdx(vph_mu_endsec, fRegN);
 
             LOG(!PandoraTrkHitdQdx.empty());
             if (!fKeepAll && PandoraTrkHitdQdx.empty()) continue;
@@ -721,7 +714,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                     BraggSphereEnergy = 0;
                     BraggSphereEnergyTP = 0;
-                    for (PtrHit const& ph_ev : vph_end_sec) {
+                    for (PtrHit const& ph_ev : vph_mu_endsec) {
                         if (GetDistance(ph_ev, sh_mu.end) > fMichelRadius) continue;
 
                         PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -747,7 +740,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     
 
                     // VecPtrHit vph_near;
-                    // for (PtrHit const& ph_ev : vph_end_sec) {
+                    // for (PtrHit const& ph_ev : vph_mu_endsec) {
                     //     if (GetDistance(ph_ev, bragg.end) > fNearbyRadius) continue;
 
                     //     // not from mu

@@ -47,6 +47,7 @@ private:
     bool TrkCathodeCrossing;
     bool TrkAnodeCrossing;
 
+    ana::Hits TrkHits;
     ana::Hit TrkStartHit, TrkEndHit;
     float TrkEndHitX;
     int TrkRegDirZ;
@@ -55,6 +56,7 @@ private:
     float TrkChi2PerNdof;
     bool TrkHitEndInVolumeX;
 
+    std::vector<float> EndSecHitdQdx;
     std::vector<float> TopHitdQdx;
     std::vector<float> BotHitdQdx;
 
@@ -145,6 +147,7 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
     tTrack->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
     tTrack->Branch("TrkAnodeCrossing", &TrkAnodeCrossing);
 
+    TrkHits.SetBranches(tTrack, "");
     TrkStartHit.SetBranches(tTrack, "Start");
     TrkEndHit.SetBranches(tTrack, "End");
     tTrack->Branch("TrkEndHitX", &TrkEndHitX);
@@ -154,6 +157,7 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
     tTrack->Branch("TrkChi2PerNdof", &TrkChi2PerNdof);
     tTrack->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
 
+    tTrack->Branch("EndSecHitdQdx", &EndSecHitdQdx);
     tTrack->Branch("TopHitdQdx", &TopHitdQdx);
     tTrack->Branch("BotHitdQdx", &BotHitdQdx);
 
@@ -228,6 +232,17 @@ void ana::MuonCalib::analyze(art::Event const& e) {
 
         ASSERT(TrkReg.r2 > 0.4)
         track_content["r2 > 0.4"]++;
+
+        VecPtrHit vph_trk_endsec;
+        for (PtrHit const& ph_trk : sh_trk.vph) {
+            if (ph_trk->View() != geo::kW) continue;
+            ana::Hit hit = GetHit(ph_trk);
+            TrkHits.push_back(hit);
+
+            if (hit.section != sh_trk.end_sec()) continue;
+            vph_trk_endsec.push_back(ph_trk);
+        }
+        EndSecHitdQdx = GetdQdx(vph_trk_endsec, 6);
 
         TopHitdQdx = GetdQdx(sh_trk.vph.begin(), sh_trk.bot(), 6);
         BotHitdQdx = GetdQdx(sh_trk.bot(), sh_trk.vph.end(), 6);
