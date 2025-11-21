@@ -731,8 +731,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     VecPtrHit vph_mu_bragg(vph_mu_endsec.begin(), vph_mu_endsec.end() - 2*fBraggN);
                     VecPtrHit vph_mu_tail(vph_mu_endsec.end() - 2*fBraggN, vph_mu_endsec.end());
 
-                    int n = 0;
-                    while (n < fBraggN) {
+                    int n = fBraggN;
+                    while (n--) {
                         float min_dist = std::numeric_limits<float>::max();
                         PtrHit closest_hit;
                         for (PtrHit const& ph_ev : vph_ev_endsec) {
@@ -752,10 +752,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                                 closest_hit = ph_ev;
                             }
                         }
-                        if (closest_hit) {
-                            vph_mu_tail.push_back(closest_hit);
-                            n++;
-                        }
+                        if (closest_hit) vph_mu_tail.push_back(closest_hit);
                         else break;
                     }
 
