@@ -232,6 +232,7 @@ void ana::MuonCalib::analyze(art::Event const& e) {
 
         ASSERT(TrkReg.r2 > 0.4)
         track_content["r2 > 0.4"]++;
+        EventiTrack.push_back(iTrack);
 
         VecPtrHit vph_trk_endsec;
         for (PtrHit const& ph_trk : sh_trk.vph) {
@@ -244,8 +245,8 @@ void ana::MuonCalib::analyze(art::Event const& e) {
         }
         EndSecHitdQdx = GetdQdx(vph_trk_endsec, 6);
 
-        TopHitdQdx = GetdQdx(sh_trk.vph.begin(), sh_trk.bot(), 6);
-        BotHitdQdx = GetdQdx(sh_trk.bot(), sh_trk.vph.end(), 6);
+        TopHitdQdx = GetdQdx(sh_trk.vph.begin(), sh_trk.bot_it(), 6);
+        BotHitdQdx = GetdQdx(sh_trk.bot_it(), sh_trk.vph.end(), 6);
 
         TrkCathodeCrossing = sh_trk.is_cc()
             && abs(sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime())*fTick2cm < 2 * fCathodeGap;
@@ -338,6 +339,7 @@ void ana::MuonCalib::resetTrack() {
     TrkCathodeCrossing = false;
     TrkAnodeCrossing = false;
 
+    TrkHits.clear();
     TrkStartHit = ana::Hit();
     TrkEndHit = ana::Hit();
     TrkEndHitX = -500.F;
@@ -347,6 +349,7 @@ void ana::MuonCalib::resetTrack() {
     TrkChi2PerNdof = 0.F;
     TrkHitEndInVolumeX = false;
 
+    EndSecHitdQdx.clear();
     TopHitdQdx.clear();
     BotHitdQdx.clear(); 
 

@@ -192,7 +192,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     switch (geoDet) {
         case kPDVD:
             geoLowX = ana::Bounds3D<float>{
-                asGeo->TPC(geo::TPCID{0, 0}).Min(), 
+                asGeo->TPC(geo::TPCID{0, 0}).Min(),
                 asGeo->TPC(geo::TPCID{0, 7}).Max()
             };
             geoHighX = ana::Bounds3D<float>{
@@ -338,7 +338,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     tMuon->Branch("TrueEndProcess", &TrueEndProcess);
     MuonTrueStartPoint.SetBranches(tMuon, "TrueStart");
     MuonTrueEndPoint.SetBranches(tMuon, "TrueEnd");
-    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy); 
+    tMuon->Branch("TrueEndEnergy", &MuonTrueEndEnergy);
     tMuon->Branch("TrueDownward", &TrueDownward);
     MuonTrueStartHit.SetBranches(tMuon, "TrueStart");
     MuonTrueEndHit.SetBranches(tMuon, "TrueEnd");
@@ -462,7 +462,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         else if (geoDet == kPDHD)
             TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fFiducialLength) || geoLowX.isInsideYZ(Start, fFiducialLength);
 
-        
+
         /* COMPARE TO AGNOCHECKS
         std::vector<ana::LinearRegression> reg_side(2);
         std::vector<VecPtrHit> vph_side(2);
@@ -490,7 +490,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     double sa = reg_side[0].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
                     double sb = reg_side[0].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
                     return sa < sb;
-                } 
+                }
             );
             ends_side[1] = std::minmax_element(
                 vph_side[1].begin(), vph_side[1].end(),
@@ -498,7 +498,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     double sa = reg_side[1].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
                     double sb = reg_side[1].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
                     return sa < sb;
-                } 
+                }
             );
             std::vector<std::pair<PtrHit, PtrHit>> pairs = {
                 { *ends_side[0].first, *ends_side[1].first },
@@ -546,14 +546,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
             /* ASSUMS DOWNWARD MUONS FOR PDVD */
             if (geoDet == kPDVD)
-                TrkHitAnodeCrossing = TrkStartHit.section < 4 
+                TrkHitAnodeCrossing = TrkStartHit.section < 4
                     && geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
                     && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
             else if (geoDet == kPDHD)
-                TrkHitAnodeCrossing = 
+                TrkHitAnodeCrossing =
                     geoHighX.z.isInside(TrkStartHit.space, fFiducialLength)
                     && wireWindow.isInside(TrkStartHit.tick, fFiducialLength/fTick2cm);
-            
+
             LOG(TrkHitCathodeCrossing != kNoCC || TrkHitAnodeCrossing);
             if (!fKeepAll && (!TrkHitAnodeCrossing && !TrkHitCathodeCrossing)) continue;
 
@@ -596,7 +596,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ana::Hit hit = GetHit(ph_mu);
                 TrkHits.push_back(hit);
             }
-                    
+
             /* COMPARE TO AGNOCHECKS
             HitPtrPair ends = GetTrackEndsHits(vph_mu);
             if (!LOG(ends.first && ends.second)) continue;
@@ -650,7 +650,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 if (std::find_if(
                     vph_mi.begin(), vph_mi.end(),
                     [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-                ) != vph_mi.end()) 
+                ) != vph_mi.end())
                     PandoraSphereEnergyTP = ph_ev->ROISummedADC();
             }
 
@@ -769,13 +769,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     }
                 ) / (sh_mu.vph.end() - fBraggN - sh_mu.endsec_it());
                 BraggdQdx = (*it_dQ_max)->ROISummedADC();
-                for (VecPtrHit::iterator it=vph_mu_tail.begin(); it!=it_dQ_max+1; ++it) 
+                for (VecPtrHit::iterator it=vph_mu_tail.begin(); it!=it_dQ_max+1; ++it)
                     vph_mu_bragg.push_back(*it);
 
 
 
                 BraggEndHit = GetHit(vph_mu_bragg.back());
-                for (PtrHit const& ph_mu : vph_mu_bragg) 
+                for (PtrHit const& ph_mu : vph_mu_bragg)
                     BraggMuonHits.push_back(GetHit(ph_mu));
 
                 BraggBaryHasLongTrack = false;
@@ -785,7 +785,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                     PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                     // not from other long track
-                    if (pt_hit 
+                    if (pt_hit
                         && pt_hit.key() != pt_ev.key()
                         && pt_hit->Length() > fMichelRadius
                     ) {
@@ -816,7 +816,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     if (std::find_if(
                         vph_mi.begin(), vph_mi.end(),
                         [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-                    ) != vph_mi.end()) 
+                    ) != vph_mi.end())
                         BraggSphereEnergyTP = ph_ev->ROISummedADC();
                 }
 
@@ -979,10 +979,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             ana::Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
                             float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                            if (dist > 5 
+                            if (dist > 5
                                 && cosa < cos(30.F * TMath::DegToRad())
                             ) continue;
-                            
+
                             MichelKeyholeEnergy += ph_mi->ROISummedADC();
 
                             if (cosa < cos(30.F * TMath::DegToRad())) continue;
@@ -1190,7 +1190,7 @@ void ana::MichelAnalysis::resetMuon() {
 //         else if (side_reg[1].n < nmin)
 //             return side_ends[0];
 //     }
-    
+
 //     // given the ends of two pieces of track, find the closest ends
 //     auto closestHits = [&](
 //         HitPtrPair const& pph1,
@@ -1226,7 +1226,7 @@ void ana::MichelAnalysis::resetMuon() {
 //                 [dmin](double d2) { return d2 < dmin*dmin; }
 //             )) != d2s.end())
 //             candidates_idx.push_back(std::distance(d2s.begin(), it++));
-        
+
 //         // no candidates found
 //         if (candidates_idx.empty()) return {};
 
@@ -1235,7 +1235,7 @@ void ana::MichelAnalysis::resetMuon() {
 //             candidates_idx.begin(),
 //             candidates_idx.end(),
 //             [&d2s](unsigned i, unsigned j) { return d2s[i] < d2s[j]; });
-        
+
 //         // if outermost hits are requested, get the outermost pair
 //         if (otherHits) {
 //             unsigned other_idx = (closest_idx+2) % 4; // opposite pair
@@ -1261,14 +1261,14 @@ void ana::MichelAnalysis::resetMuon() {
 //     // if cathode crossing info is requested
 //     if (pp_cathode_crossing)
 //         *pp_cathode_crossing = cathode_crossing;
-    
+
 //     // if no tpc crossing info is needed
 //     if (geoDet == kPDHD || !vp_tpc_crossing) {
 //         return trk_ends;
 //     }
 
 //     std::vector<HitPtrPair> per_sec_ends(ana::n_sec[geoDet]);
-    
+
 //     // if a sorted list of hits is requested
 //     // if (vvp_sec_sorted_hits) {
 //     //     // get a sorted list of hits for each section (ie. pair of TPCs)
@@ -1284,7 +1284,7 @@ void ana::MichelAnalysis::resetMuon() {
 //     //     for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
 //     //         int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
 //     //         std::sort(
-//     //             vvp_sec_sorted_hits->at(s).begin(), 
+//     //             vvp_sec_sorted_hits->at(s).begin(),
 //     //             vvp_sec_sorted_hits->at(s).end(),
 //     //             [&, &reg=side_reg[side]](
 //     //                 HitPtr const& h1, HitPtr const& h2
@@ -1340,7 +1340,7 @@ void ana::MichelAnalysis::resetMuon() {
 
 //             int side = s >= ana::n_sec[geoDet]/2 ? 1 : 0;
 //             std::sort(
-//                 vp_sec_sorted.begin(), 
+//                 vp_sec_sorted.begin(),
 //                 vp_sec_sorted.end(),
 //                 [&, &reg=side_reg[side]](
 //                     HitPtr const& h1, HitPtr const& h2
