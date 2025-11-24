@@ -224,6 +224,9 @@ void ana::MuonCalib::analyze(art::Event const& e) {
         ASSERT(sh_trk)
         track_content[">4 hits in one section"]++;
 
+        TrkLength = pt_ev->Length();
+        TrkStartPoint = ana::Point(Start);
+        TrkEndPoint = ana::Point(End);
         TrkStartHit = GetHit(sh_trk.start);
         TrkEndHit = GetHit(sh_trk.end);
         TrkReg = sh_trk.end_reg(geoDet);
