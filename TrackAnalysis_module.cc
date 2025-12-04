@@ -117,6 +117,8 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("cathode_misaligned",   &mu.is_cathode_misaligned);
     mu.start_hit.SetBranches(mu.tree, "start_");
     mu.end_hit.SetBranches(mu.tree, "end_");
+    mu.top_last_hit.SetBranches(mu.tree, "top_last_");
+    mu.bottom_first_hit.SetBranches(mu.tree, "bottom_first_");
     mu.hits.SetBranches(mu.tree);
     mu.sec_crossing_hits.SetBranches(mu.tree, "sec_cross_");
     mu.end_reg.SetBranches(mu.tree);
