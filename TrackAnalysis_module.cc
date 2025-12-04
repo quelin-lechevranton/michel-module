@@ -118,6 +118,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.start_hit.SetBranches(mu.tree, "start_");
     mu.end_hit.SetBranches(mu.tree, "end_");
     mu.hits.SetBranches(mu.tree);
+    mu.sec_crossing_hits.SetBranches(mu.tree, "sec_cross_");
     mu.end_reg.SetBranches(mu.tree);
 }
 
