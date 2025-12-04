@@ -1,14 +1,38 @@
 #include "utils.h"
 
+
+/* READ ME
+
+Naming conventions,
+some variables are prefixed by their type followed by an underscore:
+ - `ph_`  for `art::Ptr<recob::Hit>`
+ - `vph_` for `std::vector<art::Ptr<recob::Hit>>`
+
+ - `pt_`  for `art::Ptr<recob::Track>`
+ - `vpt_` for `std::vector<art::Ptr<recob::Track>>`
+
+ - `ps_`  for `art::Ptr<recob::Shower>`
+ - `vps_` for `std::vector<art::Ptr<recob::Shower>>`
+
+ _ `tag_` for `art::InputTag`
+ - `mcp_` for `simb::MCParticle*`
+
+ - `sh_` for custom `ana::SortedHits`, a structure containing info on the sorted list of hits of a track
+
+*/
+
+
+
+
+
 namespace ana {
     class MichelAnalysis;
 }
 
-// using HitPtr = art::Ptr<recob::Hit>;
-// using HitPtrVec = std::vector<art::Ptr<recob::Hit>>;
-// using HitPtrPair = std::pair<art::Ptr<recob::Hit>, art::Ptr<recob::Hit>>;
-
-class ana::MichelAnalysis : public art::EDAnalyzer, private ana::MichelAnalyzer {
+class ana::MichelAnalysis : 
+    public art::EDAnalyzer, 
+    private ana::MichelAnalyzer 
+{
 public:
     explicit MichelAnalysis(fhicl::ParameterSet const& p);
     MichelAnalysis(MichelAnalysis const&) = delete;
@@ -58,10 +82,6 @@ private:
     bool TrkIsUpright; // Supposition: Muon is downward
     ana::Point TrkStartPoint, TrkEndPoint;
     bool TrkEndInVolumeYZ;
-    bool TrkCathodeCrossing;
-    bool TrkAnodeCrossing;
-    // bool AgnoTagTrkEndLowN,
-    //      AgnoTagTrkEndBadCC;
 
     // Hit from track information
     bool TrkHitError;
@@ -169,8 +189,9 @@ private:
     // );
 };
 
-ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
-    : EDAnalyzer{p}, MichelAnalyzer{p},
+ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) : 
+    EDAnalyzer{p}, 
+    MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
     fKeepAll(p.get<bool>("KeepAll", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 20.F)), // in cm
@@ -256,10 +277,6 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     TrkStartPoint.SetBranches(tMuon, "Start");
     TrkEndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("TrkEndInVolumeYZ", &TrkEndInVolumeYZ);
-    tMuon->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
-    tMuon->Branch("TrkAnodeCrossing", &TrkAnodeCrossing);
-    // tMuon->Branch("AgnoTagTrkEndLowN", &AgnoTagTrkEndLowN);
-    // tMuon->Branch("AgnoTagTrkEndBadCC", &AgnoTagTrkEndBadCC);
 
     tMuon->Branch("MIPdQdx", &MIPdQdx);
 
@@ -409,7 +426,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (p_hit->View() == geo::kW)
             EventHits.push_back(GetHit(p_hit));
 
-    // loop over tracks to find muons
+    // loop over tracks to find stopping muons
     for (PtrTrk const& pt_ev : vpt_ev) {
         if (fLog) std::cout << "e" << iEvent << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
@@ -430,12 +447,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << iEvent << "m" << EventNMuon << " (" << iMuon << ")" "\033[0m" << std::endl;
         EventiMuon.push_back(iMuon);
 
+        // ============================
+        // Dump basic track information
         TrkLength = pt_ev->Length();
         TrkChi2 = pt_ev->Chi2();
         TrkChi2PerNdof = pt_ev->Chi2PerNdof();
+
         LOG(TrkLength >= fTrackLengthCut);
         if (!fKeepAll && TrkLength < fTrackLengthCut) continue;
-
 
         TrkIsUpright =  IsUpright(*pt_ev);
         geo::Point_t Start = TrkIsUpright ? pt_ev->Start() : pt_ev->End();
@@ -448,74 +467,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         LOG(TrkEndInVolumeYZ);
         if (!fKeepAll && !TrkEndInVolumeYZ) continue;
 
-        TrkCathodeCrossing = (
-            geoLowX.isInside(Start)
-            && geoHighX.isInside(End)
-        ) || (
-            geoHighX.isInside(Start)
-            && geoLowX.isInside(End)
-        );
 
-        // Anode Crossing: SUPPOSITION: Muon is downward
-        if (geoDet == kPDVD)
-            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fFiducialLength);
-        else if (geoDet == kPDHD)
-            TrkAnodeCrossing = geoHighX.isInsideYZ(Start, fFiducialLength) || geoLowX.isInsideYZ(Start, fFiducialLength);
-
-
-        /* COMPARE TO AGNOCHECKS
-        std::vector<ana::LinearRegression> reg_side(2);
-        std::vector<VecPtrHit> vph_side(2);
-        for (PtrHit const& ph_hit : vph_mu) {
-            if (ph_hit->View() != geo::kW) continue;
-            int side = ana::tpc2side[geoDet][ph_hit->WireID().TPC];
-            if (side == -1) continue;
-            double z = GetSpace(ph_hit->WireID());
-            double t = ph_hit->PeakTime() * fTick2cm;
-            reg_side[side].add(z, t);
-            vph_side[side].push_back(ph_hit);
-        }
-        AgnoTagTrkEndLowN = reg_side[0].n < ana::LinearRegression::nmin
-            && reg_side[1].n < ana::LinearRegression::nmin;
-
-        if (reg_side[0].n >= ana::LinearRegression::nmin
-            && reg_side[1].n >= ana::LinearRegression::nmin
-        ) {
-            reg_side[0].compute();
-            reg_side[1].compute();
-            std::vector<std::pair<VecPtrHit::iterator, VecPtrHit::iterator>> ends_side(2);
-            ends_side[0] = std::minmax_element(
-                vph_side[0].begin(), vph_side[0].end(),
-                [&](PtrHit const& a, PtrHit const& b) -> bool {
-                    double sa = reg_side[0].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
-                    double sb = reg_side[0].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
-                    return sa < sb;
-                }
-            );
-            ends_side[1] = std::minmax_element(
-                vph_side[1].begin(), vph_side[1].end(),
-                [&](PtrHit const& a, PtrHit const& b) -> bool {
-                    double sa = reg_side[1].projection(GetSpace(a->WireID()), a->PeakTime() * fTick2cm);
-                    double sb = reg_side[1].projection(GetSpace(b->WireID()), b->PeakTime() * fTick2cm);
-                    return sa < sb;
-                }
-            );
-            std::vector<std::pair<PtrHit, PtrHit>> pairs = {
-                { *ends_side[0].first, *ends_side[1].first },
-                { *ends_side[0].first, *ends_side[1].second },
-                { *ends_side[0].second, *ends_side[1].first },
-                { *ends_side[0].second, *ends_side[1].second }
-            };
-            AgnoTagTrkEndBadCC = std::find_if(
-                pairs.begin(), pairs.end(),
-                [&](std::pair<PtrHit, PtrHit> const& p) -> bool {
-                    return GetDistance(p.first, p.second) < 2 * fCathodeGap;
-                }
-            ) == pairs.end();
-        } else AgnoTagTrkEndBadCC = false;
-        // End of Agnochecks
-        */
-
+        // ===================================================
+        // We need some more information on the track, mainly:
+        // - which is the last point? (ASSUMING DOWNWARD TRACK, for cosmic muons)
+        // - does the track cross the cathode? (for t0)
+        // - some quality tags...?
+        // For that, we make linear regressions on each side of the cathode
+        // on the hits associated to the track given by Pandora
 
         // SUPPOSITION: Muon is downward
         TrkRegDirZ = End.Z() > Start.Z() ? 1 : -1;
@@ -926,8 +885,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
                     // MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
-
-
                     float mu_end_angle = sh_mcp.end_reg(geoDet).theta(MuonTrueRegDirZ);
                     // for (PtrHit const& ph_mi : vph_mi) {
                     for (size_t i=0; i<vph_mi.size(); i++) {
@@ -969,25 +926,27 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                         MichelBaryMuonAngle = da;
 
-                        // float angle = end_bary.angle();
-                        MichelConeEnergy = 0;
-                        for (PtrHit const& ph_mi : vph_mi) {
-                            if (ph_mi->View() != geo::kW) continue;
-                            float dist = GetDistance(ph_mi, sh_mcp.end);
-                            if (dist > 30) continue;
+                        if (fCone) {
+                            // float angle = end_bary.angle();
+                            MichelConeEnergy = 0;
+                            for (PtrHit const& ph_mi : vph_mi) {
+                                if (ph_mi->View() != geo::kW) continue;
+                                float dist = GetDistance(ph_mi, sh_mcp.end);
+                                if (dist > 30) continue;
 
-                            ana::Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
-                            float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
+                                ana::Vec2 end_hit = GetHit(ph_mi).vec(fTick2cm) - MuonTrueEndHit.vec(fTick2cm);
+                                float cosa = end_bary.dot(end_hit) / (end_bary.norm() * end_hit.norm());
 
-                            if (dist > 5
-                                && cosa < cos(30.F * TMath::DegToRad())
-                            ) continue;
+                                if (dist > 5
+                                    && cosa < cos(30.F * TMath::DegToRad())
+                                ) continue;
 
-                            MichelKeyholeEnergy += ph_mi->ROISummedADC();
+                                MichelKeyholeEnergy += ph_mi->ROISummedADC();
 
-                            if (cosa < cos(30.F * TMath::DegToRad())) continue;
+                                if (cosa < cos(30.F * TMath::DegToRad())) continue;
 
-                            MichelConeEnergy += ph_mi->ROISummedADC();
+                                MichelConeEnergy += ph_mi->ROISummedADC();
+                            }
                         }
                     }
                 }

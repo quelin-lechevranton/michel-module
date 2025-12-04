@@ -393,6 +393,7 @@ namespace ana {
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
+    // Computationally intensive!!
     simb::MCParticle const* trk2mcp(
         PtrTrk const& pt,
         detinfo::DetectorClocksData const& clockData,
@@ -411,6 +412,7 @@ namespace ana {
         return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
     }
 
+    // Computationally intensive!!
     PtrTrk mcp2trk(
         simb::MCParticle const* mcp, 
         VecPtrTrk const& vp_trk,

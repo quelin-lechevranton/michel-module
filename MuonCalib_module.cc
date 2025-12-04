@@ -129,7 +129,7 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
     tEvent->Branch("iEvent", &iEvent);
     tEvent->Branch("NTrack", &EventNTrack);
     tEvent->Branch("iTrack", &EventiTrack);
-    EventHits.SetBranches(tEvent, "Event");
+    EventHits.SetBranches(tEvent, "");
 
     tTrack = asFile->make<TTree>("track", "");
 
@@ -140,22 +140,22 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
     tTrack->Branch("iTrack", &iTrack);
     tTrack->Branch("iTrackInEvent", &EventNTrack);
 
-    tTrack->Branch("TrkLength", &TrkLength);
-    tTrack->Branch("TrkIsUpright", &TrkIsUpright);
+    tTrack->Branch("Length", &TrkLength);
+    tTrack->Branch("IsUpright", &TrkIsUpright);
     TrkStartPoint.SetBranches(tTrack, "Start");
     TrkEndPoint.SetBranches(tTrack, "End");
-    tTrack->Branch("TrkCathodeCrossing", &TrkCathodeCrossing);
-    tTrack->Branch("TrkAnodeCrossing", &TrkAnodeCrossing);
+    tTrack->Branch("CathodeCrossing", &TrkCathodeCrossing);
+    tTrack->Branch("AnodeCrossing", &TrkAnodeCrossing);
 
     TrkHits.SetBranches(tTrack, "");
     TrkStartHit.SetBranches(tTrack, "Start");
     TrkEndHit.SetBranches(tTrack, "End");
-    tTrack->Branch("TrkEndHitX", &TrkEndHitX);
-    tTrack->Branch("TrkRegDirZ", &TrkRegDirZ);
-    TrkReg.SetBranches(tTrack, "TrkReg");
-    tTrack->Branch("TrkChi2", &TrkChi2);
-    tTrack->Branch("TrkChi2PerNdof", &TrkChi2PerNdof);
-    tTrack->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
+    tTrack->Branch("EndHitX", &TrkEndHitX);
+    tTrack->Branch("RegDirZ", &TrkRegDirZ);
+    TrkReg.SetBranches(tTrack, "");
+    tTrack->Branch("Chi2", &TrkChi2);
+    tTrack->Branch("Chi2PerNdof", &TrkChi2PerNdof);
+    tTrack->Branch("HitEndInVolumeX", &TrkHitEndInVolumeX);
 
     tTrack->Branch("EndSecHitdQdx", &EndSecHitdQdx);
     tTrack->Branch("TopHitdQdx", &TopHitdQdx);
@@ -163,9 +163,9 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
 
     tTrack->Branch("TruePdg", &TruePdg);
     tTrack->Branch("TrueEndProcess", &TrueEndProcess);
-    MuonTrueStartPoint.SetBranches(tTrack, "MuonTrueStart");
-    MuonTrueEndPoint.SetBranches(tTrack, "MuonTrueEnd");
-    tTrack->Branch("MuonTrueEndEnergy", &MuonTrueEndEnergy);
+    MuonTrueStartPoint.SetBranches(tTrack, "TrueStart");
+    MuonTrueEndPoint.SetBranches(tTrack, "TrueEnd");
+    tTrack->Branch("TrueEndEnergy", &MuonTrueEndEnergy);
     tTrack->Branch("TrueDownward", &TrueDownward);
 }
 
