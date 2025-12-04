@@ -206,7 +206,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                     if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
                         if (abs(sec_curr - sec_next) != 1)
                             mu.is_section_jumping = true;
-                    } else {
+
+                        unsigned j = ana::sec2side[geoDet][sec_curr] == 0 ? i : i-1;
                         if ((sh.sc[2*i]->PeakTime()-sh.sc[2*i+1]->PeakTime())*fTick2cm > 2.F)
                             mu.is_section_misaligned = true;
                     }
