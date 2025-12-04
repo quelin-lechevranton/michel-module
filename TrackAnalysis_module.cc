@@ -157,7 +157,10 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
         mu.hits.clear();
         mu.sec_crossing_hits.clear();
+        mu.is_section_jumping = false;
+        mu.is_section_misaligned = false;
         mu.sh_error = !sh;
+        LOG(!mu.sh_error);
         if (!mu.sh_error) {
             mu.start_hit = GetHit(sh.start);
             mu.end_hit = GetHit(sh.end);
@@ -178,6 +181,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.is_cathode_crossing = sh.is_cc();
             mu.is_cathode_misaligned = sh.is_cc() 
                 && !(abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
+            LOG(mu.is_cathode_crossing);
+            LOG(mu.is_cathode_misaligned);
 
             if (geoDet == kPDVD)
                 mu.is_anode_crossing = mu.start_hit.section < 4
@@ -187,10 +192,10 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.is_anode_crossing =
                     geoHighX.z.isInside(mu.start_hit.space, 10.F)
                     && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
+            LOG(mu.is_anode_crossing);
 
+            LOG(sh.secs.size() > 1);
             if (sh.secs.size() > 1) {
-                mu.is_section_jumping = false;
-                mu.is_section_misaligned = false;
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
                     int sec_curr = sh.secs[i];
                     int sec_next = sh.secs[i+1];
@@ -203,6 +208,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                             mu.is_section_misaligned = true;
                     }
                 }
+                LOG(mu.is_section_jumping);
+                LOG(mu.is_section_misaligned);
             }    
         } else {
             mu.start_hit = ana::Hit{};
