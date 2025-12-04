@@ -27,6 +27,7 @@ private:
 
     struct {
         TTree* tree;
+        ana::Hits hits;
         size_t  run, 
                 subrun, 
                 event; 
@@ -35,8 +36,8 @@ private:
 
     struct {
         TTree* tree;
-        float length;
         ana::Hits hits, sec_crossing_hits;
+        float length;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
 
         bool    is_upright,
@@ -136,6 +137,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
     ev.event = e.event();
     ev.is_data = e.isRealData();
 
+    ev.hits.clear();
+    for (PtrHit ph : vph_ev)
+        if (ph->View() == geo::kW)
+            ev.hits.push_back(GetHit(ph));
+
     for (PtrTrk pt_ev : vpt_ev) {
         VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
         ASSERT(vph_trk.size())
@@ -155,8 +161,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.bottom_first_hit = ana::Hit{};
         }
 
+        mu.hits.clear();
         for (PtrHit ph : sh.vph)
             mu.hits.push_back(GetHit(ph));
+
+        mu.sec_crossing_hits.clear();
         for (PtrHit ph : sh.sc)
             mu.sec_crossing_hits.push_back(GetHit(ph));
 
