@@ -40,7 +40,8 @@ private:
         float length;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
 
-        bool    is_upright,
+        bool    sh_error,
+                is_upright,
                 is_cathode_crossing,
                 is_anode_crossing,
                 is_section_jumping,
@@ -95,6 +96,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree = asFile->make<TTree>("muon", "");
 
     mu.tree->Branch("length", &mu.length);
+    mu.tree->Branch("sh_error", &mu.sh_error);
     mu.tree->Branch("upright", &mu.is_upright);
     mu.tree->Branch("cathode_crossing", &mu.is_cathode_crossing);
     mu.tree->Branch("anode_crossing", &mu.is_anode_crossing);
@@ -108,6 +110,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
 
 void ana::TrackAnalysis::beginJob() {}
 void ana::TrackAnalysis::endJob() {}
+
 void ana::TrackAnalysis::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
@@ -151,53 +154,67 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         geo::Point_t End = mu.is_upright ? pt_ev->End() : pt_ev->Start();
 
         ana::SortedHits sh = GetSortedHits(vph_trk, End.Z() > Start.Z() ? 1 : -1);
-        mu.start_hit = GetHit(sh.start);
-        mu.end_hit = GetHit(sh.end);
-        if (sh.is_cc()) {
-            mu.top_last_hit = GetHit(sh.cc.first);
-            mu.bottom_first_hit = GetHit(sh.cc.second);
-        } else {
-            mu.top_last_hit = ana::Hit{};
-            mu.bottom_first_hit = ana::Hit{};
-        }
 
         mu.hits.clear();
-        for (PtrHit ph : sh.vph)
-            mu.hits.push_back(GetHit(ph));
-
         mu.sec_crossing_hits.clear();
-        for (PtrHit ph : sh.sc)
-            mu.sec_crossing_hits.push_back(GetHit(ph));
+        mu.sh_error = !sh;
+        if (!mu.sh_error) {
+            mu.start_hit = GetHit(sh.start);
+            mu.end_hit = GetHit(sh.end);
+            if (sh.is_cc()) {
+                mu.top_last_hit = GetHit(sh.cc.first);
+                mu.bottom_first_hit = GetHit(sh.cc.second);
+            } else {
+                mu.top_last_hit = ana::Hit{};
+                mu.bottom_first_hit = ana::Hit{};
+            }
 
-        mu.is_cathode_crossing = sh.is_cc();
-        mu.is_cathode_misaligned = sh.is_cc() 
-            && !(abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
+            for (PtrHit ph : sh.vph)
+                mu.hits.push_back(GetHit(ph));
 
-        if (geoDet == kPDVD)
-            mu.is_anode_crossing = mu.start_hit.section < 4
-                && geoHighX.z.isInside(mu.start_hit.space, 10.F)
-                && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
-        else if (geoDet == kPDHD)
-            mu.is_anode_crossing =
-                geoHighX.z.isInside(mu.start_hit.space, 10.F)
-                && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
+            for (PtrHit ph : sh.sc)
+                mu.sec_crossing_hits.push_back(GetHit(ph));
 
-        if (sh.secs.size() > 1) {
+            mu.is_cathode_crossing = sh.is_cc();
+            mu.is_cathode_misaligned = sh.is_cc() 
+                && !(abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
+
+            if (geoDet == kPDVD)
+                mu.is_anode_crossing = mu.start_hit.section < 4
+                    && geoHighX.z.isInside(mu.start_hit.space, 10.F)
+                    && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
+            else if (geoDet == kPDHD)
+                mu.is_anode_crossing =
+                    geoHighX.z.isInside(mu.start_hit.space, 10.F)
+                    && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
+
+            if (sh.secs.size() > 1) {
+                mu.is_section_jumping = false;
+                mu.is_section_misaligned = false;
+                for (unsigned i=0; i<sh.secs.size()-1; i++) {
+                    int sec_curr = sh.secs[i];
+                    int sec_next = sh.secs[i+1];
+
+                    if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
+                        if (abs(sec_curr - sec_next) != 1)
+                            mu.is_section_jumping = true;
+                    } else {
+                        if ((sh.sc[2*i]->PeakTime()-sh.sc[2*i+1]->PeakTime())*fTick2cm > 2.F)
+                            mu.is_section_misaligned = true;
+                    }
+                }
+            }    
+        } else {
+            mu.start_hit = ana::Hit{};
+            mu.end_hit = ana::Hit{};
+            mu.top_last_hit = ana::Hit{};
+            mu.bottom_first_hit = ana::Hit{};
+            mu.is_cathode_crossing = false;
+            mu.is_anode_crossing = false;
             mu.is_section_jumping = false;
             mu.is_section_misaligned = false;
-            for (unsigned i=0; i<sh.secs.size()-1; i++) {
-                int sec_curr = sh.secs[i];
-                int sec_next = sh.secs[i+1];
-
-                if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
-                    if (abs(sec_curr - sec_next) != 1)
-                        mu.is_section_jumping = true;
-                } else {
-                    if ((sh.sc[2*i]->PeakTime()-sh.sc[2*i+1]->PeakTime())*fTick2cm > 2.F)
-                        mu.is_section_misaligned = true;
-                }
-            }
-        }    
+            mu.is_cathode_misaligned = false;
+        }
     }
 }
 
