@@ -27,6 +27,8 @@ private:
 
     struct {
         TTree* tree;
+        size_t index=0;
+        size_t muon_number=0;
         ana::Hits hits;
         size_t  run, 
                 subrun, 
@@ -36,9 +38,11 @@ private:
 
     struct {
         TTree* tree;
+        size_t index=0;
         ana::Hits hits, sec_crossing_hits;
         float length;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
+        ana::LinearRegression end_reg;
 
         bool    sh_error,
                 is_upright,
@@ -87,25 +91,33 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     //
     ev.tree = asFile->make<TTree>("event", "");
 
-    ev.tree->Branch("run", &ev.run);
-    ev.tree->Branch("subrun", &ev.subrun);
-    ev.tree->Branch("event", &ev.event);
-    ev.tree->Branch("is_data", &ev.is_data);
+    ev.tree->Branch("run",      &ev.run);
+    ev.tree->Branch("subrun",   &ev.subrun);
+    ev.tree->Branch("event",    &ev.event);
+    ev.tree->Branch("index",    &ev.index);
+    ev.tree->Branch("muon_number", &ev.muon_number);
+    ev.tree->Branch("is_data",  &ev.is_data);
+    ev.hits.SetBranches(ev.tree);
 
     //
     mu.tree = asFile->make<TTree>("muon", "");
 
-    mu.tree->Branch("length", &mu.length);
-    mu.tree->Branch("sh_error", &mu.sh_error);
-    mu.tree->Branch("upright", &mu.is_upright);
-    mu.tree->Branch("cathode_crossing", &mu.is_cathode_crossing);
-    mu.tree->Branch("anode_crossing", &mu.is_anode_crossing);
-    mu.tree->Branch("section_jumping", &mu.is_section_jumping);
-    mu.tree->Branch("section_misaligned", &mu.is_section_misaligned);
-    mu.tree->Branch("cathode_misaligned", &mu.is_cathode_misaligned);
+    mu.tree->Branch("run",                  &ev.run);
+    mu.tree->Branch("subrun",               &ev.subrun);
+    mu.tree->Branch("event",                &ev.event);
+    mu.tree->Branch("index",                &mu.index);
+    mu.tree->Branch("length",               &mu.length);
+    mu.tree->Branch("sh_error",             &mu.sh_error);
+    mu.tree->Branch("upright",              &mu.is_upright);
+    mu.tree->Branch("cathode_crossing",     &mu.is_cathode_crossing);
+    mu.tree->Branch("anode_crossing",       &mu.is_anode_crossing);
+    mu.tree->Branch("section_jumping",      &mu.is_section_jumping);
+    mu.tree->Branch("section_misaligned",   &mu.is_section_misaligned);
+    mu.tree->Branch("cathode_misaligned",   &mu.is_cathode_misaligned);
     mu.start_hit.SetBranches(mu.tree, "start_");
     mu.end_hit.SetBranches(mu.tree, "end_");
     mu.hits.SetBranches(mu.tree);
+    mu.end_reg.SetBranches(mu.tree);
 }
 
 void ana::TrackAnalysis::beginJob() {}
@@ -149,6 +161,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
         ASSERT(vph_trk.size())
 
+        mu.length = pt_ev->Length();
         mu.is_upright = IsUpright(*pt_ev);
         geo::Point_t Start = mu.is_upright ? pt_ev->Start() : pt_ev->End();
         geo::Point_t End = mu.is_upright ? pt_ev->End() : pt_ev->Start();
@@ -162,6 +175,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.sh_error = !sh;
         LOG(!mu.sh_error);
         if (!mu.sh_error) {
+            mu.end_reg = sh.end_reg(geoDet);
             mu.start_hit = GetHit(sh.start);
             mu.end_hit = GetHit(sh.end);
             if (sh.is_cc()) {
@@ -205,7 +219,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                         if (abs(sec_curr - sec_next) != 1)
                             mu.is_section_jumping = true;
 
-                        if ((*sc_it)->PeakTime()-(*++sc_it)->PeakTime())*fTick2cm > 2.F))
+                        if (((*sc_it)->PeakTime()-(*++sc_it)->PeakTime())*fTick2cm > 2.F)
                             mu.is_section_misaligned = true;
                     }
                 }
@@ -213,6 +227,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 LOG(mu.is_section_misaligned);
             }    
         } else {
+            mu.end_reg = ana::LinearRegression{};
             mu.start_hit = ana::Hit{};
             mu.end_hit = ana::Hit{};
             mu.top_last_hit = ana::Hit{};
@@ -223,7 +238,12 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.is_section_misaligned = false;
             mu.is_cathode_misaligned = false;
         }
+        mu.tree->Fill();
+        mu.index++;
+        ev.muon_number++;
     }
+    ev.tree->Fill();
+    ev.index++;
 }
 
 DEFINE_ART_MODULE(ana::TrackAnalysis)
