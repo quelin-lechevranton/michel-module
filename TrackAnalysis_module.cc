@@ -196,6 +196,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             LOG(sh.secs.size() > 1);
             if (sh.secs.size() > 1) {
+                VecPtrHit::iterator sc_it = sh.sc.begin();
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
                     int sec_curr = sh.secs[i];
                     int sec_next = sh.secs[i+1];
@@ -204,8 +205,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                         if (abs(sec_curr - sec_next) != 1)
                             mu.is_section_jumping = true;
 
-                        unsigned j = ana::sec2side[geoDet][sec_curr] == 0 ? i : i-1;
-                        if ((sh.sc[2*i]->PeakTime()-sh.sc[2*i+1]->PeakTime())*fTick2cm > 2.F)
+                        if ((*sc_it)->PeakTime()-(*++sc_it)->PeakTime())*fTick2cm > 2.F))
                             mu.is_section_misaligned = true;
                     }
                 }
