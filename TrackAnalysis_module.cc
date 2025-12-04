@@ -105,6 +105,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("run",                  &ev.run);
     mu.tree->Branch("subrun",               &ev.subrun);
     mu.tree->Branch("event",                &ev.event);
+    mu.tree->Branch("event_index",          &ev.index);
     mu.tree->Branch("index",                &mu.index);
     mu.tree->Branch("length",               &mu.length);
     mu.tree->Branch("sh_error",             &mu.sh_error);
