@@ -196,9 +196,6 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             LOG(sh.secs.size() > 1);
             if (sh.secs.size() > 1) {
-                LOG(2*(sh.secs.size()-1) == sh.sc.size());
-                std::cout << sh.secs.size() << " sections crossed." << std::endl;
-                std::cout << sh.sc.size() << " section crossing hits." << std::endl;
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
                     int sec_curr = sh.secs[i];
                     int sec_next = sh.secs[i+1];
