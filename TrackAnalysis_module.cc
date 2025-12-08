@@ -41,6 +41,7 @@ private:
         size_t index=0;
         ana::Hits hits, sec_crossing_hits;
         float length;
+        float max_consecutive_dist;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
         ana::LinearRegression end_reg;
 
@@ -108,6 +109,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("event_index",          &ev.index);
     mu.tree->Branch("index",                &mu.index);
     mu.tree->Branch("length",               &mu.length);
+    mu.tree->Branch("max_consecutive_dist", &mu.max_consecutive_dist);
     mu.tree->Branch("sh_error",             &mu.sh_error);
     mu.tree->Branch("upright",              &mu.is_upright);
     mu.tree->Branch("cathode_crossing",     &mu.is_cathode_crossing);
@@ -179,6 +181,16 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.sh_error = !sh;
         LOG(!mu.sh_error);
         if (!mu.sh_error) {
+
+            mu.max_consecutive_dist = 0.F;
+            for (VecPtrHit::iterator it=sh.vph.begin(); it!=sh.vph.end()-1; ++it) {
+                Hit h1 = GetHit(*it), h2 = GetHit(*(it+1));
+                if (h1.section != h2.section) continue;
+                float dist = GetDistance(h1, h2);
+                if (dist > mu.max_consecutive_dist)
+                    mu.max_consecutive_dist = dist; 
+            }
+
             mu.end_reg = sh.end_reg(geoDet);
             mu.start_hit = GetHit(sh.start);
             mu.end_hit = GetHit(sh.end);
@@ -231,6 +243,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 LOG(mu.is_section_misaligned);
             }    
         } else {
+            mu.max_consecutive_dist = -1.F;
             mu.end_reg = ana::LinearRegression{};
             mu.start_hit = ana::Hit{};
             mu.end_hit = ana::Hit{};
