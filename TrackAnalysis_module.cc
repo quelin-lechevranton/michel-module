@@ -42,8 +42,10 @@ private:
         ana::Hits hits, sec_crossing_hits;
         float length;
         float max_consecutive_dist;
+        ana::Point start_point, end_point;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
-        ana::LinearRegression end_reg;
+        ana::LinearRegression top_reg, bot_reg;
+        std::vector<float> top_dQdx, bot_dQdx;
 
         bool    sh_error,
                 is_upright,
@@ -58,8 +60,12 @@ private:
             std::string end_process;
             ana::Hits hits, sec_crossing_hits;
             float max_consecutive_dist;
+            ana::Point start_point, end_point;
             ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
-            ana::LinearRegression end_reg;
+            float end_hit_x;
+            int dir_z;
+            ana::LinearRegression top_reg, bot_reg;
+            std::vector<float> top_dQdx, bot_dQdx;
             float end_energy;
 
             bool    sh_error,
@@ -136,13 +142,18 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("section_jumping",      &mu.is_section_jumping);
     mu.tree->Branch("section_misaligned",   &mu.is_section_misaligned);
     mu.tree->Branch("cathode_misaligned",   &mu.is_cathode_misaligned);
+    mu.start_point.             SetBranches(mu.tree, "start_");
+    mu.end_point.               SetBranches(mu.tree, "end_");
     mu.start_hit.               SetBranches(mu.tree, "start_");
     mu.end_hit.                 SetBranches(mu.tree, "end_");
     mu.top_last_hit.            SetBranches(mu.tree, "top_last_");
     mu.bottom_first_hit.        SetBranches(mu.tree, "bottom_first_");
     mu.hits.                    SetBranches(mu.tree);
     mu.sec_crossing_hits.       SetBranches(mu.tree, "sec_cross_");
-    mu.end_reg.                 SetBranches(mu.tree);
+    mu.top_reg.                 SetBranches(mu.tree);
+    mu.bot_reg.                 SetBranches(mu.tree);
+    mu.tree->Branch("top_dQdx",            &mu.top_dQdx);
+    mu.tree->Branch("bot_dQdx",            &mu.bot_dQdx);
 
     mu.tree->Branch("tru_pdg",                  &mu.tru.pdg);
     mu.tree->Branch("tru_end_process",          &mu.tru.end_process);
@@ -154,13 +165,18 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("tru_section_jumping",      &mu.tru.is_section_jumping);
     mu.tree->Branch("tru_section_misaligned",   &mu.tru.is_section_misaligned);
     mu.tree->Branch("tru_cathode_misaligned",   &mu.tru.is_cathode_misaligned);
+    mu.tru.start_point.         SetBranches(mu.tree, "tru_start_");
+    mu.tru.end_point.           SetBranches(mu.tree, "tru_end_");
     mu.tru.start_hit.           SetBranches(mu.tree, "tru_start_");
     mu.tru.end_hit.             SetBranches(mu.tree, "tru_end_");
     mu.tru.top_last_hit.        SetBranches(mu.tree, "tru_top_last_");
     mu.tru.bottom_first_hit.    SetBranches(mu.tree, "tru_bottom_first_");
     mu.tru.hits.                SetBranches(mu.tree, "tru_");
     mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "tru_sec_cross_");
-    mu.tru.end_reg.             SetBranches(mu.tree, "tru_end_");
+    mu.tru.top_reg.             SetBranches(mu.tree, "tru_end_");
+    mu.tru.bot_reg.             SetBranches(mu.tree, "tru_end_");
+    mu.tree->Branch("tru_top_dQdx",          &mu.tru.top_dQdx);
+    mu.tree->Branch("tru_bot_dQdx",          &mu.tru.bot_dQdx);
     mu.tree->Branch("tru_has_michel",           &mu.tru.has_michel);
     mu.tree->Branch("tru_michel_energy",        &mu.tru.michel_energy);
 }
@@ -208,20 +224,23 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
         mu.length = pt_ev->Length();
         mu.is_upright = IsUpright(*pt_ev);
-        geo::Point_t Start = mu.is_upright ? pt_ev->Start() : pt_ev->End();
-        geo::Point_t End = mu.is_upright ? pt_ev->End() : pt_ev->Start();
+        mu.start_point = ana::Point(mu.is_upright ? pt_ev->Start() : pt_ev->End());
+        mu.end_point = ana::Point(mu.is_upright ? pt_ev->End() : pt_ev->Start());
 
-        ana::SortedHits sh = GetSortedHits(vph_trk, End.Z() > Start.Z() ? 1 : -1);
+        ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
 
         mu.hits.clear();
         mu.sec_crossing_hits.clear();
         mu.is_section_jumping = false;
         mu.is_section_misaligned = false;
+        mu.top_dQdx.clear();
+        mu.bot_dQdx.clear();
         mu.sh_error = !sh;
         LOG(!mu.sh_error);
         if (!mu.sh_error) {
 
-            mu.end_reg = sh.end_reg(geoDet);
+            mu.top_reg = sh.regs[0];
+            mu.bot_reg = sh.regs[1];
             mu.start_hit = GetHit(sh.start);
             mu.end_hit = GetHit(sh.end);
             if (sh.is_cc()) {
@@ -237,6 +256,9 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             for (PtrHit ph : sh.sc)
                 mu.sec_crossing_hits.push_back(GetHit(ph));
+
+            mu.top_dQdx = GetdQdx(sh.vph.begin(), sh.bot_it(), 6);
+            mu.bot_dQdx = GetdQdx(sh.bot_it(), sh.vph.end(), 6);
 
             mu.max_consecutive_dist = 0.F;
             for (VecPtrHit::iterator it=sh.vph.begin(); it!=sh.vph.end()-1; ++it) {
@@ -283,7 +305,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             }    
         } else {
             mu.max_consecutive_dist = -1.F;
-            mu.end_reg = ana::LinearRegression{};
+            mu.top_reg = ana::LinearRegression{};
+            mu.bot_reg = ana::LinearRegression{};
             mu.start_hit = ana::Hit{};
             mu.end_hit = ana::Hit{};
             mu.top_last_hit = ana::Hit{};
@@ -303,18 +326,24 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.tru.end_process = mcp->EndProcess();
             mu.tru.end_energy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
+            mu.tru.start_point = ana::Point(mcp->Position().Vect());
+            mu.tru.end_point = ana::Point(mcp->EndPosition().Vect());
+
             VecPtrHit vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mu.tru.end_point.z > mu.tru.start_point.z ? 1 : -1);
 
             mu.tru.hits.clear();   
             mu.tru.sec_crossing_hits.clear();
             mu.tru.is_section_jumping = false;
             mu.tru.is_section_misaligned = false;
+            mu.tru.top_dQdx.clear();
+            mu.tru.bot_dQdx.clear();
             mu.tru.sh_error = !sh_mcp;
             LOG(!mu.tru.sh_error);
             if (!mu.tru.sh_error) {
 
-                mu.tru.end_reg = sh_mcp.end_reg(geoDet);
+                mu.tru.top_reg = sh_mcp.regs[0];
+                mu.tru.bot_reg = sh_mcp.regs[1];
                 mu.tru.start_hit = GetHit(sh_mcp.start);
                 mu.tru.end_hit = GetHit(sh_mcp.end);
                 if (sh_mcp.is_cc()) {
@@ -330,6 +359,9 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                 for (PtrHit ph : sh_mcp.sc)
                     mu.tru.sec_crossing_hits.push_back(GetHit(ph));
+
+                mu.tru.top_dQdx = GetdQdx(sh_mcp.vph.begin(), sh_mcp.bot_it(), 6);
+                mu.tru.bot_dQdx = GetdQdx(sh_mcp.bot_it(), sh_mcp.vph.end(), 6);
 
                 mu.tru.max_consecutive_dist = 0.F;
                 for (VecPtrHit::iterator it=sh_mcp.vph.begin(); it!=sh_mcp.vph.end()-1; ++it) {
@@ -376,7 +408,10 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 }    
             } else {
                 mu.tru.max_consecutive_dist = -1.F;
-                mu.tru.end_reg = ana::LinearRegression{};
+                mu.tru.top_reg = ana::LinearRegression{};
+                mu.tru.bot_reg = ana::LinearRegression{};
+                mu.tru.start_point = ana::Point{};
+                mu.tru.end_point = ana::Point{};
                 mu.tru.start_hit = ana::Hit{};
                 mu.tru.end_hit = ana::Hit{};
                 mu.tru.top_last_hit = ana::Hit{};
