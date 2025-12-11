@@ -22,6 +22,7 @@ private:
     ana::Bounds<float> geoTickWindow;
     ana::Bounds3D<float> geoHighX, geoLowX;
     float geoCathodeGap; // cm
+    float misalignmentTolerance = 3.F; // cm
 
     bool fLog;
 
@@ -48,7 +49,6 @@ private:
         std::vector<float> top_dQdx, bot_dQdx;
 
         bool    sh_error,
-                is_upright,
                 is_cathode_crossing,
                 is_anode_crossing,
                 is_section_jumping,
@@ -117,68 +117,67 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     //
     ev.tree = asFile->make<TTree>("event", "");
 
-    ev.tree->Branch("run",      &ev.run);
-    ev.tree->Branch("subrun",   &ev.subrun);
-    ev.tree->Branch("event",    &ev.event);
-    ev.tree->Branch("index",    &ev.index);
-    ev.tree->Branch("muon_number", &ev.muon_number);
-    ev.tree->Branch("is_data",  &ev.is_data);
+    ev.tree->Branch("Run",      &ev.run);
+    ev.tree->Branch("Subrun",   &ev.subrun);
+    ev.tree->Branch("Event",    &ev.event);
+    ev.tree->Branch("iEvent",   &ev.index);
+    ev.tree->Branch("NMuon",    &ev.muon_number);
+    ev.tree->Branch("IsData",   &ev.is_data);
     ev.hits.SetBranches(ev.tree);
 
     //
     mu.tree = asFile->make<TTree>("muon", "");
 
-    mu.tree->Branch("run",                  &ev.run);
-    mu.tree->Branch("subrun",               &ev.subrun);
-    mu.tree->Branch("event",                &ev.event);
-    mu.tree->Branch("event_index",          &ev.index);
-    mu.tree->Branch("index",                &mu.index);
-    mu.tree->Branch("length",               &mu.length);
-    mu.tree->Branch("sh_error",             &mu.sh_error);
-    mu.tree->Branch("upright",              &mu.is_upright);
-    mu.tree->Branch("max_consecutive_dist", &mu.max_consecutive_dist);
-    mu.tree->Branch("cathode_crossing",     &mu.is_cathode_crossing);
-    mu.tree->Branch("anode_crossing",       &mu.is_anode_crossing);
-    mu.tree->Branch("section_jumping",      &mu.is_section_jumping);
-    mu.tree->Branch("section_misaligned",   &mu.is_section_misaligned);
-    mu.tree->Branch("cathode_misaligned",   &mu.is_cathode_misaligned);
-    mu.start_point.             SetBranches(mu.tree, "start_");
-    mu.end_point.               SetBranches(mu.tree, "end_");
-    mu.start_hit.               SetBranches(mu.tree, "start_");
-    mu.end_hit.                 SetBranches(mu.tree, "end_");
-    mu.top_last_hit.            SetBranches(mu.tree, "top_last_");
-    mu.bottom_first_hit.        SetBranches(mu.tree, "bottom_first_");
+    mu.tree->Branch("Run",                  &ev.run);
+    mu.tree->Branch("Subrun",               &ev.subrun);
+    mu.tree->Branch("Event",                &ev.event);
+    mu.tree->Branch("iEvent",               &ev.index);
+    mu.tree->Branch("iMuon",                &mu.index);
+    mu.tree->Branch("Length",               &mu.length);
+    mu.tree->Branch("SortedHitsError",      &mu.sh_error);
+    mu.tree->Branch("MaxConsecutiveDist",   &mu.max_consecutive_dist);
+    mu.tree->Branch("CathodeCrossing",      &mu.is_cathode_crossing);
+    mu.tree->Branch("AnodeCrossing",        &mu.is_anode_crossing);
+    mu.tree->Branch("SectionJumping",       &mu.is_section_jumping);
+    mu.tree->Branch("SectionMisaligned",    &mu.is_section_misaligned);
+    mu.tree->Branch("CathodeMisaligned",    &mu.is_cathode_misaligned);
+    mu.start_point.             SetBranches(mu.tree, "Start");
+    mu.end_point.               SetBranches(mu.tree, "End");
+    mu.start_hit.               SetBranches(mu.tree, "Start");
+    mu.end_hit.                 SetBranches(mu.tree, "End");
+    mu.top_last_hit.            SetBranches(mu.tree, "TopLast");
+    mu.bottom_first_hit.        SetBranches(mu.tree, "BottomFirst");
     mu.hits.                    SetBranches(mu.tree);
-    mu.sec_crossing_hits.       SetBranches(mu.tree, "sec_cross_");
-    mu.top_reg.                 SetBranches(mu.tree);
-    mu.bot_reg.                 SetBranches(mu.tree);
-    mu.tree->Branch("top_dQdx",            &mu.top_dQdx);
-    mu.tree->Branch("bot_dQdx",            &mu.bot_dQdx);
+    mu.sec_crossing_hits.       SetBranches(mu.tree, "SecCross");
+    mu.top_reg.                 SetBranches(mu.tree, "Top");
+    mu.bot_reg.                 SetBranches(mu.tree, "Bot");
+    mu.tree->Branch("TopdQdx",                &mu.top_dQdx);
+    mu.tree->Branch("BotdQdx",                &mu.bot_dQdx);
 
-    mu.tree->Branch("tru_pdg",                  &mu.tru.pdg);
-    mu.tree->Branch("tru_end_process",          &mu.tru.end_process);
-    mu.tree->Branch("tru_end_energy",           &mu.tru.end_energy);
-    mu.tree->Branch("tru_sh_error",             &mu.tru.sh_error);
-    mu.tree->Branch("tru_max_consecutive_dist", &mu.tru.max_consecutive_dist);
-    mu.tree->Branch("tru_cathode_crossing",     &mu.tru.is_cathode_crossing);
-    mu.tree->Branch("tru_anode_crossing",       &mu.tru.is_anode_crossing);
-    mu.tree->Branch("tru_section_jumping",      &mu.tru.is_section_jumping);
-    mu.tree->Branch("tru_section_misaligned",   &mu.tru.is_section_misaligned);
-    mu.tree->Branch("tru_cathode_misaligned",   &mu.tru.is_cathode_misaligned);
-    mu.tru.start_point.         SetBranches(mu.tree, "tru_start_");
-    mu.tru.end_point.           SetBranches(mu.tree, "tru_end_");
-    mu.tru.start_hit.           SetBranches(mu.tree, "tru_start_");
-    mu.tru.end_hit.             SetBranches(mu.tree, "tru_end_");
-    mu.tru.top_last_hit.        SetBranches(mu.tree, "tru_top_last_");
-    mu.tru.bottom_first_hit.    SetBranches(mu.tree, "tru_bottom_first_");
-    mu.tru.hits.                SetBranches(mu.tree, "tru_");
-    mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "tru_sec_cross_");
-    mu.tru.top_reg.             SetBranches(mu.tree, "tru_end_");
-    mu.tru.bot_reg.             SetBranches(mu.tree, "tru_end_");
-    mu.tree->Branch("tru_top_dQdx",          &mu.tru.top_dQdx);
-    mu.tree->Branch("tru_bot_dQdx",          &mu.tru.bot_dQdx);
-    mu.tree->Branch("tru_has_michel",           &mu.tru.has_michel);
-    mu.tree->Branch("tru_michel_energy",        &mu.tru.michel_energy);
+    mu.tree->Branch("TruPdg",                 &mu.tru.pdg);
+    mu.tree->Branch("TruEndProcess",          &mu.tru.end_process);
+    mu.tree->Branch("TruEndEnergy",           &mu.tru.end_energy);
+    mu.tree->Branch("truSortedHitsError",     &mu.tru.sh_error);
+    mu.tree->Branch("TruMaxConsecutiveDist",  &mu.tru.max_consecutive_dist);
+    mu.tree->Branch("TruCathodeCrossing",     &mu.tru.is_cathode_crossing);
+    mu.tree->Branch("TruAnodeCrossing",       &mu.tru.is_anode_crossing);
+    mu.tree->Branch("TruSectionJumping",      &mu.tru.is_section_jumping);
+    mu.tree->Branch("TruSectionMisaligned",   &mu.tru.is_section_misaligned);
+    mu.tree->Branch("TruCathodeMisaligned",   &mu.tru.is_cathode_misaligned);
+    mu.tru.start_point.         SetBranches(mu.tree, "TruStart");
+    mu.tru.end_point.           SetBranches(mu.tree, "TruEnd");
+    mu.tru.start_hit.           SetBranches(mu.tree, "TruStart");
+    mu.tru.end_hit.             SetBranches(mu.tree, "TruEnd");
+    mu.tru.top_last_hit.        SetBranches(mu.tree, "TruTopLast");
+    mu.tru.bottom_first_hit.    SetBranches(mu.tree, "TruBottomFirst");
+    mu.tru.hits.                SetBranches(mu.tree, "Tru");
+    mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "TruSecCross");
+    mu.tru.top_reg.             SetBranches(mu.tree, "TruTop");
+    mu.tru.bot_reg.             SetBranches(mu.tree, "TruBot");
+    mu.tree->Branch("TruTopdQdx",          &mu.tru.top_dQdx);
+    mu.tree->Branch("TruBotdQdx",          &mu.tru.bot_dQdx);
+    mu.tree->Branch("TruHasMichel",           &mu.tru.has_michel);
+    mu.tree->Branch("TruMichelEnergy",        &mu.tru.michel_energy);
 }
 
 void ana::TrackAnalysis::beginJob() {}
@@ -223,9 +222,9 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         ASSERT(vph_trk.size())
 
         mu.length = pt_ev->Length();
-        mu.is_upright = IsUpright(*pt_ev);
-        mu.start_point = ana::Point(mu.is_upright ? pt_ev->Start() : pt_ev->End());
-        mu.end_point = ana::Point(mu.is_upright ? pt_ev->End() : pt_ev->Start());
+        bool up = IsUpright(*pt_ev);
+        mu.start_point = ana::Point(up ? pt_ev->Start() : pt_ev->End());
+        mu.end_point = ana::Point(up ? pt_ev->End() : pt_ev->Start());
 
         ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
 
@@ -271,7 +270,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             mu.is_cathode_crossing = sh.is_cc();
             mu.is_cathode_misaligned = sh.is_cc() 
-                && !(abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
+                && abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
             LOG(mu.is_cathode_crossing);
             LOG(mu.is_cathode_misaligned);
 
@@ -296,7 +295,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                         if (abs(sec_curr - sec_next) != 1)
                             mu.is_section_jumping = true;
 
-                        if (((*sc_it)->PeakTime()-(*++sc_it)->PeakTime())*fTick2cm > 2.F)
+                        if (((*sc_it)->PeakTime()-(*++sc_it)->PeakTime()) > misalignmentTolerance/fTick2cm)
                             mu.is_section_misaligned = true;
                     }
                 }
