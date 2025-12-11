@@ -56,9 +56,9 @@ private:
     float TrkChi2PerNdof;
     bool TrkHitEndInVolumeX;
 
-    std::vector<float> EndSecHitdQdx;
-    std::vector<float> TopHitdQdx;
-    std::vector<float> BotHitdQdx;
+    std::vector<float> EndSecHitdQds;
+    std::vector<float> TopHitdQds;
+    std::vector<float> BotHitdQds;
 
     int TruePdg;
     std::string TrueEndProcess;
@@ -157,9 +157,9 @@ ana::MuonCalib::MuonCalib(fhicl::ParameterSet const& p)
     tTrack->Branch("Chi2PerNdof", &TrkChi2PerNdof);
     tTrack->Branch("HitEndInVolumeX", &TrkHitEndInVolumeX);
 
-    tTrack->Branch("EndSecHitdQdx", &EndSecHitdQdx);
-    tTrack->Branch("TopHitdQdx", &TopHitdQdx);
-    tTrack->Branch("BotHitdQdx", &BotHitdQdx);
+    tTrack->Branch("EndSecHitdQds", &EndSecHitdQds);
+    tTrack->Branch("TopHitdQds", &TopHitdQds);
+    tTrack->Branch("BotHitdQds", &BotHitdQds);
 
     tTrack->Branch("TruePdg", &TruePdg);
     tTrack->Branch("TrueEndProcess", &TrueEndProcess);
@@ -246,10 +246,10 @@ void ana::MuonCalib::analyze(art::Event const& e) {
             if (hit.section != sh_trk.end_sec()) continue;
             vph_trk_endsec.push_back(ph_trk);
         }
-        EndSecHitdQdx = GetdQdx(vph_trk_endsec, 6);
+        EndSecHitdQds = GetdQds(vph_trk_endsec, 6);
 
-        TopHitdQdx = GetdQdx(sh_trk.vph.begin(), sh_trk.bot_it(), 6);
-        BotHitdQdx = GetdQdx(sh_trk.bot_it(), sh_trk.vph.end(), 6);
+        TopHitdQds = GetdQds(sh_trk.vph.begin(), sh_trk.bot_it(), 6);
+        BotHitdQds = GetdQds(sh_trk.bot_it(), sh_trk.vph.end(), 6);
 
         TrkCathodeCrossing = sh_trk.is_cc()
             && abs(sh_trk.cc.first->PeakTime()-sh_trk.cc.second->PeakTime())*fTick2cm < 2 * fCathodeGap;
@@ -352,9 +352,9 @@ void ana::MuonCalib::resetTrack() {
     TrkChi2PerNdof = 0.F;
     TrkHitEndInVolumeX = false;
 
-    EndSecHitdQdx.clear();
-    TopHitdQdx.clear();
-    BotHitdQdx.clear(); 
+    EndSecHitdQds.clear();
+    TopHitdQds.clear();
+    BotHitdQds.clear(); 
 
     TruePdg = 0;
     TrueEndProcess = "";

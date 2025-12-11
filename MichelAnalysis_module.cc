@@ -22,9 +22,6 @@ some variables are prefixed by their type followed by an underscore:
 */
 
 
-
-
-
 namespace ana {
     class MichelAnalysis;
 }
@@ -95,7 +92,7 @@ private:
     bool TrkHitEndInVolumeX;
     bool TrkHitEndInWindow;
     ana::Hits TrkHits;
-    std::vector<float> PandoraTrkHitdQdx;
+    std::vector<float> PandoraTrkHitdQds;
     ana::Hits PandoraSphereHits;
     std::vector<float> PandoraSphereHitMuonAngle;
     // bool PandoraSphereHasShower;
@@ -119,8 +116,8 @@ private:
     // Bragg information
     int BraggError;
     enum EnumBraggError { kNoError, kEndNotFound, kSmallBody };
-    float MIPdQdx;
-    float BraggdQdx;
+    float MIPdQds;
+    float BraggdQds;
     ana::Hit BraggEndHit;
     ana::Hits BraggMuonHits;
 
@@ -278,7 +275,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     TrkEndPoint.SetBranches(tMuon, "End");
     tMuon->Branch("TrkEndInVolumeYZ", &TrkEndInVolumeYZ);
 
-    tMuon->Branch("MIPdQdx", &MIPdQdx);
+    tMuon->Branch("MIPdQds", &MIPdQds);
 
     // Hit
     tMuon->Branch("TrkHitError", &TrkHitError);
@@ -292,7 +289,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
     tMuon->Branch("TrkHitEndInWindow", &TrkHitEndInWindow);
     TrkHits.SetBranches(tMuon, "");
-    tMuon->Branch("HitdQdx", &PandoraTrkHitdQdx);
+    tMuon->Branch("HitdQds", &PandoraTrkHitdQds);
     PandoraSphereHits.SetBranches(tMuon, "PandoraSphere");
     tMuon->Branch("PandoraSphereHitMuonAngle", &PandoraSphereHitMuonAngle);
     // tMuon->Branch("PandoraSphereHasShower", &PandoraSphereHasShower);
@@ -319,7 +316,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     if (fBragg) {
         // Bragg
         tMuon->Branch("BraggError", &BraggError);
-        tMuon->Branch("BraggdQdx", &BraggdQdx);
+        tMuon->Branch("BraggdQds", &BraggdQds);
         BraggEndHit.SetBranches(tMuon, "BraggEnd");
         BraggMuonHits.SetBranches(tMuon, "BraggMuon");
 
@@ -662,15 +659,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
             }
 
-            // End dQdx
-            PandoraTrkHitdQdx = GetdQdx(sh_mu.endsec_it(), sh_mu.vph.end(), fRegN);
+            // End dQds
+            PandoraTrkHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), fRegN);
 
-            LOG(!PandoraTrkHitdQdx.empty());
-            if (!fKeepAll && PandoraTrkHitdQdx.empty()) continue;
+            LOG(!PandoraTrkHitdQds.empty());
+            if (!fKeepAll && PandoraTrkHitdQds.empty()) continue;
 
 
 
-            MIPdQdx = 0;
+            MIPdQds = 0;
 
 
             if (!fBragg || std::distance(sh_mu.endsec_it(), sh_mu.vph.end()) < 2 * fBraggN) {
@@ -706,11 +703,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     else break;
                 }
 
-                // unsigned i_dQdx_max;
-                // std::vector<float> bragg_dQdx = GetdQdx(vph_mu_tail, fRegN, &i_dQdx_max);
+                // unsigned i_dQds_max;
+                // std::vector<float> bragg_dQds = GetdQds(vph_mu_tail, fRegN, &i_dQds_max);
 
-                // BraggdQdx = bragg_dQdx[i_dQdx_max];
-                // for (unsigned i=0; i<=i_dQdx_max; i++) {
+                // BraggdQds = bragg_dQds[i_dQds_max];
+                // for (unsigned i=0; i<=i_dQds_max; i++) {
                 //     vph_mu_bragg.push_back(vph_mu_tail[i]);
                 // }
 
@@ -721,13 +718,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     }
                 );
 
-                MIPdQdx = std::accumulate(
+                MIPdQds = std::accumulate(
                     sh_mu.endsec_it(), sh_mu.vph.end() - fBraggN, 0.F,
                     [&](float sum, PtrHit const& ph) -> float {
                         return sum + ph->ROISummedADC();
                     }
                 ) / (sh_mu.vph.end() - fBraggN - sh_mu.endsec_it());
-                BraggdQdx = (*it_dQ_max)->ROISummedADC();
+                BraggdQds = (*it_dQ_max)->ROISummedADC();
                 for (VecPtrHit::iterator it=vph_mu_tail.begin(); it!=it_dQ_max+1; ++it)
                     vph_mu_bragg.push_back(*it);
 
@@ -982,7 +979,7 @@ void ana::MichelAnalysis::resetMuon() {
     TrkRegDirZ = 0;
     TrkReg = ana::LinearRegression{};
     TrkHits.clear();
-    PandoraTrkHitdQdx.clear();
+    PandoraTrkHitdQds.clear();
     PandoraSphereHits.clear();
     PandoraSphereHitMuonAngle.clear();
     // PandoraSphereHasShower = false;
@@ -1004,8 +1001,8 @@ void ana::MichelAnalysis::resetMuon() {
 
 
     // Bragg
-    MIPdQdx = 0;
-    BraggdQdx = -1.F;
+    MIPdQds = 0;
+    BraggdQds = -1.F;
     BraggEndHit = ana::Hit{};
     BraggMuonHits.clear();
     BraggSphereHits.clear();

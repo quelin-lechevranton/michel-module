@@ -46,7 +46,7 @@ private:
         ana::Point start_point, end_point;
         ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
         ana::LinearRegression top_reg, bot_reg;
-        std::vector<float> top_dQdx, bot_dQdx;
+        std::vector<float> top_dQds, bot_dQds;
 
         bool    sh_error,
                 is_cathode_crossing,
@@ -65,7 +65,7 @@ private:
             float end_hit_x;
             int dir_z;
             ana::LinearRegression top_reg, bot_reg;
-            std::vector<float> top_dQdx, bot_dQdx;
+            std::vector<float> top_dQds, bot_dQds;
             float end_energy;
 
             bool    sh_error,
@@ -151,8 +151,8 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.sec_crossing_hits.       SetBranches(mu.tree, "SecCross");
     mu.top_reg.                 SetBranches(mu.tree, "Top");
     mu.bot_reg.                 SetBranches(mu.tree, "Bot");
-    mu.tree->Branch("TopdQdx",                &mu.top_dQdx);
-    mu.tree->Branch("BotdQdx",                &mu.bot_dQdx);
+    mu.tree->Branch("TopdQds",                &mu.top_dQds);
+    mu.tree->Branch("BotdQds",                &mu.bot_dQds);
 
     mu.tree->Branch("TruPdg",                 &mu.tru.pdg);
     mu.tree->Branch("TruEndProcess",          &mu.tru.end_process);
@@ -174,8 +174,8 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "TruSecCross");
     mu.tru.top_reg.             SetBranches(mu.tree, "TruTop");
     mu.tru.bot_reg.             SetBranches(mu.tree, "TruBot");
-    mu.tree->Branch("TruTopdQdx",          &mu.tru.top_dQdx);
-    mu.tree->Branch("TruBotdQdx",          &mu.tru.bot_dQdx);
+    mu.tree->Branch("TruTopdQds",             &mu.tru.top_dQds);
+    mu.tree->Branch("TruBotdQds",             &mu.tru.bot_dQds);
     mu.tree->Branch("TruHasMichel",           &mu.tru.has_michel);
     mu.tree->Branch("TruMichelEnergy",        &mu.tru.michel_energy);
 }
@@ -232,8 +232,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.sec_crossing_hits.clear();
         mu.is_section_jumping = false;
         mu.is_section_misaligned = false;
-        mu.top_dQdx.clear();
-        mu.bot_dQdx.clear();
+        mu.top_dQds.clear();
+        mu.bot_dQds.clear();
         mu.sh_error = !sh;
         LOG(!mu.sh_error);
         if (!mu.sh_error) {
@@ -256,8 +256,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             for (PtrHit ph : sh.sc)
                 mu.sec_crossing_hits.push_back(GetHit(ph));
 
-            mu.top_dQdx = GetdQdx(sh.vph.begin(), sh.bot_it(), 6);
-            mu.bot_dQdx = GetdQdx(sh.bot_it(), sh.vph.end(), 6);
+            mu.top_dQds = GetdQds(sh.vph.begin(), sh.bot_it(), 6);
+            mu.bot_dQds = GetdQds(sh.bot_it(), sh.vph.end(), 6);
 
             mu.max_consecutive_dist = 0.F;
             for (VecPtrHit::iterator it=sh.vph.begin(); it!=sh.vph.end()-1; ++it) {
@@ -335,8 +335,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.tru.sec_crossing_hits.clear();
             mu.tru.is_section_jumping = false;
             mu.tru.is_section_misaligned = false;
-            mu.tru.top_dQdx.clear();
-            mu.tru.bot_dQdx.clear();
+            mu.tru.top_dQds.clear();
+            mu.tru.bot_dQds.clear();
             mu.tru.sh_error = !sh_mcp;
             LOG(!mu.tru.sh_error);
             if (!mu.tru.sh_error) {
@@ -359,8 +359,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 for (PtrHit ph : sh_mcp.sc)
                     mu.tru.sec_crossing_hits.push_back(GetHit(ph));
 
-                mu.tru.top_dQdx = GetdQdx(sh_mcp.vph.begin(), sh_mcp.bot_it(), 6);
-                mu.tru.bot_dQdx = GetdQdx(sh_mcp.bot_it(), sh_mcp.vph.end(), 6);
+                mu.tru.top_dQds = GetdQds(sh_mcp.vph.begin(), sh_mcp.bot_it(), 6);
+                mu.tru.bot_dQds = GetdQds(sh_mcp.bot_it(), sh_mcp.vph.end(), 6);
 
                 mu.tru.max_consecutive_dist = 0.F;
                 for (VecPtrHit::iterator it=sh_mcp.vph.begin(); it!=sh_mcp.vph.end()-1; ++it) {
