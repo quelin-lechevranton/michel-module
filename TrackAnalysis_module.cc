@@ -236,8 +236,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.top_dQds.clear();
         mu.bot_dQds.clear();
         mu.sh_error = !sh;
-        if (fAssert) ASSERT(!mu.sh_error)
-        else         LOG(!mu.sh_error)
+        if (fAssert) { ASSERT(!mu.sh_error) }
+        else { LOG(!mu.sh_error); }
         if (!mu.sh_error) {
 
             mu.top_reg = sh.regs[0];
@@ -273,9 +273,9 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.cathode_crossing = sh.is_cc();
             mu.cathode_misaligned = sh.is_cc() 
                 && abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
-            if (fAssert) ASSERT(mu.cathode_crossing)
-            else         LOG(mu.cathode_crossing)
-            LOG(mu.cathode_misaligned)
+            if (fAssert) { ASSERT(mu.cathode_crossing) }
+            else { LOG(mu.cathode_crossing); }
+            LOG(mu.cathode_misaligned);
 
             if (geoDet == kPDVD)
                 mu.anode_crossing = mu.start_hit.section < 4
@@ -285,9 +285,9 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.anode_crossing =
                     geoHighX.z.isInside(mu.start_hit.space, 10.F)
                     && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
-            LOG(mu.anode_crossing)
+            LOG(mu.anode_crossing);
 
-            LOG(sh.secs.size() > 1)
+            LOG(sh.secs.size() > 1);
             if (sh.secs.size() > 1) {
                 VecPtrHit::iterator sc_it = sh.sc.begin();
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
@@ -302,8 +302,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                             mu.section_misaligned = true;
                     }
                 }
-                LOG(mu.section_jumping)
-                LOG(mu.section_misaligned)
+                LOG(mu.section_jumping);
+                LOG(mu.section_misaligned);
             }    
         } else {
             mu.max_consecutive_dist = -1.F;
@@ -341,7 +341,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.tru.top_dQds.clear();
             mu.tru.bot_dQds.clear();
             mu.tru.sh_error = !sh_mcp;
-            LOG(!mu.tru.sh_error)
+            LOG(!mu.tru.sh_error);
             if (!mu.tru.sh_error) {
 
                 mu.tru.top_reg = sh_mcp.regs[0];
@@ -377,8 +377,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.tru.cathode_crossing = sh_mcp.is_cc();
                 mu.tru.cathode_misaligned = sh_mcp.is_cc() 
                     && !(abs(sh_mcp.cc.first->PeakTime()-sh_mcp.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
-                LOG(mu.tru.cathode_crossing)
-                LOG(mu.tru.cathode_misaligned)
+                LOG(mu.tru.cathode_crossing);
+                LOG(mu.tru.cathode_misaligned);
 
                 // if (geoDet == kPDVD)
                 //     mu.tru.anode_crossing = mu.tru.start_hit.section < 4
@@ -393,11 +393,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 float y_anode = mcp->Vy(0) + mcp->Py(0) * t_anode;
                 mu.tru.anode_crossing = geoHighX.z.isInside(z_anode, 10.F) && geoHighX.y.isInside(y_anode, 10.F);
                 // the anode crossing might be out of the tick window!
-                LOG(mu.tru.anode_crossing)
+                LOG(mu.tru.anode_crossing);
 
 
 
-                LOG(sh_mcp.secs.size() > 1)
+                LOG(sh_mcp.secs.size() > 1);
                 if (sh_mcp.secs.size() > 1) {
                     VecPtrHit::iterator sc_it = sh_mcp.sc.begin();
                     for (unsigned i=0; i<sh_mcp.secs.size()-1; i++) {
@@ -412,8 +412,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                                 mu.tru.section_misaligned = true;
                         }
                     }
-                    LOG(mu.tru.section_jumping)
-                    LOG(mu.tru.section_misaligned)
+                    LOG(mu.tru.section_jumping);
+                    LOG(mu.tru.section_misaligned);
                 }    
             } else {
                 mu.tru.max_consecutive_dist = -1.F;
@@ -434,7 +434,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
             mu.tru.has_michel = !!mcp_mi;
-            LOG(mu.tru.has_michel)
+            LOG(mu.tru.has_michel);
             if (mu.tru.has_michel)
                 mu.tru.michel_energy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3; // MeV
             else 
