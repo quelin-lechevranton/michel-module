@@ -63,7 +63,7 @@ private:
     float TrkHitCathodeDeltaTick;
     int TrkHitAnodeCrossing, TrkHitCathodeCrossing;
     float TrkHitCathodeTick;
-    std::vector<float> TrkHitdQdx;
+    std::vector<float> TrkHitdQds;
     ana::Hits TrkNearbyHits;
     ana::LinearRegression TrkReg;
     int TrkRegDirZ;
@@ -75,7 +75,7 @@ private:
     float HitCathodeDeltaTick, HitCathodeTick;
     ana::Hits Hits;
     std::vector<float> HitProjection;
-    std::vector<float> HitdQdx;
+    std::vector<float> HitdQds;
 
     bool HasMichel;
     // enum EnumHasMichel { kNoMichel, kHasMichelOutside, kHasMichelInside, kHasMichelFiducial };
@@ -181,7 +181,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
 
     Hits.SetBranches(tMuon, "");
     tMuon->Branch("HitProjection", &HitProjection);
-    tMuon->Branch("HitdQdx", &HitdQdx);
+    tMuon->Branch("HitdQds", &HitdQds);
     StartHit.SetBranches(tMuon, "Start");
     EndHit.SetBranches(tMuon, "End");
     StartPoint.SetBranches(tMuon, "Start");
@@ -209,7 +209,7 @@ ana::MichelTruth::MichelTruth(fhicl::ParameterSet const& p)
     tMuon->Branch("TrackHitAnodeCrossing",&TrkHitAnodeCrossing);
     tMuon->Branch("TrackHitCathodeCrossing",&TrkHitCathodeCrossing);
     tMuon->Branch("TrackHitCathodeTick",&TrkHitCathodeTick);
-    tMuon->Branch("TrackHitdQdx",&TrkHitdQdx);
+    tMuon->Branch("TrackHitdQds",&TrkHitdQds);
     TrkNearbyHits.SetBranches(tMuon, "TrackNearby");
     TrkReg.SetBranches(tMuon, "Track");
     tMuon->Branch("TrackRegDirZ", &TrkRegDirZ);
@@ -465,7 +465,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
                 }
                 if (vph_trk_sec.size() > fRegN) {
                     TrkTag++;
-                    TrkHitdQdx = GetdQdx(vph_trk_sec, fRegN);
+                    TrkHitdQds = GetdQds(vph_trk_sec, fRegN);
 
                     for (PtrHit const& ph_ev : vph_ev) {
                         if (ph_ev->View() != geo::kW) continue;
@@ -531,7 +531,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             }
         }
         ASSERT(vph_mu_sec.size() > fRegN)
-        HitdQdx = GetdQdx(vph_mu_sec, fRegN);
+        HitdQds = GetdQds(vph_mu_sec, fRegN);
 
         simb::MCParticle const* mcp_mi = GetMichelMCP(&mcp);
         if (!mcp_mi) {
@@ -709,7 +709,7 @@ void ana::MichelTruth::resetMuon() {
     TrkEndHit = ana::Hit();
     TrkHits.clear();
     TrkHitTP = 0;
-    TrkHitdQdx.clear();
+    TrkHitdQds.clear();
     TrkNearbyHits.clear();
     TrkReg = ana::LinearRegression();
     TrkRegDirZ = 0;
@@ -718,7 +718,7 @@ void ana::MichelTruth::resetMuon() {
 
     Hits.clear();
     HitProjection.clear();
-    HitdQdx.clear();
+    HitdQds.clear();
     
     // Michel
     HasMichel = false;

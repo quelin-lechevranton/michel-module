@@ -147,23 +147,23 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.end_hit.                 SetBranches(mu.tree, "End");
     mu.top_last_hit.            SetBranches(mu.tree, "TopLast");
     mu.bottom_first_hit.        SetBranches(mu.tree, "BottomFirst");
-    mu.hits.                    SetBranches(mu.tree);
+    mu.hits.                    SetBranches(mu.tree, "");
     mu.sec_crossing_hits.       SetBranches(mu.tree, "SecCross");
     mu.top_reg.                 SetBranches(mu.tree, "Top");
     mu.bot_reg.                 SetBranches(mu.tree, "Bot");
-    mu.tree->Branch("TopdQds",                &mu.top_dQds);
-    mu.tree->Branch("BotdQds",                &mu.bot_dQds);
+    mu.tree->Branch("TopdQds",              &mu.top_dQds);
+    mu.tree->Branch("BotdQds",              &mu.bot_dQds);
 
-    mu.tree->Branch("TruPdg",                 &mu.tru.pdg);
-    mu.tree->Branch("TruEndProcess",          &mu.tru.end_process);
-    mu.tree->Branch("TruEndEnergy",           &mu.tru.end_energy);
-    mu.tree->Branch("truSortedHitsError",     &mu.tru.sh_error);
-    mu.tree->Branch("TruMaxConsecutiveDist",  &mu.tru.max_consecutive_dist);
-    mu.tree->Branch("TruCathodeCrossing",     &mu.tru.is_cathode_crossing);
-    mu.tree->Branch("TruAnodeCrossing",       &mu.tru.is_anode_crossing);
-    mu.tree->Branch("TruSectionJumping",      &mu.tru.is_section_jumping);
-    mu.tree->Branch("TruSectionMisaligned",   &mu.tru.is_section_misaligned);
-    mu.tree->Branch("TruCathodeMisaligned",   &mu.tru.is_cathode_misaligned);
+    mu.tree->Branch("TruPdg",               &mu.tru.pdg);
+    mu.tree->Branch("TruEndProcess",        &mu.tru.end_process);
+    mu.tree->Branch("TruEndEnergy",         &mu.tru.end_energy);
+    mu.tree->Branch("truSortedHitsError",   &mu.tru.sh_error);
+    mu.tree->Branch("TruMaxConsecutiveDist",&mu.tru.max_consecutive_dist);
+    mu.tree->Branch("TruCathodeCrossing",   &mu.tru.is_cathode_crossing);
+    mu.tree->Branch("TruAnodeCrossing",     &mu.tru.is_anode_crossing);
+    mu.tree->Branch("TruSectionJumping",    &mu.tru.is_section_jumping);
+    mu.tree->Branch("TruSectionMisaligned", &mu.tru.is_section_misaligned);
+    mu.tree->Branch("TruCathodeMisaligned", &mu.tru.is_cathode_misaligned);
     mu.tru.start_point.         SetBranches(mu.tree, "TruStart");
     mu.tru.end_point.           SetBranches(mu.tree, "TruEnd");
     mu.tru.start_hit.           SetBranches(mu.tree, "TruStart");
@@ -174,10 +174,10 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "TruSecCross");
     mu.tru.top_reg.             SetBranches(mu.tree, "TruTop");
     mu.tru.bot_reg.             SetBranches(mu.tree, "TruBot");
-    mu.tree->Branch("TruTopdQds",             &mu.tru.top_dQds);
-    mu.tree->Branch("TruBotdQds",             &mu.tru.bot_dQds);
-    mu.tree->Branch("TruHasMichel",           &mu.tru.has_michel);
-    mu.tree->Branch("TruMichelEnergy",        &mu.tru.michel_energy);
+    mu.tree->Branch("TruTopdQds",           &mu.tru.top_dQds);
+    mu.tree->Branch("TruBotdQds",           &mu.tru.bot_dQds);
+    mu.tree->Branch("TruHasMichel",         &mu.tru.has_michel);
+    mu.tree->Branch("TruMichelEnergy",      &mu.tru.michel_energy);
 }
 
 void ana::TrackAnalysis::beginJob() {}
