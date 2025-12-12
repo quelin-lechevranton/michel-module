@@ -24,7 +24,7 @@ private:
     float geoCathodeGap; // cm
     float misalignmentTolerance = 3.F; // cm
 
-    bool fLog;
+    bool fLog, fAssert;
 
     struct {
         TTree* tree;
@@ -49,11 +49,11 @@ private:
         std::vector<float> top_dQds, bot_dQds;
 
         bool    sh_error,
-                is_cathode_crossing,
-                is_anode_crossing,
-                is_section_jumping,
-                is_section_misaligned,
-                is_cathode_misaligned;
+                cathode_crossing,
+                anode_crossing,
+                section_jumping,
+                section_misaligned,
+                cathode_misaligned;
 
         struct {
             int pdg;
@@ -69,11 +69,11 @@ private:
             float end_energy;
 
             bool    sh_error,
-                    is_cathode_crossing,
-                    is_anode_crossing,
-                    is_section_jumping,
-                    is_section_misaligned,
-                    is_cathode_misaligned;
+                    cathode_crossing,
+                    anode_crossing,
+                    section_jumping,
+                    section_misaligned,
+                    cathode_misaligned;
             bool has_michel;
             float michel_energy;
         } tru;
@@ -83,7 +83,8 @@ private:
 ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) : 
     EDAnalyzer{p}, 
     MichelAnalyzer{p},
-    fLog(p.get<bool>("Log", true))
+    fLog(p.get<bool>("Log", true)),
+    fAssert(p.get<bool>("Assert", false))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -136,11 +137,11 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("Length",               &mu.length);
     mu.tree->Branch("SortedHitsError",      &mu.sh_error);
     mu.tree->Branch("MaxConsecutiveDist",   &mu.max_consecutive_dist);
-    mu.tree->Branch("CathodeCrossing",      &mu.is_cathode_crossing);
-    mu.tree->Branch("AnodeCrossing",        &mu.is_anode_crossing);
-    mu.tree->Branch("SectionJumping",       &mu.is_section_jumping);
-    mu.tree->Branch("SectionMisaligned",    &mu.is_section_misaligned);
-    mu.tree->Branch("CathodeMisaligned",    &mu.is_cathode_misaligned);
+    mu.tree->Branch("CathodeCrossing",      &mu.cathode_crossing);
+    mu.tree->Branch("AnodeCrossing",        &mu.anode_crossing);
+    mu.tree->Branch("SectionJumping",       &mu.section_jumping);
+    mu.tree->Branch("SectionMisaligned",    &mu.section_misaligned);
+    mu.tree->Branch("CathodeMisaligned",    &mu.cathode_misaligned);
     mu.start_point.             SetBranches(mu.tree, "Start");
     mu.end_point.               SetBranches(mu.tree, "End");
     mu.start_hit.               SetBranches(mu.tree, "Start");
@@ -159,11 +160,11 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("TruEndEnergy",         &mu.tru.end_energy);
     mu.tree->Branch("truSortedHitsError",   &mu.tru.sh_error);
     mu.tree->Branch("TruMaxConsecutiveDist",&mu.tru.max_consecutive_dist);
-    mu.tree->Branch("TruCathodeCrossing",   &mu.tru.is_cathode_crossing);
-    mu.tree->Branch("TruAnodeCrossing",     &mu.tru.is_anode_crossing);
-    mu.tree->Branch("TruSectionJumping",    &mu.tru.is_section_jumping);
-    mu.tree->Branch("TruSectionMisaligned", &mu.tru.is_section_misaligned);
-    mu.tree->Branch("TruCathodeMisaligned", &mu.tru.is_cathode_misaligned);
+    mu.tree->Branch("TruCathodeCrossing",   &mu.tru.cathode_crossing);
+    mu.tree->Branch("TruAnodeCrossing",     &mu.tru.anode_crossing);
+    mu.tree->Branch("TruSectionJumping",    &mu.tru.section_jumping);
+    mu.tree->Branch("TruSectionMisaligned", &mu.tru.section_misaligned);
+    mu.tree->Branch("TruCathodeMisaligned", &mu.tru.cathode_misaligned);
     mu.tru.start_point.         SetBranches(mu.tree, "TruStart");
     mu.tru.end_point.           SetBranches(mu.tree, "TruEnd");
     mu.tru.start_hit.           SetBranches(mu.tree, "TruStart");
@@ -230,12 +231,13 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
         mu.hits.clear();
         mu.sec_crossing_hits.clear();
-        mu.is_section_jumping = false;
-        mu.is_section_misaligned = false;
+        mu.section_jumping = false;
+        mu.section_misaligned = false;
         mu.top_dQds.clear();
         mu.bot_dQds.clear();
         mu.sh_error = !sh;
-        LOG(!mu.sh_error);
+        if (fAssert) ASSERT(!mu.sh_error)
+        else         LOG(!mu.sh_error)
         if (!mu.sh_error) {
 
             mu.top_reg = sh.regs[0];
@@ -268,23 +270,24 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                     mu.max_consecutive_dist = dist; 
             }
 
-            mu.is_cathode_crossing = sh.is_cc();
-            mu.is_cathode_misaligned = sh.is_cc() 
+            mu.cathode_crossing = sh.is_cc();
+            mu.cathode_misaligned = sh.is_cc() 
                 && abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
-            LOG(mu.is_cathode_crossing);
-            LOG(mu.is_cathode_misaligned);
+            if (fAssert) ASSERT(mu.cathode_crossing)
+            else         LOG(mu.cathode_crossing)
+            LOG(mu.cathode_misaligned)
 
             if (geoDet == kPDVD)
-                mu.is_anode_crossing = mu.start_hit.section < 4
+                mu.anode_crossing = mu.start_hit.section < 4
                     && geoHighX.z.isInside(mu.start_hit.space, 10.F)
                     && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
             else if (geoDet == kPDHD)
-                mu.is_anode_crossing =
+                mu.anode_crossing =
                     geoHighX.z.isInside(mu.start_hit.space, 10.F)
                     && geoTickWindow.isInside(mu.start_hit.tick, 10.F/fTick2cm);
-            LOG(mu.is_anode_crossing);
+            LOG(mu.anode_crossing)
 
-            LOG(sh.secs.size() > 1);
+            LOG(sh.secs.size() > 1)
             if (sh.secs.size() > 1) {
                 VecPtrHit::iterator sc_it = sh.sc.begin();
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
@@ -293,14 +296,14 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                     if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
                         if (abs(sec_curr - sec_next) != 1)
-                            mu.is_section_jumping = true;
+                            mu.section_jumping = true;
 
                         if (((*sc_it)->PeakTime()-(*++sc_it)->PeakTime()) > misalignmentTolerance/fTick2cm)
-                            mu.is_section_misaligned = true;
+                            mu.section_misaligned = true;
                     }
                 }
-                LOG(mu.is_section_jumping);
-                LOG(mu.is_section_misaligned);
+                LOG(mu.section_jumping)
+                LOG(mu.section_misaligned)
             }    
         } else {
             mu.max_consecutive_dist = -1.F;
@@ -310,11 +313,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.end_hit = ana::Hit{};
             mu.top_last_hit = ana::Hit{};
             mu.bottom_first_hit = ana::Hit{};
-            mu.is_cathode_crossing = false;
-            mu.is_anode_crossing = false;
-            mu.is_section_jumping = false;
-            mu.is_section_misaligned = false;
-            mu.is_cathode_misaligned = false;
+            mu.cathode_crossing = false;
+            mu.anode_crossing = false;
+            mu.section_jumping = false;
+            mu.section_misaligned = false;
+            mu.cathode_misaligned = false;
         }
 
 
@@ -333,12 +336,12 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             mu.tru.hits.clear();   
             mu.tru.sec_crossing_hits.clear();
-            mu.tru.is_section_jumping = false;
-            mu.tru.is_section_misaligned = false;
+            mu.tru.section_jumping = false;
+            mu.tru.section_misaligned = false;
             mu.tru.top_dQds.clear();
             mu.tru.bot_dQds.clear();
             mu.tru.sh_error = !sh_mcp;
-            LOG(!mu.tru.sh_error);
+            LOG(!mu.tru.sh_error)
             if (!mu.tru.sh_error) {
 
                 mu.tru.top_reg = sh_mcp.regs[0];
@@ -371,23 +374,30 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                         mu.tru.max_consecutive_dist = dist; 
                 }
 
-                mu.tru.is_cathode_crossing = sh_mcp.is_cc();
-                mu.tru.is_cathode_misaligned = sh_mcp.is_cc() 
+                mu.tru.cathode_crossing = sh_mcp.is_cc();
+                mu.tru.cathode_misaligned = sh_mcp.is_cc() 
                     && !(abs(sh_mcp.cc.first->PeakTime()-sh_mcp.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
-                LOG(mu.tru.is_cathode_crossing);
-                LOG(mu.tru.is_cathode_misaligned);
+                LOG(mu.tru.cathode_crossing)
+                LOG(mu.tru.cathode_misaligned)
 
-                if (geoDet == kPDVD)
-                    mu.tru.is_anode_crossing = mu.tru.start_hit.section < 4
-                        && geoHighX.z.isInside(mu.tru.start_hit.space, 10.F)
-                        && geoTickWindow.isInside(mu.tru.start_hit.tick, 10.F/fTick2cm);
-                else if (geoDet == kPDHD)
-                    mu.tru.is_anode_crossing =
-                        geoHighX.z.isInside(mu.tru.start_hit.space, 10.F)
-                        && geoTickWindow.isInside(mu.tru.start_hit.tick, 10.F/fTick2cm);
-                LOG(mu.tru.is_anode_crossing);
+                // if (geoDet == kPDVD)
+                //     mu.tru.anode_crossing = mu.tru.start_hit.section < 4
+                //         && geoHighX.z.isInside(mu.tru.start_hit.space, 10.F)
+                //         && geoTickWindow.isInside(mu.tru.start_hit.tick, 10.F/fTick2cm);
+                // else if (geoDet == kPDHD)
+                //     mu.tru.anode_crossing =
+                //         geoHighX.z.isInside(mu.tru.start_hit.space, 10.F)
+                //         && geoTickWindow.isInside(mu.tru.start_hit.tick, 10.F/fTick2cm);
+                float t_anode = (geoHighX.x.max - mcp->Vx(0)) / mcp->Px(0);
+                float z_anode = mcp->Vz(0) + mcp->Pz(0) * t_anode;
+                float y_anode = mcp->Vy(0) + mcp->Py(0) * t_anode;
+                mu.tru.anode_crossing = geoHighX.z.isInside(z_anode, 10.F) && geoHighX.y.isInside(y_anode, 10.F);
+                // the anode crossing might be out of the tick window!
+                LOG(mu.tru.anode_crossing)
 
-                LOG(sh_mcp.secs.size() > 1);
+
+
+                LOG(sh_mcp.secs.size() > 1)
                 if (sh_mcp.secs.size() > 1) {
                     VecPtrHit::iterator sc_it = sh_mcp.sc.begin();
                     for (unsigned i=0; i<sh_mcp.secs.size()-1; i++) {
@@ -396,14 +406,14 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                         if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
                             if (abs(sec_curr - sec_next) != 1)
-                                mu.tru.is_section_jumping = true;
+                                mu.tru.section_jumping = true;
 
                             if (((*sc_it)->PeakTime()-(*++sc_it)->PeakTime())*fTick2cm > 2.F)
-                                mu.tru.is_section_misaligned = true;
+                                mu.tru.section_misaligned = true;
                         }
                     }
-                    LOG(mu.tru.is_section_jumping);
-                    LOG(mu.tru.is_section_misaligned);
+                    LOG(mu.tru.section_jumping)
+                    LOG(mu.tru.section_misaligned)
                 }    
             } else {
                 mu.tru.max_consecutive_dist = -1.F;
@@ -415,16 +425,16 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.tru.end_hit = ana::Hit{};
                 mu.tru.top_last_hit = ana::Hit{};
                 mu.tru.bottom_first_hit = ana::Hit{};
-                mu.tru.is_cathode_crossing = false;
-                mu.tru.is_anode_crossing = false;
-                mu.tru.is_section_jumping = false;
-                mu.tru.is_section_misaligned = false;
-                mu.tru.is_cathode_misaligned = false;
+                mu.tru.cathode_crossing = false;
+                mu.tru.anode_crossing = false;
+                mu.tru.section_jumping = false;
+                mu.tru.section_misaligned = false;
+                mu.tru.cathode_misaligned = false;
             }
 
             simb::MCParticle const* mcp_mi = GetMichelMCP(mcp);
             mu.tru.has_michel = !!mcp_mi;
-            LOG(mu.tru.has_michel);
+            LOG(mu.tru.has_michel)
             if (mu.tru.has_michel)
                 mu.tru.michel_energy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3; // MeV
             else 
