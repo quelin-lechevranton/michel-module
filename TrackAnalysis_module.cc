@@ -41,6 +41,11 @@ private:
         TTree* tree;
         size_t index=0;
         ana::Hits hits, sec_crossing_hits;
+        struct {
+            ana::Hits hits;
+            std::vector<unsigned> hit_indices;
+            std::vector<float> hit_dxs;
+        } trk;
         float length;
         float max_consecutive_dist;
         ana::Point start_point, end_point;
@@ -155,6 +160,10 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("TopdQds",              &mu.top_dQds);
     mu.tree->Branch("BotdQds",              &mu.bot_dQds);
 
+    mu.trk.hits.                SetBranches(mu.tree, "Trk");
+    mu.tree->Branch("TrkHitIndex", &mu.trk.hit_indices);
+    mu.tree->Branch("TrkHitDx",    &mu.trk.hit_dxs);
+
     mu.tree->Branch("TruPdg",               &mu.tru.pdg);
     mu.tree->Branch("TruEndProcess",        &mu.tru.end_process);
     mu.tree->Branch("TruEndEnergy",         &mu.tru.end_energy);
@@ -205,7 +214,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
 
     ev.run = e.run();
@@ -220,7 +229,22 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
     for (PtrTrk pt_ev : vpt_ev) {
         VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
+        std::vector<recob::TrackHitMeta const*> vhm_trk = fmp_trk2hit.data(pt_ev.key());
         ASSERT(vph_trk.size())
+
+        // Trying TrackHitMeta
+        LOG(vph_trk.size() == vhm_trk.size());
+        mu.trk.hits.clear();
+        mu.trk.hit_indices.clear();
+        mu.trk.hit_dxs.clear();
+        auto iph = vph_trk.begin(); 
+        auto ihm = vhm_trk.begin();
+        for (; iph != vph_trk.end() && ihm != vhm_trk.end(); ++iph, ++ihm) {
+            if ((*iph)->View() != geo::kW) continue;
+            mu.trk.hits.push_back(GetHit(*iph));
+            mu.trk.hit_indices.push_back((*ihm)->Index());
+            mu.trk.hit_dxs.push_back((*ihm)->Dx());
+        }
 
         mu.length = pt_ev->Length();
         bool up = IsUpright(*pt_ev);

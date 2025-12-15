@@ -26,6 +26,8 @@
 #include "canvas/Persistency/Common/FindManyP.h"
 #include "canvas/Persistency/Common/FindOneP.h"
 
+#include "lardataobj/RecoBase/TrackHitMeta.h"
+
 #include <TTree.h>
 #include <TBranch.h>
 
@@ -394,10 +396,10 @@ namespace ana {
     art::ServiceHandle<cheat::BackTrackerService> bt_serv;
 
     // Computationally intensive!!
-    simb::MCParticle const* trk2mcp(
+    template<typename Data> simb::MCParticle const* trk2mcp(
         PtrTrk const& pt,
         detinfo::DetectorClocksData const& clockData,
-        art::FindManyP<recob::Hit> const& fmp_trk2hit
+        art::FindManyP<recob::Hit, Data> const& fmp_trk2hit
     ) {
         std::unordered_map<int, float> map_tid_ene;
         for (PtrHit const& p_hit : fmp_trk2hit.at(pt.key()))
@@ -413,11 +415,11 @@ namespace ana {
     }
 
     // Computationally intensive!!
-    PtrTrk mcp2trk(
+    template<typename Data> PtrTrk mcp2trk(
         simb::MCParticle const* mcp, 
         VecPtrTrk const& vp_trk,
         detinfo::DetectorClocksData const& clockData,
-        art::FindManyP<recob::Hit> const& fmp_trk2hit
+        art::FindManyP<recob::Hit, Data> const& fmp_trk2hit
     ) {
         std::unordered_map<PtrTrk, unsigned> map_trk_nhit;
         for (PtrTrk p_trk : vp_trk)
@@ -430,11 +432,11 @@ namespace ana {
                 max = p.second, p_trk_from_mcp = p.first;
         return p_trk_from_mcp;
     }
-    VecPtrTrk mcp2trks(
+    template<typename Data> VecPtrTrk mcp2trks(
         simb::MCParticle const* mcp,
         VecPtrTrk const& vpt_ev,
         detinfo::DetectorClocksData const& clockData,
-        art::FindManyP<recob::Hit> const& fmp_trk2hit
+        art::FindManyP<recob::Hit, Data> const& fmp_trk2hit
     ) {
         if (!mcp) return VecPtrTrk{};
         VecPtrTrk vpt_mcp;
