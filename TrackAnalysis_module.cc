@@ -45,6 +45,7 @@ private:
             ana::Hits hits;
             std::vector<unsigned> hit_indices;
             std::vector<float> hit_dxs;
+            ana::Hit end_hit;
         } trk;
         float length;
         float max_consecutive_dist;
@@ -161,6 +162,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("BotdQds",              &mu.bot_dQds);
 
     mu.trk.hits.                SetBranches(mu.tree, "Trk");
+    mu.trk.end_hit.             SetBranches(mu.tree, "TrkEnd");
     mu.tree->Branch("TrkHitIndex", &mu.trk.hit_indices);
     mu.tree->Branch("TrkHitDx",    &mu.trk.hit_dxs);
 
@@ -232,24 +234,40 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         std::vector<recob::TrackHitMeta const*> vhm_trk = fmp_trk2hit.data(pt_ev.key());
         ASSERT(vph_trk.size())
 
+        mu.length = pt_ev->Length();
+        bool up = IsUpright(*pt_ev);
+        mu.start_point = ana::Point(up ? pt_ev->Start() : pt_ev->End());
+        mu.end_point = ana::Point(up ? pt_ev->End() : pt_ev->Start());
+
         // Trying TrackHitMeta
         LOG(vph_trk.size() == vhm_trk.size());
         mu.trk.hits.clear();
         mu.trk.hit_indices.clear();
         mu.trk.hit_dxs.clear();
+        float min_dist = std::numeric_limits<float>::max();
         auto iph = vph_trk.begin(); 
         auto ihm = vhm_trk.begin();
         for (; iph != vph_trk.end() && ihm != vhm_trk.end(); ++iph, ++ihm) {
             if ((*iph)->View() != geo::kW) continue;
             mu.trk.hits.push_back(GetHit(*iph));
-            mu.trk.hit_indices.push_back((*ihm)->Index());
+            unsigned idx = (*ihm)->Index();
+            mu.trk.hit_indices.push_back(idx);
             mu.trk.hit_dxs.push_back((*ihm)->Dx());
+
+            if (pt_ev->HasValidPoint(idx)) {
+                geo::Point_t pt = pt_ev->LocationAtPoint(idx);
+                float dist = sqrt(
+                    pow(pt.x() - mu.end_point.x, 2) +
+                    pow(pt.y() - mu.end_point.y, 2) +
+                    pow(pt.z() - mu.end_point.z, 2)
+                );
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    mu.trk.end_hit = GetHit(*iph);
+                }
+            }
         }
 
-        mu.length = pt_ev->Length();
-        bool up = IsUpright(*pt_ev);
-        mu.start_point = ana::Point(up ? pt_ev->Start() : pt_ev->End());
-        mu.end_point = ana::Point(up ? pt_ev->End() : pt_ev->Start());
 
         ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
 
