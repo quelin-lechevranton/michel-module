@@ -831,12 +831,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     }
     if (sh.secs.empty()) return ana::SortedHits{};
 
-    std::find_if(
-        sh.secs.begin(), sh.secs.end(),
-        [&](int sec) {
-            return ana::tpc2side.at(geoDet).at(sec) == 1;
-        }
-    );
     std::sort(
         sh.secs.begin(), sh.secs.end(),
         [&sec_mz, dirz](int sec1, int sec2) {
@@ -910,7 +904,6 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_PDVD_Downward(
     sh.regs[0].compute();
     sh.regs[1].compute();
 
-    // sec order according to the direction in Z
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
         if (vph_sec[sec].size() < ana::LinearRegression::nmin) {
             vph_sec[sec].clear();
@@ -925,7 +918,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_PDVD_Downward(
     // first section in the bot volume
     std::vector<int>::iterator bot_it = std::find_if(
         sh.secs.begin(), sh.secs.end(),
-        [&](int sec) { return ana::tpc2side.at(geoDet).at(sec) == 0; }
+        [&](int sec) { return ana::sec2side.at(geoDet).at(sec) == 0; }
     );
 
     std::sort(
