@@ -143,11 +143,11 @@ void ana::MichelDisplayer::DrawMarker(TCanvas* c, PtrHit const& ph, MarkerStyle 
     TMarker *m = new TMarker();
     SetMarkerStyle(m, ms);
     if (this->geoDet == kPDVD) {
-        int s = ana::tpc2sec[this->geoDet][ph->WireID().TPC];
+        int s = ana::tpc2sec.at(this->geoDet).at(ph->WireID().TPC);
         c->cd(s+1);
         m->DrawMarker(this->GetSpace(ph->WireID()), ph->PeakTime() * this->fTick2cm);
     } else if (this->geoDet == kPDHD) {
-        int s = ana::tpc2sec[this->geoDet][ph->WireID().TPC];
+        int s = ana::tpc2sec.at(this->geoDet).at(ph->WireID().TPC);
         if (s == -1) return;
         c->cd(s+1);
         m->DrawMarker(ph->PeakTime() * this->fTick2cm, this->GetSpace(ph->WireID()));
@@ -166,7 +166,7 @@ void ana::MichelDisplayer::DrawGraph(TCanvas* c, VecPtrHit const& vph, char cons
     }
     for (PtrHit p_hit : vph) {
         if (p_hit->View() != geo::kW) continue;
-        int s = ana::tpc2sec[this->geoDet][p_hit->WireID().TPC];
+        int s = ana::tpc2sec.at(this->geoDet).at(p_hit->WireID().TPC);
         if (s == -1) continue;
         if (geoDet == kPDVD)
             gs[s]->AddPoint(this->GetSpace(p_hit->WireID()), p_hit->PeakTime() * this->fTick2cm);

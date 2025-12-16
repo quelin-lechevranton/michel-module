@@ -376,11 +376,11 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         TMarker *m = new TMarker();
         SetMarkerStyle(m, ms);
         if (geoDet == kPDVD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
             c->cd(s+1);
             m->DrawMarker(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
         } else if (geoDet == kPDHD) {
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
             if (s == -1) return;
             c->cd(s+1);
             m->DrawMarker(p_hit->PeakTime() * fTick2cm, GetSpace(p_hit->WireID()));
@@ -398,7 +398,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         }
         for (HitPtr p_hit : vp_hit) {
             if (p_hit->View() != geo::kW) continue;
-            int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+            int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
             if (s == -1) continue;
             if (geoDet == kPDVD)
                 gs[s]->AddPoint(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
@@ -454,7 +454,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
     // }
     // for (HitPtr p_hit : vp_hit) {
     //     if (p_hit->View() != geo::kW) continue;
-    //     int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //     int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
     //     if (s == -1) continue;
     //     // int q = std::min(p_hit->Integral() / 1000???200, 1.F);
     //     int q = p_hit->Integral();
@@ -630,7 +630,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
             // } else {
             //     for (HitPtr const& p_hit : vp_hit_muon) {
             //         if (p_hit->View() != geo::kW) continue;
-            //         if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
+            //         if (ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC) != int(s)) continue;
             //         double const z = GetSpace(p_hit->WireID());
             //         double const t = p_hit->PeakTime() * fTick2cm;
             //         reg.add(z, t);
@@ -647,7 +647,7 @@ void ana::Trackchecks::analyze(art::Event const& e) {
 
             for (HitPtr const& p_hit : vp_hit_muon) {
                 if (p_hit->View() != geo::kW) continue;
-                if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != int(s)) continue;
+                if (ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC) != int(s)) continue;
                 reg.add(GetSpace(p_hit->WireID()), p_hit->PeakTime() * fTick2cm);
             }
             reg.compute();
@@ -857,9 +857,9 @@ void ana::Trackchecks::analyze(art::Event const& e) {
         // get a sorted list of hits for each section (ie. pair of TPCs)
         std::vector<HitPtrVec> per_sec_vph(ana::n_sec[geoDet]);
         for (HitPtr const& ph : per_side_vph.first)
-            per_sec_vph[ana::tpc2sec[geoDet][ph->WireID().TPC]].push_back(ph);
+            per_sec_vph[ana::tpc2sec.at(geoDet).at(ph->WireID().TPC)].push_back(ph);
         for (HitPtr const& ph : per_side_vph.second)
-            per_sec_vph[ana::tpc2sec[geoDet][ph->WireID().TPC]].push_back(ph);
+            per_sec_vph[ana::tpc2sec.at(geoDet).at(ph->WireID().TPC)].push_back(ph);
 
         for (unsigned s=0; s<ana::n_sec[geoDet]; s++) {
             LinearRegression const& reg = s >= ana::n_sec[geoDet]/2 ? per_side_reg.second : per_side_reg.first;
@@ -1151,7 +1151,7 @@ ana::Hit ana::Trackchecks::GetHit(HitPtr const p_hit) {
     
     return ana::Hit{
         wid.TPC,
-        ana::tpc2sec[geoDet][wid.TPC],
+        ana::tpc2sec.at(geoDet).at(wid.TPC),
         float(GetSpace(wid)),
         p_hit->Channel(),
         p_hit->PeakTime(),
@@ -1336,7 +1336,7 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
     //     vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
     //     for (HitPtr const& p_hit : vp_hit) {
     //         if (p_hit->View() != view) continue;
-    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
     //         if (s == -1) continue;
     //         vvp_sec_sorted_hits->at(s).push_back(p_hit);
     //     }
@@ -1372,7 +1372,7 @@ HitPtrPair ana::Trackchecks::GetTrackEndsHits(
     std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
         if (s == -1) continue;
         vp_sec_hit[s].push_back(p_hit);
     }

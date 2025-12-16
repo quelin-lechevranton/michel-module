@@ -718,7 +718,7 @@ void ana::Agnochecks::analyze(art::Event const& e) {
 
             // if (from_track and (p_trk.key() != p_hit_trk.key())) continue;
 
-            if (ana::tpc2sec[geoDet][p_hit->WireID().TPC] != MuonEndHit.section) continue;
+            if (ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC) != MuonEndHit.section) continue;
             ana::Hit hit = GetHit(p_hit);
 
             float dz = (hit.space - MuonEndHit.space);
@@ -1032,7 +1032,7 @@ ana::Hit ana::Agnochecks::GetHit(HitPtr const p_hit) {
     
     return ana::Hit{
         wid.TPC,
-        ana::tpc2sec[geoDet][wid.TPC],
+        ana::tpc2sec.at(geoDet).at(wid.TPC),
         float(GetSpace(wid)),
         p_hit->Channel(),
         p_hit->PeakTime(),
@@ -1383,7 +1383,7 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
     //     vvp_sec_sorted_hits->resize(ana::n_sec[geoDet]);
     //     for (HitPtr const& p_hit : vp_hit) {
     //         if (p_hit->View() != view) continue;
-    //         int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+    //         int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
     //         if (s == -1) continue;
     //         vvp_sec_sorted_hits->at(s).push_back(p_hit);
     //     }
@@ -1419,7 +1419,7 @@ HitPtrPair ana::Agnochecks::GetTrackEndsHits(
     std::vector<HitPtrVec> vp_sec_hit(ana::n_sec[geoDet]);
     for (HitPtr const& p_hit : vp_hit) {
         if (p_hit->View() != view) continue;
-        int s = ana::tpc2sec[geoDet][p_hit->WireID().TPC];
+        int s = ana::tpc2sec.at(geoDet).at(p_hit->WireID().TPC);
         if (s == -1) continue;
         vp_sec_hit[s].push_back(p_hit);
     }
