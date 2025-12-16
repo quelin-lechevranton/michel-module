@@ -24,7 +24,7 @@ private:
     float geoCathodeGap; // cm
     float misalignmentTolerance = 3.F; // cm
 
-    bool fLog, fAssert;
+    bool fLog, fAssert, fRemoveBadHits;
 
     struct {
         TTree* tree;
@@ -90,7 +90,8 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     EDAnalyzer{p}, 
     MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
-    fAssert(p.get<bool>("Assert", false))
+    fAssert(p.get<bool>("Assert", false)),
+    fRemoveBadHits(p.get<bool>("RemoveBadHits", false))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -240,19 +241,20 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.end_point = ana::Point(up ? pt_ev->End() : pt_ev->Start());
 
         // Trying TrackHitMeta
-        LOG(vph_trk.size() == vhm_trk.size());
+        ASSERT(vph_trk.size() == vhm_trk.size())
         mu.trk.hits.clear();
         mu.trk.hit_indices.clear();
         mu.trk.hit_dxs.clear();
         float min_dist = std::numeric_limits<float>::max();
-        auto iph = vph_trk.begin(); 
-        auto ihm = vhm_trk.begin();
-        for (; iph != vph_trk.end() && ihm != vhm_trk.end(); ++iph, ++ihm) {
-            if ((*iph)->View() != geo::kW) continue;
-            mu.trk.hits.push_back(GetHit(*iph));
-            unsigned idx = (*ihm)->Index();
+        std::vector<unsigned> bad_hit_indices;
+        for (unsigned i=0; i<vph_trk.size(); i++) {
+            PtrHit const& ph = vph_trk[i];
+            recob::TrackHitMeta const* ihm = vhm_trk[i];
+            if (ph->View() != geo::kW) continue;
+            mu.trk.hits.push_back(GetHit(ph));
+            unsigned idx = ihm->Index();
             mu.trk.hit_indices.push_back(idx);
-            mu.trk.hit_dxs.push_back((*ihm)->Dx());
+            mu.trk.hit_dxs.push_back(ihm->Dx());
 
             if (pt_ev->HasValidPoint(idx)) {
                 geo::Point_t pt = pt_ev->LocationAtPoint(idx);
@@ -263,11 +265,13 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 );
                 if (dist < min_dist) {
                     min_dist = dist;
-                    mu.trk.end_hit = GetHit(*iph);
+                    mu.trk.end_hit = GetHit(ph);
                 }
-            }
+            } else bad_hit_indices.push_back(i);
         }
-
+        if (fRemoveBadHits)
+            for (int i=bad_hit_indices.size()-1; i>=0; i--)
+                vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
 
         ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
 
