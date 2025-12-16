@@ -106,7 +106,7 @@ namespace ana {
             t->DrawText(
                 gPad->GetLeftMargin(),
                 1-gPad->GetTopMargin()+0.01,
-                Form("TPC %u & %u", sec2tpc[geoDet][s].first, sec2tpc[geoDet][s].second)
+                Form("TPC %u & %u", ana::sec2tpc.at(geoDet).at(s).first, ana::sec2tpc.at(geoDet).at(s).second)
             );
 
             if (s == 0) {
