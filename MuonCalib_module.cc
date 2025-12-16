@@ -269,7 +269,7 @@ void ana::MuonCalib::analyze(art::Event const& e) {
                 TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_trk.cc.second->PeakTime()) * fTick2cm;
                 TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
             } else if (geoDet == kPDHD) {
-                int cc_sec = ana::tpc2sec[geoDet][sh_trk.cc.second->WireID().TPC];
+                int cc_sec = ana::tpc2sec.at(geoDet).at(sh_trk.cc.second->WireID().TPC);
                 if (cc_sec == 0) {
                     TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_trk.cc.second->PeakTime()) * fTick2cm;
                     TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);

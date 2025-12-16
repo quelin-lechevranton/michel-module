@@ -50,7 +50,7 @@ private:
         float length;
         float max_consecutive_dist;
         ana::Point start_point, end_point;
-        ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
+        ana::Hit start_hit, end_hit, top_last_hit, bot_first_hit;
         ana::LinearRegression top_reg, bot_reg;
         std::vector<float> top_dQds, bot_dQds;
 
@@ -67,7 +67,7 @@ private:
             ana::Hits hits, sec_crossing_hits;
             float max_consecutive_dist;
             ana::Point start_point, end_point;
-            ana::Hit start_hit, end_hit, top_last_hit, bottom_first_hit;
+            ana::Hit start_hit, end_hit, top_last_hit, bot_first_hit;
             float end_hit_x;
             int dir_z;
             ana::LinearRegression top_reg, bot_reg;
@@ -154,7 +154,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.start_hit.               SetBranches(mu.tree, "Start");
     mu.end_hit.                 SetBranches(mu.tree, "End");
     mu.top_last_hit.            SetBranches(mu.tree, "TopLast");
-    mu.bottom_first_hit.        SetBranches(mu.tree, "BottomFirst");
+    mu.bot_first_hit.           SetBranches(mu.tree, "BotFirst");
     mu.hits.                    SetBranches(mu.tree, "");
     mu.sec_crossing_hits.       SetBranches(mu.tree, "SecCross");
     mu.top_reg.                 SetBranches(mu.tree, "Top");
@@ -182,7 +182,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tru.start_hit.           SetBranches(mu.tree, "TruStart");
     mu.tru.end_hit.             SetBranches(mu.tree, "TruEnd");
     mu.tru.top_last_hit.        SetBranches(mu.tree, "TruTopLast");
-    mu.tru.bottom_first_hit.    SetBranches(mu.tree, "TruBottomFirst");
+    mu.tru.bot_first_hit.       SetBranches(mu.tree, "TruBotFirst");
     mu.tru.hits.                SetBranches(mu.tree, "Tru");
     mu.tru.sec_crossing_hits.   SetBranches(mu.tree, "TruSecCross");
     mu.tru.top_reg.             SetBranches(mu.tree, "TruTop");
@@ -273,7 +273,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             for (int i=bad_hit_indices.size()-1; i>=0; i--)
                 vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
 
-        ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
+        // ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
+        ana::SortedHits sh = GetSortedHits_PDVD_Downward(vph_trk);
 
         mu.hits.clear();
         mu.sec_crossing_hits.clear();
@@ -283,7 +284,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         mu.bot_dQds.clear();
         mu.sh_error = !sh;
         if (fAssert) { ASSERT(!mu.sh_error) }
-        else { LOG(!mu.sh_error); }
+        else         { LOG(!mu.sh_error); }
         if (!mu.sh_error) {
 
             mu.top_reg = sh.regs[0];
@@ -292,10 +293,10 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.end_hit = GetHit(sh.end);
             if (sh.is_cc()) {
                 mu.top_last_hit = GetHit(sh.cc.first);
-                mu.bottom_first_hit = GetHit(sh.cc.second);
+                mu.bot_first_hit = GetHit(sh.cc.second);
             } else {
                 mu.top_last_hit = ana::Hit{};
-                mu.bottom_first_hit = ana::Hit{};
+                mu.bot_first_hit = ana::Hit{};
             }
 
             for (PtrHit ph : sh.vph)
@@ -320,7 +321,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.cathode_misaligned = sh.is_cc() 
                 && abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
             if (fAssert) { ASSERT(mu.cathode_crossing) }
-            else { LOG(mu.cathode_crossing); }
+            else         { LOG(mu.cathode_crossing); }
             LOG(mu.cathode_misaligned);
 
             if (geoDet == kPDVD)
@@ -340,7 +341,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                     int sec_curr = sh.secs[i];
                     int sec_next = sh.secs[i+1];
 
-                    if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
+                    if (ana::sec2side.at(geoDet).at(sec_curr) == ana::sec2side.at(geoDet).at(sec_next)) {
                         if (abs(sec_curr - sec_next) != 1)
                             mu.section_jumping = true;
 
@@ -358,7 +359,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.start_hit = ana::Hit{};
             mu.end_hit = ana::Hit{};
             mu.top_last_hit = ana::Hit{};
-            mu.bottom_first_hit = ana::Hit{};
+            mu.bot_first_hit = ana::Hit{};
             mu.cathode_crossing = false;
             mu.anode_crossing = false;
             mu.section_jumping = false;
@@ -396,10 +397,10 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.tru.end_hit = GetHit(sh_mcp.end);
                 if (sh_mcp.is_cc()) {
                     mu.tru.top_last_hit = GetHit(sh_mcp.cc.first);
-                    mu.tru.bottom_first_hit = GetHit(sh_mcp.cc.second);
+                    mu.tru.bot_first_hit = GetHit(sh_mcp.cc.second);
                 } else {
                     mu.tru.top_last_hit = ana::Hit{};
-                    mu.tru.bottom_first_hit = ana::Hit{};
+                    mu.tru.bot_first_hit = ana::Hit{};
                 }
 
                 for (PtrHit ph : sh_mcp.vph)
@@ -450,7 +451,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                         int sec_curr = sh_mcp.secs[i];
                         int sec_next = sh_mcp.secs[i+1];
 
-                        if (ana::sec2side[geoDet][sec_curr] == ana::sec2side[geoDet][sec_next]) {
+                        if (ana::sec2side.at(geoDet).at(sec_curr) == ana::sec2side.at(geoDet).at(sec_next)) {
                             if (abs(sec_curr - sec_next) != 1)
                                 mu.tru.section_jumping = true;
 
@@ -470,7 +471,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 mu.tru.start_hit = ana::Hit{};
                 mu.tru.end_hit = ana::Hit{};
                 mu.tru.top_last_hit = ana::Hit{};
-                mu.tru.bottom_first_hit = ana::Hit{};
+                mu.tru.bot_first_hit = ana::Hit{};
                 mu.tru.cathode_crossing = false;
                 mu.tru.anode_crossing = false;
                 mu.tru.section_jumping = false;

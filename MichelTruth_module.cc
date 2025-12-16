@@ -431,7 +431,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
                         TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
                         TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
                     } else if (geoDet == kPDHD) {
-                        int cc_sec = ana::tpc2sec[geoDet][sh_mu.cc.second->WireID().TPC];
+                        int cc_sec = ana::tpc2sec.at(geoDet).at(sh_mu.cc.second->WireID().TPC);
                         if (cc_sec == 0) {
                             TrkEndHitX = geoLowX.x.max - abs(TrkEndHit.tick - sh_mu.cc.second->PeakTime()) * fTick2cm;
                             TrkHitEndInVolumeX = geoLowX.x.isInside(TrkEndHitX, fFiducialLength);
@@ -459,7 +459,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
 
                 VecPtrHit vph_trk_sec;
                 for (PtrHit const& ph : sh_trk.vph) {
-                    if (ana::tpc2sec[geoDet][ph->WireID().TPC] == sh_trk.end_sec()) {
+                    if (ana::tpc2sec.at(geoDet).at(ph->WireID().TPC) == sh_trk.end_sec()) {
                         vph_trk_sec.push_back(ph);
                     }
                 }
@@ -522,7 +522,7 @@ void ana::MichelTruth::analyze(art::Event const& e)
             ana::Hit hit = GetHit(ph_mu);
             Hits.push_back(hit);
             HitProjection.push_back(
-                sh_mu.regs[ana::tpc2side[geoDet][hit.tpc]].projection(
+                sh_mu.regs[ana::tpc2side.at(geoDet).at(hit.tpc)].projection(
                     hit.space, hit.tick * fTick2cm
                 )
             );
