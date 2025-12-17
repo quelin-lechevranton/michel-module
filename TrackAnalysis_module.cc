@@ -40,20 +40,26 @@ private:
     struct {
         TTree* tree;
         size_t index=0;
-        ana::Hits hits, sec_crossing_hits;
-        struct {
-            ana::Hits hits;
-            std::vector<unsigned> hit_indices;
-            std::vector<float> hit_dxs;
-            ana::Hit end_hit;
-        } trk;
+        ana::Hits hits, 
+                  sec_crossing_hits;
+        // struct {
+        //     ana::Hits hits;
+        //     std::vector<unsigned> hit_indices;
+        //     std::vector<float> hit_dxs;
+        //     ana::Hit end_hit;
+        // } trk;
         float length;
         float max_consecutive_dist;
-        ana::Point start_point, end_point;
-        ana::Hit start_hit, end_hit, top_last_hit, bot_first_hit;
-        ana::LinearRegression top_reg, bot_reg;
-        std::vector<float> top_dQds, bot_dQds;
-
+        ana::Point  start_point, 
+                    end_point;
+        ana::Hit    start_hit,
+                    end_hit, 
+                    top_last_hit, 
+                    bot_first_hit;
+        ana::LinearRegression   top_reg, 
+                                bot_reg;
+        std::vector<float>  top_dQds, 
+                            bot_dQds;
         bool    sh_error,
                 cathode_crossing,
                 anode_crossing,
@@ -64,16 +70,22 @@ private:
         struct {
             int pdg;
             std::string end_process;
-            ana::Hits hits, sec_crossing_hits;
+            ana::Hits   hits, 
+                        sec_crossing_hits;
             float max_consecutive_dist;
-            ana::Point start_point, end_point;
-            ana::Hit start_hit, end_hit, top_last_hit, bot_first_hit;
+            ana::Point  start_point, 
+                        end_point;
+            ana::Hit    start_hit, 
+                        end_hit, 
+                        top_last_hit, 
+                        bot_first_hit;
             // float end_hit_x;
             // int dir_z;
-            ana::LinearRegression top_reg, bot_reg;
-            std::vector<float> top_dQds, bot_dQds;
+            ana::LinearRegression   top_reg, 
+                                    bot_reg;
+            std::vector<float>  top_dQds, 
+                                bot_dQds;
             float end_energy;
-
             bool    downward,
                     sh_error,
                     cathode_crossing,
@@ -95,10 +107,10 @@ void ana::TrackAnalysis::reset_ev(void) {
     ev.hits.clear();
 }
 void ana::TrackAnalysis::reset_mu(void) {
-    mu.trk.hits.clear();
-    mu.trk.hit_indices.clear();
-    mu.trk.hit_dxs.clear();
-    mu.trk.end_hit = ana::Hit{};
+    // mu.trk.hits.clear();
+    // mu.trk.hit_indices.clear();
+    // mu.trk.hit_dxs.clear();
+    // mu.trk.end_hit = ana::Hit{};
 
     mu.hits.clear();
     mu.sec_crossing_hits.clear();
@@ -229,10 +241,10 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.tree->Branch("TopdQds",              &mu.top_dQds);
     mu.tree->Branch("BotdQds",              &mu.bot_dQds);
 
-    mu.trk.hits.                SetBranches(mu.tree, "Trk");
-    mu.trk.end_hit.             SetBranches(mu.tree, "TrkEnd");
-    mu.tree->Branch("TrkHitIndex", &mu.trk.hit_indices);
-    mu.tree->Branch("TrkHitDx",    &mu.trk.hit_dxs);
+    // mu.trk.hits.                SetBranches(mu.tree, "Trk");
+    // mu.trk.end_hit.             SetBranches(mu.tree, "TrkEnd");
+    // mu.tree->Branch("TrkHitIndex", &mu.trk.hit_indices);
+    // mu.tree->Branch("TrkHitDx",    &mu.trk.hit_dxs);
 
     mu.tree->Branch("TruPdg",               &mu.tru.pdg);
     mu.tree->Branch("TruEndProcess",        &mu.tru.end_process);
@@ -316,26 +328,31 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         float min_dist = std::numeric_limits<float>::max();
         std::vector<unsigned> bad_hit_indices;
         for (unsigned i=0; i<vph_trk.size(); i++) {
-            PtrHit const& ph = vph_trk[i];
-            recob::TrackHitMeta const* ihm = vhm_trk[i];
-            if (ph->View() != geo::kW) continue;
-            mu.trk.hits.push_back(GetHit(ph));
-            unsigned idx = ihm->Index();
-            mu.trk.hit_indices.push_back(idx);
-            mu.trk.hit_dxs.push_back(ihm->Dx());
+            // PtrHit const& ph = vph_trk[i];
+            // recob::TrackHitMeta const* ihm = vhm_trk[i];
+            // if (ph->View() != geo::kW) continue;
+            // mu.trk.hits.push_back(GetHit(ph));
+            // unsigned idx = ihm->Index();
+            // mu.trk.hit_indices.push_back(idx);
+            // mu.trk.hit_dxs.push_back(ihm->Dx());
 
-            if (pt_ev->HasValidPoint(idx)) {
-                geo::Point_t pt = pt_ev->LocationAtPoint(idx);
-                float dist = sqrt(
-                    pow(pt.x() - mu.end_point.x, 2) +
-                    pow(pt.y() - mu.end_point.y, 2) +
-                    pow(pt.z() - mu.end_point.z, 2)
-                );
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    mu.trk.end_hit = GetHit(ph);
-                }
-            } else bad_hit_indices.push_back(i);
+            // if (pt_ev->HasValidPoint(idx)) {
+            //     geo::Point_t pt = pt_ev->LocationAtPoint(idx);
+            //     float dist = sqrt(
+            //         pow(pt.x() - mu.end_point.x, 2) +
+            //         pow(pt.y() - mu.end_point.y, 2) +
+            //         pow(pt.z() - mu.end_point.z, 2)
+            //     );
+            //     if (dist < min_dist) {
+            //         min_dist = dist;
+            //         mu.trk.end_hit = GetHit(ph);
+            //     }
+            // } else bad_hit_indices.push_back(i);
+
+            if (vph_trk[i]->View() != geo::kW) continue;
+            if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
+                bad_hit_indices.push_back(i);
+            }
         }
         if (fRemoveBadHits)
             for (int i=bad_hit_indices.size()-1; i>=0; i--)
