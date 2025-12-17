@@ -174,16 +174,8 @@ private:
     float MichelConeEnergy;
     float MichelKeyholeEnergy;
 
-    void resetEvent();
-    void resetMuon();
-
-    // HitPtrPair GetTrackEndsHits(
-    //     HitPtrVec const& vp_hit,
-    //     HitPtrPair *pp_cathode_crossing = nullptr,
-    //     HitPtrVec *vp_tpc_crossing = nullptr,
-    //     HitPtrVec *vp_sorted_hit = nullptr,
-    //     geo::View_t view = geo::kW
-    // );
+    void resetEvent(void);
+    void resetMuon(void);
 };
 
 ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) : 
@@ -261,7 +253,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     tMuon->Branch("eventRun", &evRun);
     tMuon->Branch("eventSubRun", &evSubRun);
     tMuon->Branch("eventEvent", &evEvent);
-    tEvent->Branch("isReal", &EventIsReal);
+    tMuon->Branch("isReal", &EventIsReal);
     tMuon->Branch("iEvent", &iEvent);
     tMuon->Branch("iMuon", &iMuon);
     tMuon->Branch("iMuonInEvent", &EventNMuon);
@@ -407,7 +399,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     // VecPtrShw vps_ev;
     // art::fill_ptr_vector(vps_ev, vh_shw);
 
-    art::FindManyP<recob::Hit> fmp_trk2hit(vh_trk, e, tag_trk);
+    art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     // art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
     // art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
@@ -429,7 +421,20 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         resetMuon();
 
         VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
+        std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
         ASSERT(vph_mu.size())
+
+        ASSERT(vph_mu.size() == vhm_mu.size())
+        std::vector<unsigned> bad_hit_indices;
+        for (unsigned i=0; i<vph_mu.size(); i++) {
+            if (vph_mu[i]->View() != geo::kW) continue;
+            if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) {
+                bad_hit_indices.push_back(i);
+            }
+        }
+        for (int i=bad_hit_indices.size()-1; i>=0; i--)
+            vph_mu.erase(vph_mu.begin() + bad_hit_indices[i]);
+
 
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = nullptr;
@@ -475,7 +480,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // SUPPOSITION: Muon is downward
         TrkRegDirZ = End.Z() > Start.Z() ? 1 : -1;
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
+        // ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
+        ana::SortedHits sh_mu = GetSortedHits_PDVD_Downward(vph_mu);
         TrkHitError = !sh_mu;
 
 
@@ -552,19 +558,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ana::Hit hit = GetHit(ph_mu);
                 TrkHits.push_back(hit);
             }
-
-            /* COMPARE TO AGNOCHECKS
-            HitPtrPair ends = GetTrackEndsHits(vph_mu);
-            if (!LOG(ends.first && ends.second)) continue;
-            bool increasing_z = IsUpright(*pt_ev)
-                ? pt_ev->End().Z() > pt_ev->Start().Z()
-                : pt_ev->Start().Z() > pt_ev->End().Z();
-            int dir_z = increasing_z ? 1 : -1;
-            float fz = GetSpace(ends.first->WireID());
-            float sz = GetSpace(ends.second->WireID());
-            HitPtr end = (sz-fz) * dir_z > 0 ? ends.second : ends.first;
-            TrkEndHit = GetHit(end);
-            */
 
             VecPtrHit vph_ev_endsec;
             for (PtrHit const& ph_ev : vph_ev) {

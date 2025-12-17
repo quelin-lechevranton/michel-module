@@ -313,7 +313,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
     for (PtrTrk pt_ev : vpt_ev) {
         VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
-        std::vector<recob::TrackHitMeta const*> vhm_trk = fmp_trk2hit.data(pt_ev.key());
+        std::vector<recob::TrackHitMeta const*> const& vhm_trk = fmp_trk2hit.data(pt_ev.key());
         ASSERT(vph_trk.size())
 
         reset_mu();
@@ -325,7 +325,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
         // Trying TrackHitMeta
         ASSERT(vph_trk.size() == vhm_trk.size())
-        float min_dist = std::numeric_limits<float>::max();
+        // float min_dist = std::numeric_limits<float>::max();
         std::vector<unsigned> bad_hit_indices;
         for (unsigned i=0; i<vph_trk.size(); i++) {
             // PtrHit const& ph = vph_trk[i];
