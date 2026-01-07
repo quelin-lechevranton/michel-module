@@ -24,6 +24,7 @@ some variables are prefixed by their type followed by an underscore:
 
 namespace ana {
     class MichelAnalysis;
+    const float kBadPoint = -500.F;
 }
 
 class ana::MichelAnalysis : 
@@ -86,7 +87,7 @@ private:
     enum EnumCathodeCrossing { kNoCC, kHitOnBothSides, kAlignedHitOnBothSides };
     bool TrkHitAnodeCrossing;
     ana::Hit TrkStartHit, TrkEndHit;
-    float TrkEndHitX;
+    float TrkEndHitX, TrkEndHitY;
     int TrkRegDirZ;
     ana::LinearRegression TrkReg;
     bool TrkHitEndInVolumeX;
@@ -276,6 +277,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     TrkStartHit.SetBranches(tMuon, "Start");
     TrkEndHit.SetBranches(tMuon, "End");
     tMuon->Branch("EndHitX", &TrkEndHitX);
+    tMuon->Branch("EndHitY", &TrkEndHitY);
     tMuon->Branch("RegDirZ", &TrkRegDirZ);
     TrkReg.SetBranches(tMuon, "");
     tMuon->Branch("TrkHitEndInVolumeX", &TrkHitEndInVolumeX);
@@ -366,8 +368,6 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     tMuon->Branch("MichelBaryMuonAngle", &MichelBaryMuonAngle); // rad
     tMuon->Branch("MichelConeEnergy", &MichelConeEnergy); // ADC
     tMuon->Branch("MichelKeyholeEnergy", &MichelKeyholeEnergy); // ADC
-
-
 }
 
 void ana::MichelAnalysis::analyze(art::Event const& e) {
@@ -422,6 +422,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
         std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
+        std::map<size_t, unsigned> map_hitkey_to_metaidx;
         ASSERT(vph_mu.size())
 
         ASSERT(vph_mu.size() == vhm_mu.size())
@@ -430,6 +431,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (vph_mu[i]->View() != geo::kW) continue;
             if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) {
                 bad_hit_indices.push_back(i);
+            } else {
+                map_hitkey_to_metaidx[vph_mu[i].key()] = i;
             }
         }
         for (int i=bad_hit_indices.size()-1; i>=0; i--)
@@ -481,7 +484,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // SUPPOSITION: Muon is downward
         TrkRegDirZ = End.Z() > Start.Z() ? 1 : -1;
         // ana::SortedHits sh_mu = GetSortedHits(vph_mu, TrkRegDirZ);
-        ana::SortedHits sh_mu = GetSortedHits_PDVD_Downward(vph_mu);
+        ana::SortedHits sh_mu = geoDet == kPDVD ? 
+            GetSortedHits_PDVD_Downward(vph_mu)
+            : GetSortedHits_PDVD_Downward(vph_mu);
         TrkHitError = !sh_mu;
 
 
@@ -490,6 +495,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (!TrkHitError) {
             TrkStartHit = GetHit(sh_mu.start);
             TrkEndHit = GetHit(sh_mu.end);
+            size_t end_track_idx = vhm_mu[map_hitkey_to_metaidx.at(sh_mu.end.key())]->Index();
+            TrkEndHitY = pt_ev->HasValidPoint(end_track_idx)
+                ? pt_ev->LocationAtPoint(end_track_idx).Y()
+                : kBadPoint;
             TrkReg = sh_mu.end_reg(geoDet);
             TrkHitEndInWindow = wireWindow.isInside(TrkEndHit.tick, fFiducialLength / fTick2cm);
 
@@ -657,7 +666,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
             LOG(!PandoraTrkHitdQds.empty());
             if (!fKeepAll && PandoraTrkHitdQds.empty()) continue;
-
 
 
             MIPdQds = 0;
@@ -848,7 +856,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 TrueDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
             MuonTrueRegDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, MuonTrueRegDirZ);
+            ana::SortedHits sh_mcp = geoDet == kPDVD ? 
+                GetSortedHits_PDVD_Downward(vph_mcp_mu)
+                : GetSortedHits_PDVD_Downward(vph_mcp_mu);
 
             LOG(sh_mcp);
             if (sh_mcp) {
@@ -966,7 +976,8 @@ void ana::MichelAnalysis::resetMuon() {
     TrkHitAnodeCrossing = false;
     TrkStartHit = ana::Hit{};
     TrkEndHit = ana::Hit{};
-    TrkEndHitX = -500.F;
+    TrkEndHitX = kBadPoint;
+    TrkEndHitY = kBadPoint;
     TrkHitEndInVolumeX = false;
     TrkHitEndInWindow = false;
     TrkRegDirZ = 0;

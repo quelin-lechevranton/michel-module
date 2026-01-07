@@ -56,6 +56,7 @@ private:
                     end_hit, 
                     top_last_hit, 
                     bot_first_hit;
+        float end_hit_y;
         ana::LinearRegression   top_reg, 
                                 bot_reg;
         std::vector<float>  top_dQds, 
@@ -129,6 +130,7 @@ void ana::TrackAnalysis::reset_mu(void) {
     mu.bot_reg = ana::LinearRegression{};
     mu.start_hit = ana::Hit{};
     mu.end_hit = ana::Hit{};
+    mu.end_hit_y = -500.F;
     mu.top_last_hit = ana::Hit{};
     mu.bot_first_hit = ana::Hit{};
 
@@ -232,6 +234,7 @@ ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) :
     mu.end_point.               SetBranches(mu.tree, "End");
     mu.start_hit.               SetBranches(mu.tree, "Start");
     mu.end_hit.                 SetBranches(mu.tree, "End");
+    mu.tree->Branch("EndHitY",             &mu.end_hit_y);
     mu.top_last_hit.            SetBranches(mu.tree, "TopLast");
     mu.bot_first_hit.           SetBranches(mu.tree, "BotFirst");
     mu.hits.                    SetBranches(mu.tree, "");
@@ -327,6 +330,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
         ASSERT(vph_trk.size() == vhm_trk.size())
         // float min_dist = std::numeric_limits<float>::max();
         std::vector<unsigned> bad_hit_indices;
+        std::map<size_t, unsigned> map_hitkey_to_metaidx;
         for (unsigned i=0; i<vph_trk.size(); i++) {
             // PtrHit const& ph = vph_trk[i];
             // recob::TrackHitMeta const* ihm = vhm_trk[i];
@@ -352,6 +356,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             if (vph_trk[i]->View() != geo::kW) continue;
             if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
                 bad_hit_indices.push_back(i);
+            } else {
+                map_hitkey_to_metaidx[vph_trk[i].key()] = i;
             }
         }
         if (fRemoveBadHits)
@@ -370,6 +376,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.bot_reg = sh.regs[1];
             mu.start_hit = GetHit(sh.start);
             mu.end_hit = GetHit(sh.end);
+            size_t end_track_idx = vhm_trk[map_hitkey_to_metaidx.at(sh.end.key())]->Index();
+            mu.end_hit_y = pt_ev->HasValidPoint(end_track_idx)
+                ? pt_ev->LocationAtPoint(end_track_idx).Y()
+                : -500.F;
+
             if (sh.is_cc()) {
                 mu.top_last_hit = GetHit(sh.cc.first);
                 mu.bot_first_hit = GetHit(sh.cc.second);
@@ -444,7 +455,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.tru.end_point = ana::Point(mcp->EndPosition().Vect());
 
             VecPtrHit vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mu.tru.end_point.z > mu.tru.start_point.z ? 1 : -1);
+            ana::SortedHits sh_mcp = GetSortedHits_PDVD_Downward(vph_mcp_mu);
 
             mu.tru.sh_error = !sh_mcp;
             LOG(!mu.tru.sh_error);
