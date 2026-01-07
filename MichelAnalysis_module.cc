@@ -588,8 +588,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 }
 
                 PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                if (ps_hit && ps_hit->Energy()[geo::kW] > muSphereMaxShowerEnergy)
-                    muSphereMaxShowerEnergy = ps_hit->Energy()[geo::kW];
+                if (ps_hit)
+                    for (double energy : ps_hit->Energy())
+                        if (energy > muSphereMaxShowerEnergy) 
+                            muSphereMaxShowerEnergy = energy;
 
                 if (dist < fBarycenterRadius) {
                     muBaryHits.push_back(GetHit(ph_ev));
