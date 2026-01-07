@@ -405,7 +405,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
     // art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
-    art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
+    // art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
     resetEvent();
 
@@ -587,11 +587,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     continue;
                 }
 
-                PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
-                if (ps_hit)
-                    for (double energy : ps_hit->Energy())
-                        if (energy > muSphereMaxShowerEnergy) 
-                            muSphereMaxShowerEnergy = energy;
+                // PtrShw ps_hit = fop_hit2shw.at(ph_ev.key());
+                // if (ps_hit)
+                //     for (double energy : ps_hit->Energy())
+                //         if (energy > muSphereMaxShowerEnergy)
+                //             muSphereMaxShowerEnergy = energy;
 
                 if (dist < fBarycenterRadius) {
                     muBaryHits.push_back(GetHit(ph_ev));

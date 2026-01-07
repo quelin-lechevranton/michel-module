@@ -1,5 +1,6 @@
 #include "services_dune.fcl"
 #include "services_protodunehd.fcl" 
+#include "tools_dune.fcl"
 
 process_name: RunMichelAnalysis
 
