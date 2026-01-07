@@ -36,9 +36,6 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
             Log: false
-            BodyDistance: 10
-            TrackLengthCut: 30
-            FiducialLength: 20
         }
     }
     ana: [ checks ]

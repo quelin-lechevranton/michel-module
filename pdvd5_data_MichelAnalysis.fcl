@@ -36,9 +36,6 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
             Log: false
-            KeepAll: false
-            Bragg: false
-            FiducialLength: 20
         }
     }
     ana: [ checks ]
