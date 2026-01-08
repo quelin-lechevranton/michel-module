@@ -88,7 +88,9 @@ private:
     ana::Hit                muStartHit, 
                             muEndHit;
     float                   muEndHitX, 
-                            muEndHitY;
+                            muEndHitY,
+                            muStartHitX,
+                            muStartHitY;
     ana::LinearRegression   muReg;
     std::vector<float>      muEndSecHitdQds,
                             muSphereHitMuonAngle;
@@ -96,10 +98,10 @@ private:
                             muAnodeCrossing,
                             muCathodeCrossing,
                             muCathodeMisaligned,
-                            muEndInX,
-                            muEndInY,
-                            muEndInZ,
-                            muEndInT,
+                            // muEndInX,
+                            // muEndInY,
+                            // muEndInZ,
+                            // muEndInT,
                             muBaryHasLongTrack;
     float                   muSphereMaxShowerEnergy,
                             muSphereEnergy,
@@ -161,7 +163,7 @@ private:
     // bool TrueDownward;
     ana::Hit truStartHit;
     ana::Hit truEndHit;
-    int truRegDirZ;
+    // int truRegDirZ;
     ana::LinearRegression truReg;
 
     int truHasMichel;
@@ -282,8 +284,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("EndHitX", &muEndHitX);
     muTree->Branch("EndHitY", &muEndHitY);
     muReg.SetBranches(muTree, "");
-    muTree->Branch("TrkHitEndInVolumeX", &muEndInX);
-    muTree->Branch("TrkHitEndInWindow", &muEndInT);
+    // muTree->Branch("TrkHitEndInVolumeX", &muEndInX);
+    // muTree->Branch("TrkHitEndInWindow", &muEndInT);
     muHits.SetBranches(muTree, "");
     muTree->Branch("EndSecHitdQds", &muEndSecHitdQds);
     muSphereHits.SetBranches(muTree, "PandoraSphere");
@@ -353,7 +355,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     // muTree->Branch("TrueDownward", &TrueDownward);
     truStartHit.SetBranches(muTree, "TrueStart");
     truEndHit.SetBranches(muTree, "TrueEnd");
-    muTree->Branch("TrueRegDirZ", &truRegDirZ);
+    // muTree->Branch("TrueRegDirZ", &truRegDirZ);
     truReg.SetBranches(muTree, "True");
 
     muTree->Branch("TrueHasMichel", &truHasMichel);
@@ -492,31 +494,31 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             sh_mu.cc.second -> first hit in the bot volume (side0)
         
         */
-        int dirZ = End.Z() > Start.Z() ? 1 : -1;
+        // int dirZ = End.Z() > Start.Z() ? 1 : -1;
         // ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirZ);
-        ana::SortedHits sh_mu = GetSortedHits_PDVD_Downward(vph_mu);
+        ana::SortedHits sh_mu = GetSortedHits_DecreasingX(vph_mu);
         muHitError = !sh_mu;
 
         LOG(!muHitError);
         if (!fKeepAll && muHitError) continue;
         if (!muHitError) {
             muStartHit = GetHit(sh_mu.start);
+            size_t start_track_idx = vhm_mu[map_hitkey_to_metaidx.at(sh_mu.start.key())]->Index();
+            muStartHitY = pt_ev->HasValidPoint(start_track_idx)
+                ? pt_ev->LocationAtPoint(start_track_idx).Y()
+                : kBadPoint;
+            bool start_in_Y = geoLowX.y.isInside(muStartHitY, fFiducialLength) || geoHighX.y.isInside(muStartHitY, fFiducialLength);
+            bool start_in_Z = geoLowX.z.isInside(muStartHit.space, fFiducialLength) || geoHighX.z.isInside(muStartHit.space, fFiducialLength);
+            bool start_in_T = wireWindow.isInside(muStartHit.tick, fFiducialLength / fTick2cm);
+
             muEndHit = GetHit(sh_mu.end);
             size_t end_track_idx = vhm_mu[map_hitkey_to_metaidx.at(sh_mu.end.key())]->Index();
             muEndHitY = pt_ev->HasValidPoint(end_track_idx)
                 ? pt_ev->LocationAtPoint(end_track_idx).Y()
                 : kBadPoint;
-
-            muEndInY = geoLowX.y.isInside(muEndHitY, fFiducialLength) || geoHighX.y.isInside(muEndHitY, fFiducialLength);
-            muEndInZ = geoLowX.z.isInside(muEndHit.space, fFiducialLength) || geoHighX.z.isInside(muEndHit.space, fFiducialLength);
-            muEndInT = wireWindow.isInside(muEndHit.tick, fFiducialLength / fTick2cm);
-
-            LOG(muEndInY);
-            if (!fKeepAll && !muEndInY) continue;
-            LOG(muEndInZ);
-            if (!fKeepAll && !muEndInZ) continue;
-            LOG(muEndInT);
-            if (!fKeepAll && !muEndInT) continue;
+            bool end_in_Y = geoLowX.y.isInside(muEndHitY, fFiducialLength) || geoHighX.y.isInside(muEndHitY, fFiducialLength);
+            bool end_in_Z = geoLowX.z.isInside(muEndHit.space, fFiducialLength) || geoHighX.z.isInside(muEndHit.space, fFiducialLength);
+            bool end_in_T = wireWindow.isInside(muEndHit.tick, fFiducialLength / fTick2cm);
 
             muReg = sh_mu.end_reg(geoDet);
             LOG(muReg.r2 >= 0.4);
@@ -544,19 +546,32 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (!fKeepAll && (!muAnodeCrossing && !muCathodeCrossing)) continue;
 
             LOG(muAnodeCrossing);
-            int end_side = ana::tpc2side.at(geoDet).at(muEndHit.tpc);
+            bool start_in_X=false, end_in_X=false;
             if (muCathodeCrossing) {
                 // side0: neg X | side1: pos X
+                int start_side = ana::tpc2side.at(geoDet).at(muStartHit.tpc);
+                int end_side = ana::tpc2side.at(geoDet).at(muEndHit.tpc);
+
+                muStartHitX = start_side == 0
+                    ? -(fCathodeGap/2) - (sh_mu.cc.second->PeakTime() - muStartHit.tick) * fTick2cm
+                    : +(fCathodeGap/2) + (sh_mu.cc.first->PeakTime() - muStartHit.tick) * fTick2cm;
+                start_in_X = start_side == 0
+                    ? geoLowX.x.isInside(muStartHitX, fFiducialLength)
+                    : geoHighX.x.isInside(muStartHitX, fFiducialLength);
+
                 muEndHitX = end_side == 0
                     ? -(fCathodeGap/2) - (sh_mu.cc.second->PeakTime() - muEndHit.tick) * fTick2cm
                     : +(fCathodeGap/2) + (sh_mu.cc.first->PeakTime() - muEndHit.tick) * fTick2cm;
+                end_in_X = end_side == 0
+                    ? geoLowX.x.isInside(muEndHitX, fFiducialLength)
+                    : geoHighX.x.isInside(muEndHitX, fFiducialLength);
             }
-            muEndInX = end_side == 0
-                ? geoLowX.x.isInside(muEndHitX, fFiducialLength)
-                : geoHighX.x.isInside(muEndHitX, fFiducialLength);
 
-            LOG(muEndInX);
-            if (!fKeepAll && !muEndInX) continue;
+            bool start_in_XYZT = start_in_X && start_in_Y && start_in_Z && start_in_T;
+            bool end_in_XYZT = end_in_X && end_in_Y && end_in_Z && end_in_T;
+            LOG(start_in_XYZT);
+            LOG(end_in_XYZT);
+            if (!fKeepAll && !(start_in_XYZT || end_in_XYZT)) continue;
 
             for (PtrHit const& ph_mu : sh_mu.vph) {
                 if (ph_mu->View() != geo::kW) continue;
@@ -572,6 +587,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 vph_ev_endsec.push_back(ph_ev);
             }
 
+            float mu_end_angle = muReg.theta(muEndHit.space > muStartHit.space ? 1 : -1);
             // integrate charges around muon endpoint
             muSphereEnergy = 0;
             muSphereEnergyTP = 0;
@@ -601,7 +617,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 muSphereEnergy += ph_ev->ROISummedADC();
                 muSphereHits.push_back(hit);
 
-                float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muReg.theta(dirZ);
+                float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - mu_end_angle;
                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                 muSphereHitMuonAngle.push_back(da);
 
@@ -618,7 +634,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 muBary = muBaryHits.barycenter(fTick2cm);
                 ana::Vec2 end_bary = muBary - muEndHit.vec(fTick2cm);
                 muBaryAngle = end_bary.angle();
-                float da = muBaryAngle - muReg.theta(dirZ);
+                float da = muBaryAngle - mu_end_angle;
                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
                 muBaryMuonAngle = da;
 
@@ -852,8 +868,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // else if (geoDet == kPDHD)
             //     TrueDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            truRegDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
-            ana::SortedHits sh_mcp = GetSortedHits_PDVD_Downward(vph_mcp_mu);
+            int truDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, truDirZ);
 
             LOG(sh_mcp);
             if (sh_mcp) {
@@ -880,7 +896,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
                     // MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
-                    float mu_end_angle = sh_mcp.end_reg(geoDet).theta(truRegDirZ);
+                    float mu_end_angle = sh_mcp.end_reg(geoDet).theta(truDirZ);
+                    Hits bary_hits;
                     // for (PtrHit const& ph_mi : vph_mi) {
                     for (size_t i=0; i<vph_mi.size(); i++) {
                         PtrHit const& ph_mi = vph_mi[i];
@@ -894,23 +911,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         if (hit.section != truEndHit.section) {
                             miHitMuonAngle.push_back(100);
                         } else {
-                            float mu_hit_angle = (hit.vec(fTick2cm) - truEndHit.vec(fTick2cm)).angle() - mu_end_angle;
-                            mu_hit_angle = abs(mu_hit_angle) > TMath::Pi()
-                                ? mu_hit_angle - (mu_hit_angle>0 ? 1 : -1) * 2 * TMath::Pi()
-                                : mu_hit_angle;
-                            miHitMuonAngle.push_back(mu_hit_angle);
+                            float da = (hit.vec(fTick2cm) - truEndHit.vec(fTick2cm)).angle() - mu_end_angle;
+                            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+                            miHitMuonAngle.push_back(da);
                         }
-                    }
-                    miHitEnergy = miHits.energy();
 
-                    // Cone
-                    Hits bary_hits;
-                    for (PtrHit const& ph_mi : vph_mi) {
-                        if (ph_mi->View() != geo::kW) continue;
-                        if (GetDistance(ph_mi, sh_mcp.end) > 10) continue;
+                        if (GetDistance(ph_mi, sh_mcp.end) > fBarycenterRadius) continue;
                         bary_hits.push_back(GetHit(ph_mi));
                     }
-                    miBaryNHit = bary_hits.size();
+                    miHitEnergy = miHits.energy();
 
                     LOG(miBaryNHit);
                     if (bary_hits.size()) {
@@ -973,10 +982,12 @@ void ana::MichelAnalysis::resetMuon() {
     muEndHit = ana::Hit{};
     muEndHitX = kBadPoint;
     muEndHitY = kBadPoint;
-    muEndInX = false;
-    muEndInY = false;
-    muEndInZ = false;
-    muEndInT = false;
+    muStartHitX = kBadPoint;
+    muStartHitY = kBadPoint;
+    // muEndInX = false;
+    // muEndInY = false;
+    // muEndInZ = false;
+    // muEndInT = false;
     muReg = ana::LinearRegression{};
     muHits.clear();
     muEndSecHitdQds.clear();
@@ -1037,7 +1048,6 @@ void ana::MichelAnalysis::resetMuon() {
     // truDownward = false;
     truStartHit = ana::Hit{};
     truEndHit = ana::Hit{};
-    truRegDirZ = 0;
     truReg = ana::LinearRegression{};
 
     // Michel Truth

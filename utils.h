@@ -632,7 +632,7 @@ namespace ana {
             int dirz = 1,
             geo::View_t view = geo::kW
         ) const;
-        SortedHits GetSortedHits_PDVD_Downward(
+        SortedHits GetSortedHits_DecreasingX(
             VecPtrHit const& vph_unsorted,
             geo::View_t view = geo::kW
         ) const;
@@ -887,7 +887,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     return sh;
 }
 
-ana::SortedHits ana::MichelAnalyzer::GetSortedHits_PDVD_Downward(
+ana::SortedHits ana::MichelAnalyzer::GetSortedHits_DecreasingX(
     VecPtrHit const& vph_unsorted,
     geo::View_t view
 ) const {
