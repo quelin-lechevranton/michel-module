@@ -92,7 +92,8 @@ private:
                             muStartHitX,
                             muStartHitY;
     ana::LinearRegression   muReg;
-    std::vector<float>      muEndSecHitdQds,
+    std::vector<float>      muTopHitdQds,
+                            muBotHitdQds,
                             muSphereHitMuonAngle;
     bool                    muHitError,
                             muAnodeCrossing,
@@ -287,7 +288,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     // muTree->Branch("TrkHitEndInVolumeX", &muEndInX);
     // muTree->Branch("TrkHitEndInWindow", &muEndInT);
     muHits.SetBranches(muTree, "");
-    muTree->Branch("EndSecHitdQds", &muEndSecHitdQds);
+    // muTree->Branch("EndSecHitdQds", &muEndSecHitdQds);
+    muTree->Branch("TopHitdQds", &muTopHitdQds);
+    muTree->Branch("BotHitdQds", &muBotHitdQds);
     muSphereHits.SetBranches(muTree, "PandoraSphere");
     muTree->Branch("PandoraSphereHitMuonAngle", &muSphereHitMuonAngle);
     // muTree->Branch("PandoraSphereHasShower", &muSphereHasShower);
@@ -678,10 +681,12 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             }
 
             // End dQds
-            muEndSecHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), fRegN);
+            // muEndSecHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), fRegN);
+            muTopHitdQds = GetdQds(sh_mu.vph.begin(), sh_mu.bot_it(), fRegN);
+            muBotHitdQds = GetdQds(sh_mu.bot_it(), sh_mu.vph.end(), fRegN);
 
-            LOG(!muEndSecHitdQds.empty());
-            if (!fKeepAll && muEndSecHitdQds.empty()) continue;
+            // LOG(!muEndSecHitdQds.empty());
+            // if (!fKeepAll && muEndSecHitdQds.empty()) continue;
 
             // MIPdQds = 0;
             // if (!fBragg || std::distance(sh_mu.endsec_it(), sh_mu.vph.end()) < 2 * fBraggN) {
@@ -990,7 +995,9 @@ void ana::MichelAnalysis::resetMuon() {
     // muEndInT = false;
     muReg = ana::LinearRegression{};
     muHits.clear();
-    muEndSecHitdQds.clear();
+    // muEndSecHitdQds.clear();
+    muTopHitdQds.clear();
+    muBotHitdQds.clear();
     muSphereHits.clear();
     muSphereHitMuonAngle.clear();
     // muSphereHasShower = false;
