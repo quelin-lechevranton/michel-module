@@ -282,6 +282,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("TrkHitAnodeCrossing", &muAnodeCrossing);
     muStartHit.SetBranches(muTree, "Start");
     muEndHit.SetBranches(muTree, "End");
+    muTree->Branch("StartHitX", &muStartHitX);
+    muTree->Branch("StartHitY", &muStartHitY);
     muTree->Branch("EndHitX", &muEndHitX);
     muTree->Branch("EndHitY", &muEndHitY);
     muReg.SetBranches(muTree, "");
