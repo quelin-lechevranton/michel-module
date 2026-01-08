@@ -632,8 +632,9 @@ namespace ana {
             int dirz = 1,
             geo::View_t view = geo::kW
         ) const;
-        SortedHits GetSortedHits_DecreasingX(
+        SortedHits GetSortedHits_dirX(
             VecPtrHit const& vph_unsorted,
+            int dirX = -1, // decreasing X
             geo::View_t view = geo::kW
         ) const;
         // SortedHits GetSortedHits_PDHD(
@@ -887,8 +888,9 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     return sh;
 }
 
-ana::SortedHits ana::MichelAnalyzer::GetSortedHits_DecreasingX(
+ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
     VecPtrHit const& vph_unsorted,
+    int dirX, 
     geo::View_t view
 ) const {
     ana::SortedHits sh;
@@ -928,16 +930,16 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_DecreasingX(
 
     std::sort(
         sh.secs.begin(), bot_it,
-        [&sec_mt](int sec1, int sec2) {
-            // in top volume, downward <-> increasing tick
-            return sec_mt[sec1] < sec_mt[sec2];
+        [&sec_mt, &dirX](int sec1, int sec2) {
+            // in top volume, increasing X <-> decreasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
         }
     );
     std::sort(
         bot_it, sh.secs.end(),
-        [&sec_mt](int sec1, int sec2) {
-            // in bot volume, downward <-> decreasing tick
-            return sec_mt[sec1] > sec_mt[sec2];
+        [&sec_mt, &dirX](int sec1, int sec2) {
+            // in bot volume, increasing X <-> increasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
         }
     );
 
@@ -946,9 +948,9 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_DecreasingX(
         int side = ana::sec2side.at(geoDet).at(sec);
         ana::LinearRegression const& reg = sh.regs[side];
 
-        // top volume (side==1): downward <-> increasing tick <-> increasing s for m>0
-        // bot volume (side==0): downward <-> decreasing tick <-> decreasing s for m>0
-        int sign = (side == 1 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
+        // top volume (side==1): increasing X <-> decreasing tick <-> decreasing s for m>0
+        // bot volume (side==0): increasing X <-> increasing tick <-> increasing s for m>0
+        int sign = dirX * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
 
         VecPtrHit& vph = vph_sec[sec];
         std::sort(

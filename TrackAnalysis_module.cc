@@ -365,7 +365,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
 
         // ana::SortedHits sh = GetSortedHits(vph_trk, mu.end_point.z > mu.end_point.z ? 1 : -1);
-        ana::SortedHits sh = GetSortedHits_DecreasingX(vph_trk);
+        ana::SortedHits sh = GetSortedHits_dirX(vph_trk);
 
         mu.sh_error = !sh;
         if (fAssert) { ASSERT(!mu.sh_error) }
@@ -455,7 +455,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             mu.tru.end_point = ana::Point(mcp->EndPosition().Vect());
 
             VecPtrHit vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-            ana::SortedHits sh_mcp = GetSortedHits_DecreasingX(vph_mcp_mu);
+            ana::SortedHits sh_mcp = GetSortedHits_dirX(vph_mcp_mu);
 
             mu.tru.sh_error = !sh_mcp;
             LOG(!mu.tru.sh_error);

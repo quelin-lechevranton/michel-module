@@ -501,8 +501,53 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         */
         // int dirZ = End.Z() > Start.Z() ? 1 : -1;
         // ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirZ);
-        ana::SortedHits sh_mu = GetSortedHits_DecreasingX(vph_mu);
+        ana::SortedHits sh_mu = geoDet == kPDVD
+            ? GetSortedHits_dirX(vph_mu, -1) // PDVD: decreasing X <-> downward
+            : GetSortedHits_dirX(vph_mu, End.X() > Start.X() ? 1 : -1); // PDHD
         muHitError = !sh_mu;
+
+
+        // Sort Hits by their Index in the TrackHitMeta data
+        // Never tested
+        /*
+        ana::SortedHits sh_mu;
+        sh_mu.vph = vph_mu; // collection hits with valid points
+        std::sort(sh_mu.vph.begin(), sh_mu.vph.end(),
+            [&map_hitkey_to_metaidx](PtrHit const& a, PtrHit const& b) {
+                return map_hitkey_to_metaidx.at(a.key()) < map_hitkey_to_metaidx.at(b.key());
+            }
+        );
+        int prev_sec = -1, prev_side = -1;
+        PtrHit& prev_ph = sh_mu.vph.front();
+        for (PtrHit const& ph : sh_mu.vph) {
+            int sec = ana::tpc2sec.at(geoDet).at(ph->WireID().TPC);
+            int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
+            if (prev_sec == -1 || sec != prev_sec) {
+                sh_mu.secs.push_back(sec);
+                sh_mu.sc.push_back(prev_ph);
+                sh_mu.sc.push_back(ph);
+            }
+            prev_sec = sec;
+            if (side != -1) {
+                double z = GetSpace(ph->WireID());
+                double t = ph->PeakTime() * fTick2cm;
+                sh_mu.regs[side].add(z, t);
+            }
+            if (prev_side != -1 && side != prev_side) {
+                sh_mu.cc = std::make_pair(prev_ph, ph);
+            }
+            prev_side = side;
+            prev_ph = ph;
+            // sh_mu.bot_index?
+            // sh_mu.endsec_index?
+        }
+        sh_mu.regs[0].compute();
+        sh_mu.regs[1].compute();
+
+        sh_mu.start = sh_mu.vph.front();
+        sh_mu.end = sh_mu.vph.back();
+        */
+
 
         LOG(!muHitError);
         if (!fKeepAll && muHitError) continue;
@@ -875,8 +920,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // else if (geoDet == kPDHD)
             //     TrueDownward = mcp->Position(0).Y() > mcp->EndPosition().Y();
 
-            int truDirZ = mcp->EndZ() > mcp->Vz() ? 1 : -1;
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, truDirZ);
+            ana::SortedHits sh_mcp = GetSortedHits_dirX(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
 
             LOG(sh_mcp);
             if (sh_mcp) {
@@ -903,7 +947,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
                     // MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
 
-                    float mu_end_angle = sh_mcp.end_reg(geoDet).theta(truDirZ);
+                    float mu_end_angle = sh_mcp.end_reg(geoDet).theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
                     Hits bary_hits;
                     // for (PtrHit const& ph_mi : vph_mi) {
                     for (size_t i=0; i<vph_mi.size(); i++) {
