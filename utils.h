@@ -51,12 +51,12 @@ namespace ana {
     PDVD: (beam direction along Z, inside side0)
     ┌─────────┬─────────┬─────────┬─────────┐  X
     │ side1   │ side1   │ side1   │ side1   │  🡩
-    │ sec0    │ sec1    │ sec2    │ sec3    │  │
+    │ sec0    │ sec1    │ sec2    │ sec3    │  │  TOP
     │ tpc8,10 │ tpc9,11 │ tpc12,14│ tpc13,15│  │
     │         │         │         │         │  │
     ├─────────┼─────────┼─────────┼─────────┤  │
     │ side0   │ side0   │ side0   │ side0   │  │
-    │ sec4    │ sec5    │ sec6    │ sec7    │  │
+    │ sec4    │ sec5    │ sec6    │ sec7    │  │  BOT
     │ tpc0,2  │ tpc1,3  │ tpc4,6  │ tpc5,7  │  │ 
     │         │         │         │         │  │
     └─────────┴─────────┴─────────┴─────────┘
@@ -70,6 +70,7 @@ namespace ana {
     │         │         │ │
     └─────────┴─────────┘  
      ─────────────────> X
+       BOT       TOP
     */
 
     enum EnumDet { kPDVD, kPDHD };
@@ -417,7 +418,7 @@ namespace ana {
     };
 
     template<typename AnaStruct>
-    void SetBranches(TTree* t, const char* pre="", AnaStruct* x) {   x->SetBranches(t, pre); }
+    void SetBranches(TTree* t, const char* pre, AnaStruct* x) {   x->SetBranches(t, pre); }
 
     // reco to truth functions
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
