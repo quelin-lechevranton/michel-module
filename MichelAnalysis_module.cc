@@ -100,7 +100,7 @@ private:
     ana::Hits   muBaryHits;
     float       muBaryAngle;
     float       muBaryMuonAngle;
-    bool        muBaryHasLongTrack;
+    bool        muSphereHasLongTrack;
 
     // Truth information
     int                     truPdg;
@@ -245,7 +245,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     SetBranches(muTree, "Bary",                 &muBary);
     muTree->Branch("BaryAngle",                 &muBaryAngle);
     muTree->Branch("BaryMuonAngle",             &muBaryMuonAngle);
-    muTree->Branch("BaryHasLongTrack",          &muBaryHasLongTrack);
+    muTree->Branch("BaryHasLongTrack",          &muSphereHasLongTrack);
     // muTree->Branch("SphereMaxShowerEnergy",     &muSphereMaxShowerEnergy);
 
     // Truth
@@ -353,7 +353,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         }
 
         if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evNMuon << " (" << muIndex << ")" "\033[0m" << std::endl;
-        evMuonIndices.push_back(muIndex);
 
         // ============================
         // Dump basic track information
@@ -452,8 +451,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // Linear regression of hits, same side of the cathode as the end hit
             muTopReg = sh_mu.regs[1];
             muBotReg = sh_mu.regs[0];
-            LOG(muTopReg.r2 >= 0.4 && muBotReg.r2 >= 0.4);
-            if (!inKeepAll && !(muTopReg.r2 >= 0.4 && muBotReg.r2 >= 0.4)) continue;
+            LOG(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5);
+            if (!inKeepAll && !(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5)) continue;
 
             // muEndSecHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), inRegN);
             muTopHitdQds = GetdQds(sh_mu.vph.begin(), sh_mu.bot_it(), inRegN);
@@ -510,7 +509,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muEndInXYZT = end_in_X && end_in_Y && end_in_Z && end_in_T;
             LOG(muStartInXYZT);
             LOG(muEndInXYZT);
-            if (!inKeepAll && !(muStartInXYZT || muEndInXYZT)) continue;
+            if (!inKeepAll && !muEndInXYZT) continue;
             for (PtrHit const& ph_mu : sh_mu.vph) {
                 if (ph_mu->View() != geo::kW) continue;
                 ana::Hit hit = GetHit(ph_mu);
@@ -531,7 +530,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // integrate charges around muon endpoint
             muSphereEnergy = 0;
             muSphereEnergyTP = 0;
-            muBaryHasLongTrack = false;
+            muSphereHasLongTrack = false;
             // muSphereMaxShowerEnergy = 0;
             for (PtrHit const& ph_ev : vph_ev_endsec) {
                 float dist = GetDistance(ph_ev, sh_mu.end);
@@ -539,7 +538,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
                 if (pt_hit && pt_hit->Length() > inTrackLengthCut) {
-                    if (dist < inBarycenterRadius) muBaryHasLongTrack = true;
+                    if (pt_hit.key() != pt_ev.key()) muSphereHasLongTrack = true;
                     continue;
                 }
 
@@ -865,6 +864,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         }
 
         muTree->Fill();
+        evMuonIndices.push_back(muIndex);
         muIndex++;
         evNMuon++;
     } // end of loop over tracks
@@ -906,7 +906,7 @@ void ana::MichelAnalysis::resetMuon() {
     muBaryHits.clear();
     muBaryAngle = util::kBogusF;
     muBaryMuonAngle = util::kBogusF;
-    muBaryHasLongTrack = false;
+    muSphereHasLongTrack = false;
 
     truPdg = 0;
     truEndProcess = "";
