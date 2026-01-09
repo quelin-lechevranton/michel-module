@@ -168,7 +168,7 @@ namespace ana {
         double theta(int dirx) const {
             return atan2(dirx*cov, dirx*(lp-vary));
         }
-        void SetBranches(TTree* t, const char* pre="") const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sRegM", pre), &m);
             t->Branch(Form("%sRegP", pre), &p);
             t->Branch(Form("%sRegR2", pre), &r2);
@@ -233,7 +233,7 @@ namespace ana {
         float angle() const { return atan2(drift, space); }    
         float dot(Vec2 const& v) const { return space*v.space + drift*v.drift; }
         Vec2 operator-(Vec2 const& v) const { return Vec2{space - v.space, drift - v.drift}; }
-        void SetBranches(TTree* t, const char* pre="") const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sSpace", pre), &space);
             t->Branch(Form("%sDrift", pre), &drift);
         }
@@ -257,7 +257,7 @@ namespace ana {
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
             return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
-        void SetBranches(TTree* t, const char* pre="") const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sHitTPC", pre), &tpc);
             t->Branch(Form("%sHitSection", pre), &section);
             t->Branch(Form("%sHitSpace", pre), &space);
@@ -311,7 +311,7 @@ namespace ana {
             return bn ? Vec2{bs/bn, bt/bn} : Vec2{};
         }
 
-        void SetBranches(TTree *t, const char* pre="") const {
+        void SetBranches(TTree *t, const char* pre="") {
             t->Branch(Form("%sNHit", pre), &N);
             t->Branch(Form("%sHitTPC", pre), &tpc);
             t->Branch(Form("%sHitSection", pre), &section);
@@ -364,7 +364,7 @@ namespace ana {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
         }
 
-        void SetBranches(TTree* t, const char* pre="") const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sPointX", pre), &x);
             t->Branch(Form("%sPointY", pre), &y);
             t->Branch(Form("%sPointZ", pre), &z);
@@ -396,7 +396,7 @@ namespace ana {
         }
 
 
-        void SetBranches(TTree* t, const char* pre="") const {
+        void SetBranches(TTree* t, const char* pre="") {
             t->Branch(Form("%sNPoint", pre), &N);
             t->Branch(Form("%sPointX", pre), &x);
             t->Branch(Form("%sPointY", pre), &y);
@@ -417,7 +417,7 @@ namespace ana {
     };
 
     template<typename AnaStruct>
-    void SetBranches(TTree* t, const char* pre="", AnaStruct const* x) {   x->SetBranches(t, pre); }
+    void SetBranches(TTree* t, const char* pre="", AnaStruct* x) {   x->SetBranches(t, pre); }
 
     // reco to truth functions
     art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
