@@ -59,7 +59,7 @@ private:
     unsigned                evSubRun;
     unsigned                evEvent;
     unsigned                evIndex=0;
-    unsigned                evNMuon;
+    unsigned                evMuonNumber;
     std::vector<unsigned>   evMuonIndices;
     bool                    evIsData;
     ana::Hits               evHits;
@@ -197,7 +197,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     evTree->Branch("EventSubRun",   &evSubRun);
     evTree->Branch("EventEvent",    &evEvent);
     evTree->Branch("Index",         &evIndex);
-    evTree->Branch("NMuon",         &evNMuon);
+    evTree->Branch("MuonNumber",    &evMuonNumber);
     evTree->Branch("MuonIndices",   &evMuonIndices);
     evTree->Branch("IsData",        &evIsData);
     SetBranches(evTree, "",         &evHits);
@@ -210,7 +210,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("EventEvent",    &evEvent);
     muTree->Branch("IsData",        &evIsData);
     muTree->Branch("EventIndex",    &evIndex);
-    muTree->Branch("IndexInEvent",  &evNMuon);
+    muTree->Branch("IndexInEvent",  &evMuonNumber);
     muTree->Branch("Index",         &muIndex);
 
     // Track
@@ -352,7 +352,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
         }
 
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evNMuon << " (" << muIndex << ")" "\033[0m" << std::endl;
+        if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
 
         // ============================
         // Dump basic track information
@@ -866,7 +866,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muTree->Fill();
         evMuonIndices.push_back(muIndex);
         muIndex++;
-        evNMuon++;
+        evMuonNumber++;
     } // end of loop over tracks
     evTree->Fill();
     evIndex++;
@@ -876,7 +876,7 @@ void ana::MichelAnalysis::beginJob() {}
 void ana::MichelAnalysis::endJob() {}
 
 void ana::MichelAnalysis::resetEvent() {
-    evNMuon = 0;
+    evMuonNumber = 0;
     evMuonIndices.clear();
     evHits.clear();
 }
