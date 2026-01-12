@@ -87,8 +87,7 @@ private:
     bool                    muCathodeCrossing;
     bool                    muCathodeMisaligned;
     bool                    muAnodeCrossing;
-    std::vector<float>      muFirstSideHitdQds;
-    std::vector<float>      muLastSideHitdQds;
+    std::vector<float>      muHitdQds;
     ana::Hits               muSphereHits;
     float                   muSphereEnergy;
     float                   muSphereEnergyTP;
@@ -234,8 +233,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     SetBranches(muTree, "",                     &muHits);
     SetBranches(muTree, "Top",                  &muTopReg);
     SetBranches(muTree, "Bot",                  &muBotReg);
-    muTree->Branch("FirstSideHitdQds",                &muFirstSideHitdQds);
-    muTree->Branch("LastSideHitdQds",                &muLastSideHitdQds);
+    muTree->Branch("HitdQds",                   &muHitdQds);
     SetBranches(muTree, "Sphere",               &muSphereHits);
     muTree->Branch("SphereHitMuonAngle",        &muSphereHitMuonAngle);
     muTree->Branch("SphereEnergy",              &muSphereEnergy); // ADC
@@ -455,8 +453,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (!inKeepAll && !(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5)) continue;
 
             // muEndSecHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), inRegN);
-            muFirstSideHitdQds = GetdQds(sh_mu.vph.begin(), sh_mu.after_cathode_it(), inRegN);
-            muLastSideHitdQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), inRegN);
+            muHitdQds.clear();
+            std::vector<float> tmp;
+            tmp = GetdQds(sh_mu.vph.begin(), sh_mu.after_cathode_it(), inRegN);
+            muHitdQds.insert(muHitdQds.end(), tmp.begin(), tmp.end());
+            tmp = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), inRegN);
+            muHitdQds.insert(muHitdQds.end(), tmp.begin(), tmp.end());
+            tmp.clear();
 
             // Cathode crossing <-> track has hits on both sides of the cathode
             muCathodeCrossing = sh_mu.is_cc();
@@ -894,8 +897,7 @@ void ana::MichelAnalysis::resetMuon() {
     muCathodeCrossing = false;
     muCathodeMisaligned = false;
     muAnodeCrossing = false;
-    muFirstSideHitdQds.clear();
-    muLastSideHitdQds.clear();
+    muHitdQds.clear();
     muSphereHits.clear();
     muSphereEnergy = -1.F;
     muSphereEnergyTP = -1.F;

@@ -1144,7 +1144,8 @@ std::vector<float> ana::MichelAnalyzer::GetdQds(
     unsigned smoothing_length,
     unsigned *i_max
 ) const {
-    if (vph.size() <= smoothing_length) return std::vector<float>{};
+    size_t const length = vph.size();
+    if (length <= smoothing_length) return std::vector<float>(length, 0.F);
 
     float max = -1;
     std::vector<float> v_dQds(smoothing_length, 0.F);
@@ -1193,7 +1194,8 @@ std::vector<float> ana::MichelAnalyzer::GetdQds(
     unsigned smoothing_length,
     unsigned *i_max
 ) const {
-    if (std::distance(first,last) <= smoothing_length) return std::vector<float>{};
+    ptrdiff_t const length = std::distance(first,last);
+    if (length <= smoothing_length) return std::vector<float>(length, 0.F);
 
     float max = -1;
     std::vector<float> v_dQds(smoothing_length, 0.F);
