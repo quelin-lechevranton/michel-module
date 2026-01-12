@@ -374,16 +374,16 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             mu.top_reg = sh.regs[0];
             mu.bot_reg = sh.regs[1];
-            mu.start_hit = GetHit(sh.start);
-            mu.end_hit = GetHit(sh.end);
-            size_t end_track_idx = vhm_trk[map_hitkey_to_metaidx.at(sh.end.key())]->Index();
+            mu.start_hit = GetHit(sh.start());
+            mu.end_hit = GetHit(sh.end());
+            size_t end_track_idx = vhm_trk[map_hitkey_to_metaidx.at(sh.end().key())]->Index();
             mu.end_hit_y = pt_ev->HasValidPoint(end_track_idx)
                 ? pt_ev->LocationAtPoint(end_track_idx).Y()
                 : -500.F;
 
             if (sh.is_cc()) {
-                mu.top_last_hit = GetHit(sh.cc.first);
-                mu.bot_first_hit = GetHit(sh.cc.second);
+                mu.top_last_hit = GetHit(sh.cc_first());
+                mu.bot_first_hit = GetHit(sh.cc_second());
             } else {
                 mu.top_last_hit = ana::Hit{};
                 mu.bot_first_hit = ana::Hit{};
@@ -392,11 +392,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
             for (PtrHit ph : sh.vph)
                 mu.hits.push_back(GetHit(ph));
 
-            for (PtrHit ph : sh.sc)
+            for (PtrHit ph : sh.scs())
                 mu.sec_crossing_hits.push_back(GetHit(ph));
 
-            mu.top_dQds = GetdQds(sh.vph.begin(), sh.bot_it(), 6);
-            mu.bot_dQds = GetdQds(sh.bot_it(), sh.vph.end(), 6);
+            mu.top_dQds = GetdQds(sh.vph.begin(), sh.after_cathode_it(), 6);
+            mu.bot_dQds = GetdQds(sh.after_cathode_it(), sh.vph.end(), 6);
 
             mu.max_consecutive_dist = 0.F;
             for (VecPtrHit::iterator it=sh.vph.begin(); it!=sh.vph.end()-1; ++it) {
@@ -409,7 +409,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             mu.cathode_crossing = sh.is_cc();
             mu.cathode_misaligned = sh.is_cc() 
-                && abs(sh.cc.first->PeakTime()-sh.cc.second->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
+                && abs(sh.cc_first()->PeakTime()-sh.cc_second()->PeakTime()) > (geoCathodeGap + misalignmentTolerance)/fTick2cm;
             if (fAssert) { ASSERT(mu.cathode_crossing) }
             else         { LOG(mu.cathode_crossing); }
             LOG(mu.cathode_misaligned);
@@ -426,7 +426,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
             LOG(sh.secs.size() > 1);
             if (sh.secs.size() > 1) {
-                VecPtrHit::iterator sc_it = sh.sc.begin();
+                VecPtrHit scs = sh.scs();
+                VecPtrHit::iterator sc_it = scs.begin();
                 for (unsigned i=0; i<sh.secs.size()-1; i++) {
                     int sec_curr = sh.secs[i];
                     int sec_next = sh.secs[i+1];
@@ -463,11 +464,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                 mu.tru.top_reg = sh_mcp.regs[0];
                 mu.tru.bot_reg = sh_mcp.regs[1];
-                mu.tru.start_hit = GetHit(sh_mcp.start);
-                mu.tru.end_hit = GetHit(sh_mcp.end);
+                mu.tru.start_hit = GetHit(sh_mcp.start());
+                mu.tru.end_hit = GetHit(sh_mcp.end());
                 if (sh_mcp.is_cc()) {
-                    mu.tru.top_last_hit = GetHit(sh_mcp.cc.first);
-                    mu.tru.bot_first_hit = GetHit(sh_mcp.cc.second);
+                    mu.tru.top_last_hit = GetHit(sh_mcp.cc_first());
+                    mu.tru.bot_first_hit = GetHit(sh_mcp.cc_second());
                 } else {
                     mu.tru.top_last_hit = ana::Hit{};
                     mu.tru.bot_first_hit = ana::Hit{};
@@ -476,11 +477,11 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
                 for (PtrHit ph : sh_mcp.vph)
                     mu.tru.hits.push_back(GetHit(ph));
 
-                for (PtrHit ph : sh_mcp.sc)
+                for (PtrHit ph : sh_mcp.scs())
                     mu.tru.sec_crossing_hits.push_back(GetHit(ph));
 
-                mu.tru.top_dQds = GetdQds(sh_mcp.vph.begin(), sh_mcp.bot_it(), 6);
-                mu.tru.bot_dQds = GetdQds(sh_mcp.bot_it(), sh_mcp.vph.end(), 6);
+                mu.tru.top_dQds = GetdQds(sh_mcp.vph.begin(), sh_mcp.after_cathode_it(), 6);
+                mu.tru.bot_dQds = GetdQds(sh_mcp.after_cathode_it(), sh_mcp.vph.end(), 6);
 
                 mu.tru.max_consecutive_dist = 0.F;
                 for (VecPtrHit::iterator it=sh_mcp.vph.begin(); it!=sh_mcp.vph.end()-1; ++it) {
@@ -493,7 +494,7 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                 mu.tru.cathode_crossing = sh_mcp.is_cc();
                 mu.tru.cathode_misaligned = sh_mcp.is_cc() 
-                    && !(abs(sh_mcp.cc.first->PeakTime()-sh_mcp.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap);
+                    && !(abs(sh_mcp.cc_first()->PeakTime()-sh_mcp.cc_second()->PeakTime())*fTick2cm < 3 * geoCathodeGap);
                 LOG(mu.tru.cathode_crossing);
                 LOG(mu.tru.cathode_misaligned);
 
@@ -516,7 +517,8 @@ void ana::TrackAnalysis::analyze(art::Event const& e) {
 
                 LOG(sh_mcp.secs.size() > 1);
                 if (sh_mcp.secs.size() > 1) {
-                    VecPtrHit::iterator sc_it = sh_mcp.sc.begin();
+                    VecPtrHit scs = sh.scs();
+                    VecPtrHit::iterator sc_it = scs.begin();
                     for (unsigned i=0; i<sh_mcp.secs.size()-1; i++) {
                         int sec_curr = sh_mcp.secs[i];
                         int sec_next = sh_mcp.secs[i+1];

@@ -87,8 +87,8 @@ private:
     bool                    muCathodeCrossing;
     bool                    muCathodeMisaligned;
     bool                    muAnodeCrossing;
-    std::vector<float>      muTopHitdQds;
-    std::vector<float>      muBotHitdQds;
+    std::vector<float>      muFirstSideHitdQds;
+    std::vector<float>      muLastSideHitdQds;
     ana::Hits               muSphereHits;
     float                   muSphereEnergy;
     float                   muSphereEnergyTP;
@@ -234,8 +234,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     SetBranches(muTree, "",                     &muHits);
     SetBranches(muTree, "Top",                  &muTopReg);
     SetBranches(muTree, "Bot",                  &muBotReg);
-    muTree->Branch("TopHitdQds",                &muTopHitdQds);
-    muTree->Branch("BotHitdQds",                &muBotHitdQds);
+    muTree->Branch("FirstSideHitdQds",                &muFirstSideHitdQds);
+    muTree->Branch("LastSideHitdQds",                &muLastSideHitdQds);
     SetBranches(muTree, "Sphere",               &muSphereHits);
     muTree->Branch("SphereHitMuonAngle",        &muSphereHitMuonAngle);
     muTree->Branch("SphereEnergy",              &muSphereEnergy); // ADC
@@ -429,8 +429,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (!inKeepAll && muRegError) continue;
         if (!muRegError) {
             // First hit of the track:
-            muStartHit = GetHit(sh_mu.start);
-            size_t start_track_idx = vhm_mu[map_hitkey2metaidx.at(sh_mu.start.key())]->Index();
+            muStartHit = GetHit(sh_mu.start());
+            size_t start_track_idx = vhm_mu[map_hitkey2metaidx.at(sh_mu.start().key())]->Index();
             muStartHitY = pt_ev->HasValidPoint(start_track_idx)
                 ? pt_ev->LocationAtPoint(start_track_idx).Y()
                 : util::kBogusF;
@@ -439,8 +439,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             bool start_in_T = wireWindow.isInside(muStartHit.tick, inFiducialLength / fTick2cm);
 
             // Last hit of the track:
-            muEndHit = GetHit(sh_mu.end);
-            size_t end_track_idx = vhm_mu[map_hitkey2metaidx.at(sh_mu.end.key())]->Index();
+            muEndHit = GetHit(sh_mu.end());
+            size_t end_track_idx = vhm_mu[map_hitkey2metaidx.at(sh_mu.end().key())]->Index();
             muEndHitY = pt_ev->HasValidPoint(end_track_idx)
                 ? pt_ev->LocationAtPoint(end_track_idx).Y()
                 : util::kBogusF;
@@ -455,13 +455,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (!inKeepAll && !(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5)) continue;
 
             // muEndSecHitdQds = GetdQds(sh_mu.endsec_it(), sh_mu.vph.end(), inRegN);
-            muTopHitdQds = GetdQds(sh_mu.vph.begin(), sh_mu.bot_it(), inRegN);
-            muBotHitdQds = GetdQds(sh_mu.bot_it(), sh_mu.vph.end(), inRegN);
+            muFirstSideHitdQds = GetdQds(sh_mu.vph.begin(), sh_mu.after_cathode_it(), inRegN);
+            muLastSideHitdQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), inRegN);
 
             // Cathode crossing <-> track has hits on both sides of the cathode
             muCathodeCrossing = sh_mu.is_cc();
             muCathodeMisaligned = sh_mu.is_cc()
-                && abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime())*fTick2cm < 3 * geoCathodeGap;
+                && abs(sh_mu.cc_first()->PeakTime()-sh_mu.cc_second()->PeakTime())*fTick2cm < 3 * geoCathodeGap;
 
             LOG(muCathodeCrossing);
             if (!inKeepAll && !muCathodeCrossing) continue;
@@ -491,15 +491,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
                 // side0: X<0 | side1: X>0
                 muStartHitX = start_side == 0
-                    ? -(geoCathodeGap/2) - (sh_mu.cc.second->PeakTime() - muStartHit.tick) * fTick2cm
-                    : +(geoCathodeGap/2) + (sh_mu.cc.first->PeakTime() - muStartHit.tick) * fTick2cm;
+                    ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muStartHit.tick) * fTick2cm
+                    : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muStartHit.tick) * fTick2cm;
                 start_in_X = start_side == 0
                     ? geoBot.x.isInside(muStartHitX, inFiducialLength)
                     : geoTop.x.isInside(muStartHitX, inFiducialLength);
 
                 muEndHitX = end_side == 0
-                    ? -(geoCathodeGap/2) - (sh_mu.cc.second->PeakTime() - muEndHit.tick) * fTick2cm
-                    : +(geoCathodeGap/2) + (sh_mu.cc.first->PeakTime() - muEndHit.tick) * fTick2cm;
+                    ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muEndHit.tick) * fTick2cm
+                    : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muEndHit.tick) * fTick2cm;
                 end_in_X = end_side == 0
                     ? geoBot.x.isInside(muEndHitX, inFiducialLength)
                     : geoTop.x.isInside(muEndHitX, inFiducialLength);
@@ -533,7 +533,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muSphereHasLongTrack = false;
             // muSphereMaxShowerEnergy = 0;
             for (PtrHit const& ph_ev : vph_ev_endsec) {
-                float dist = GetDistance(ph_ev, sh_mu.end);
+                float dist = GetDistance(ph_ev, sh_mu.end());
                 if (dist > inMichelRadius) continue;
 
                 PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -803,8 +803,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             ana::SortedHits sh_mcp = GetSortedHits_dirX(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
             LOG(sh_mcp);
             if (sh_mcp) {
-                truStartHit = GetHit(sh_mcp.start);
-                truEndHit = GetHit(sh_mcp.end);
+                truStartHit = GetHit(sh_mcp.start());
+                truEndHit = GetHit(sh_mcp.end());
                 truReg = sh_mcp.end_reg(geoDet);
 
                 LOG(mcp_mi);
@@ -845,7 +845,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                             miHitMuonAngle.push_back(da);
                         }
 
-                        if (GetDistance(ph_mi, sh_mcp.end) > inBarycenterRadius) continue;
+                        if (GetDistance(ph_mi, sh_mcp.end()) > inBarycenterRadius) continue;
                         bary_hits.push_back(GetHit(ph_mi));
                     }
                     miHitEnergy = miHits.energy();
@@ -894,8 +894,8 @@ void ana::MichelAnalysis::resetMuon() {
     muCathodeCrossing = false;
     muCathodeMisaligned = false;
     muAnodeCrossing = false;
-    muTopHitdQds.clear();
-    muBotHitdQds.clear();
+    muFirstSideHitdQds.clear();
+    muLastSideHitdQds.clear();
     muSphereHits.clear();
     muSphereEnergy = -1.F;
     muSphereEnergyTP = -1.F;
