@@ -239,7 +239,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         // points at cathode crossing if any,
         // points at section crossing if any
         // (a section is a set of two adjacent TPCs)
-        ana::SortedHits sh_mu = GetSortedHits(vph_muon, End.Z() > Start.Z() ? 1 : -1);
+        ana::SortedHits sh_mu = GetSortedHits_dirX(vph_muon);
         // possible cause of failure:
         // - no section with at least 4 (ana::LinearRegression::nmin) hits 
         ASSERT(sh_mu)
@@ -262,13 +262,13 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
             Color_t c_pass = vc_pass[im%vc_pass.size()];
             DrawGraph(*ihc, sh_mu.vph, "l", {}, {c_pass, ls_pass.l, ls_pass.w});
             DrawGraph2D(*itc, pt_ev, {}, {c_pass, ls_pass.l, ls_pass.w});
-            for (PtrHit const& sc : sh_mu.sc)
+            for (PtrHit const& sc : sh_mu.scs())
                 DrawMarker(*ihc, sc, ms_sc);
-            DrawMarker(*ihc, sh_mu.start, ms_end);
-            DrawMarker(*ihc, sh_mu.end, ms_end);
+            DrawMarker(*ihc, sh_mu.start(), ms_end);
+            DrawMarker(*ihc, sh_mu.end(), ms_end);
             if (sh_mu.is_cc()) {
-                DrawMarker(*ihc, sh_mu.cc.first, ms_cc);
-                DrawMarker(*ihc, sh_mu.cc.second, ms_cc);
+                DrawMarker(*ihc, sh_mu.cc_first(), ms_cc);
+                DrawMarker(*ihc, sh_mu.cc_second(), ms_cc);
             }
         };
 
@@ -291,17 +291,17 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
 
         int TrkHitCathodeCrossing = 0;
         if (sh_mu.is_cc()) {
-            if (abs(sh_mu.cc.first->PeakTime()-sh_mu.cc.second->PeakTime()) * fTick2cm < 3*fCathodeGap)
+            if (abs(sh_mu.cc_first()->PeakTime()-sh_mu.cc_second()->PeakTime()) * fTick2cm < 3*fCathodeGap)
                 TrkHitCathodeCrossing = 2;
             else
                 TrkHitCathodeCrossing = 1;
         }
         bool TrkHitEndInVolumeX = false;
         if (TrkHitCathodeCrossing) {
-            float x = abs(sh_mu.cc.second->PeakTime() - sh_mu.end->PeakTime()) * fTick2cm;
+            float x = abs(sh_mu.cc_second()->PeakTime() - sh_mu.end()->PeakTime()) * fTick2cm;
             TrkHitEndInVolumeX = x < (geoHighX.x.max - 20.F);
         }
-        bool TrkHitEndInWindow = wireWindow.isInside(sh_mu.end->PeakTime(), 20.F / fTick2cm);
+        bool TrkHitEndInWindow = wireWindow.isInside(sh_mu.end()->PeakTime(), 20.F / fTick2cm);
 
         simb::MCParticle const* mcp_mu = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = GetMichelMCP(mcp_mu);
