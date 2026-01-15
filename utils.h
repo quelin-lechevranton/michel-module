@@ -934,7 +934,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
     for (PtrHit const& ph : vph_unsorted) {
         if (ph->View() != view) continue;
         int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-        if (side == -1) continue; // skip hits on the other side of the anodes
+        if (side == -1) continue; // skip hits on the other side of the anodes in PDHD
         double z = GetSpace(ph->WireID());
         double t = ph->PeakTime() * fTick2cm;
         sh.regs[side].add(z, t);

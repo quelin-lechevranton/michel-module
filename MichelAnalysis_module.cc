@@ -238,13 +238,13 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("SphereHitMuonAngle",        &muSphereHitMuonAngle);
     muTree->Branch("SphereEnergy",              &muSphereEnergy); // ADC
     muTree->Branch("SphereEnergyTP",            &muSphereEnergyTP); // ADC
+    muTree->Branch("SphereHasLongTrack",        &muSphereHasLongTrack);
+    // muTree->Branch("SphereMaxShowerEnergy",     &muSphereMaxShowerEnergy);
 
     SetBranches(muTree, "Bary",                 &muBaryHits);
     SetBranches(muTree, "Bary",                 &muBary);
     muTree->Branch("BaryAngle",                 &muBaryAngle);
     muTree->Branch("BaryMuonAngle",             &muBaryMuonAngle);
-    muTree->Branch("BaryHasLongTrack",          &muSphereHasLongTrack);
-    // muTree->Branch("SphereMaxShowerEnergy",     &muSphereMaxShowerEnergy);
 
     // Truth
     muTree->Branch("TruePdg",               &truPdg);
@@ -266,7 +266,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("MichelHitEnergy",       &miHitEnergy); // ADC
 
     muTree->Branch("MichelBaryNHit",        &miBaryNHit);
-    SetBranches(muTree, "MichelBary", &miBary); 
+    SetBranches(muTree, "MichelBary",       &miBary); 
     muTree->Branch("MichelBaryAngle",       &miBaryAngle); // rad
     muTree->Branch("MichelBaryMuonAngle",   &miBaryMuonAngle); // rad
 }
