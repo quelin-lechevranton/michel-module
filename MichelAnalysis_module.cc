@@ -142,7 +142,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     EDAnalyzer{p}, 
     MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
-    inKeepAll(p.get<bool>("KeepAll", false)),
+    inKeepAll(p.get<bool>("KeepAll", true)),
     inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
     inFiducialLength(p.get<float>("FiducialLength", 20.F)), // in cm
     inBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)), // in cm
