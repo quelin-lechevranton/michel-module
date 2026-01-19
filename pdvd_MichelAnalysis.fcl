@@ -1,6 +1,5 @@
 #include "services_dune.fcl"
-#include "services_protodunevd.fcl" 
-#include "tools_dune.fcl"	
+#include "services_protodunevd.fcl"
 
 process_name: RunMichelAnalysis
 
@@ -25,16 +24,16 @@ physics: {
         checks: {
             module_type:    "MichelAnalysis"
             Products:       [
-                ["SingleGen",  "cosmicgenerator",   "",       "simb::MCTruth"],
-                ["G4Stage1",   "largeant",          "",       "simb::MCParticle"],
-                ["G4Stage1",   "largeant",          "LArG4DetectorServicevolTPCActive", "sim::SimEnergyDeposit"],
-                ["Reco",       "wclsdatavd",        "gauss",  "recob::Wire"],
-                ["Reco",       "hitpdune",          "",       "recob::Hit"],
-                ["Reco",       "pandora",           "",       "recob::Cluster"],
-                ["Reco",       "pandoraTrack",      "",       "recob::Track"],
-                ["Reco",       "pandoraShower",     "",       "recob::Shower"],
-                ["Reco",       "pandora",           "",       "recob::SpacePoint"],
-                ["Reco",       "pandora",           "",       "recob::PFParticle"]
+                ["SingleGen",  "cosmicgenerator", "",             "simb::MCTruth"],
+                ["G4Stage1",   "largeant",        "",             "simb::MCParticle"],
+                ["G4Stage1",   "largeant",        "IonAndScint",  "sim::SimEnergyDeposit"],
+                ["Reco",       "wclsdatavd",      "gauss",        "recob::Wire"],
+                ["Reco",       "hitpdune",        "",             "recob::Hit"],
+                ["Reco",       "pandora",         "",             "recob::Cluster"],
+                ["Reco",       "pandoraTrack",    "",             "recob::Track"],
+                ["Reco",       "pandoraShower",   "",             "recob::Shower"],
+                ["Reco",       "pandora",         "",             "recob::SpacePoint"],
+                ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
             Log: false
         }
@@ -42,3 +41,10 @@ physics: {
     ana: [ checks ]
     end_paths: [ ana ]
 }
+
+# services.DetectorClocksService.DefaultTrigTime:   2500
+# services.DetectorClocksService.TriggerOffsetTPC:  2500
+# services.DetectorClocksService.ClockSpeedTPC: 2
+# services.DetectorPropertiesService.Efield: [0.450,3.125, 5e-1, 3.125]
+# services.DetectorPropertiesService.NumberTimeSamples: 10000
+# services.DetectorPropertiesService.ReadOutWindowSize: 10000
