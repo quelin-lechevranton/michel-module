@@ -43,6 +43,7 @@ private:
 
     // Input Parameters
     bool        fLog;
+    bool        inTimeIndex;
     bool        inKeepAll;
     float       inTrackLengthCut; // in cm
     float       inFiducialLength; // in cm
@@ -142,6 +143,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     EDAnalyzer{p}, 
     MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
+    inTimeIndex(p.get<bool>("TimeIndex", false)),
     inKeepAll(p.get<bool>("KeepAll", true)),
     inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
     inFiducialLength(p.get<float>("FiducialLength", 20.F)), // in cm
@@ -185,10 +187,13 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+        << "  Keep All Events: " << inKeepAll << std::endl
+        << "  Time Indexing: " << inTimeIndex << std::endl
         << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
         << "  Barycenter Radius: " << inBarycenterRadius << " cm" << std::endl
-        << "  Michel Space Radius: " << inMichelRadius << " cm" << std::endl;
+        << "  Michel Space Radius: " << inMichelRadius << " cm" << std::endl
+        << "  Smoothing Length: " << inRegN << " points" << std::endl;
 
     evTree = asFile->make<TTree>("event","");
 
@@ -307,6 +312,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
     resetEvent();
 
+    if (inTimeIndex) time((time_t*)&evIndex);
     evRun = e.run();
     evSubRun = e.subRun();
     evEvent = e.event();
@@ -339,6 +345,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         for (int i=bad_hit_indices.size()-1; i>=0; i--)
             vph_mu.erase(vph_mu.begin() + bad_hit_indices[i]);
 
+        if (inTimeIndex) time((time_t*)&muIndex);
+        if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
 
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = nullptr;
@@ -349,8 +357,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
             vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
         }
-
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
 
         // ============================
         // Dump basic track information
