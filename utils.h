@@ -87,12 +87,14 @@ namespace ana {
             {8, 0}, {10, 0},
             {9, 1}, {11, 1},
             {12, 2}, {14, 2},
-            {13, 3}, {15, 3}
+            {13, 3}, {15, 3},
+            { geo::TPCID::InvalidID, -1 }
         }, { // PDHD
             {4, -1}, {0, -1},
             {5, 0}, {1, 0},
             {6, 1}, {2, 1},
-            {7, -1}, {3, -1}
+            {7, -1}, {3, -1},
+            { geo::TPCID::InvalidID, -1 }
         }
     };
     std::vector<std::map<int, std::pair<unsigned, unsigned>>> const sec2tpc = {
@@ -104,10 +106,12 @@ namespace ana {
             {4, {0, 2} },
             {5, {1, 3} },
             {6, {4, 6} },
-            {7, {5, 7} }
+            {7, {5, 7} },
+            {-1, { geo::TPCID::InvalidID, geo::TPCID::InvalidID } }
         }, { // PDHD
             {0, {1, 5} },
-            {1, {2, 6} }
+            {1, {2, 6} },
+            {-1, { geo::TPCID::InvalidID, geo::TPCID::InvalidID } }
         }
     };
     std::vector<std::map<unsigned, int>> const tpc2side = {
@@ -115,25 +119,31 @@ namespace ana {
             { 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 },
             { 4, 0 }, { 5, 0 }, { 6, 0 }, { 7, 0 },
             { 8, 1 }, { 9, 1 }, {10, 1 }, {11, 1 },
-            {12, 1 }, {13, 1 }, {14, 1 }, {15, 1 }
+            {12, 1 }, {13, 1 }, {14, 1 }, {15, 1 },
+            { geo::TPCID::InvalidID, -1 }
         }, { // PDHD
             { 0, -1 }, { 1, 0 }, { 2, 1 }, { 3, -1 },
-            { 4, -1 }, { 5, 0 }, { 6, 1 }, { 7, -1 }
+            { 4, -1 }, { 5, 0 }, { 6, 1 }, { 7, -1 },
+            { geo::TPCID::InvalidID, -1 }
         }
     };
     std::vector<std::map<int, std::vector<int>>> const side2secs = {
         { // PDVD
-            { 0, {4, 5, 6, 7} }, { 1, {0, 1, 2, 3} }
+            { 0, {4, 5, 6, 7} }, { 1, {0, 1, 2, 3} },
+            { -1, {} }
         }, { // PDHD
-            { 0, {0} }, { 1, {1} }
+            { 0, {0} }, { 1, {1} },
+            { -1, {} }
         }
     };
     std::vector<std::map<int, int>> const sec2side = {
         { // PDVD
             {0, 1}, {1, 1}, {2, 1}, {3, 1},
             {4, 0}, {5, 0}, {6, 0}, {7, 0},
+            { -1, -1 }
         }, { // PDHD
-            {0, 0}, {1, 1} 
+            {0, 0}, {1, 1},
+            { -1, -1 }
         }
     };
 
@@ -591,8 +601,17 @@ namespace ana {
         void reverse() {
             std::reverse(vph.begin(), vph.end());
             std::reverse(secs.begin(), secs.end());
-            for (size_t& i : secs_first) i= vph.size() - i;
-            side_first = vph.size() - side_first;
+            if (!secs_first.empty()) {
+                if (secs_first.front() == 0) {
+                    secs_first.erase(secs_first.begin());
+                    secs_first.push_back(vph.size());
+                }
+                for (size_t& i : secs_first) {
+                    i = vph.size() - i;
+                }
+                std::reverse(secs_first.begin(), secs_first.end());
+            }
+            side_first = side_first==0 ? 0 : vph.size()-side_first;
         }
 
         // PtrHit start, end;
