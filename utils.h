@@ -587,6 +587,14 @@ namespace ana {
 
         SortedHits() : vph(0), secs(0), regs(2), secs_first(0), side_first(0) {}
 
+
+        void reverse() {
+            std::reverse(vph.begin(), vph.end());
+            std::reverse(secs.begin(), secs.end());
+            for (size_t& i : secs_first) i= vph.size() - i;
+            side_first = vph.size() - side_first;
+        }
+
         // PtrHit start, end;
         // std::pair<PtrHit, PtrHit> cc; // cathode crossing
         // VecPtrHit sc; // section crossing
@@ -661,16 +669,15 @@ namespace ana {
             unsigned *i_max = nullptr
         ) const;
 
-        // SortedHits GetSortedHits(
-        //     VecPtrHit const& vph_unsorted,
-        //     int dirz = 1,
-        //     geo::View_t view = geo::kW
-        // ) const;
-        SortedHits GetSortedHits_dirX(
+        SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
-            int dirX = -1, // decreasing X
             geo::View_t view = geo::kW
         ) const;
+        // SortedHits GetSortedHits_dirX(
+        //     VecPtrHit const& vph_unsorted,
+        //     int dirX = -1, // decreasing X
+        //     geo::View_t view = geo::kW
+        // ) const;
         // SortedHits GetSortedHits_PDHD(
         //     VecPtrHit const& vph_unsorted,
         //     int dirX,
@@ -921,9 +928,12 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //     return sh;
 // }
 
-ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
+// ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
+//     VecPtrHit const& vph_unsorted,
+//     int dirX, 
+//     geo::View_t view
+ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     VecPtrHit const& vph_unsorted,
-    int dirX, 
     geo::View_t view
 ) const {
     ana::SortedHits sh;
@@ -963,16 +973,22 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
 
     std::sort(
         sh.secs.begin(), bot_it,
-        [&sec_mt, &dirX](int sec1, int sec2) {
-            // in top volume, increasing X <-> decreasing tick
-            return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
+        // [&sec_mt, &dirX](int sec1, int sec2) {
+        //     // in top volume, increasing X <-> decreasing tick
+        //     return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
+        // }
+        [&sec_mt](int sec1, int sec2) {
+            return sec_mt[sec1] < sec_mt[sec2];
         }
     );
     std::sort(
         bot_it, sh.secs.end(),
-        [&sec_mt, &dirX](int sec1, int sec2) {
-            // in bot volume, increasing X <-> increasing tick
-            return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
+        // [&sec_mt, &dirX](int sec1, int sec2) {
+        //     // in bot volume, increasing X <-> increasing tick
+        //     return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
+        // }
+        [&sec_mt](int sec1, int sec2) {
+            return sec_mt[sec1] > sec_mt[sec2];
         }
     );
 
@@ -983,7 +999,8 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
 
         // top volume (side==1): increasing X <-> decreasing tick <-> decreasing s for m>0
         // bot volume (side==0): increasing X <-> increasing tick <-> increasing s for m>0
-        int sign = dirX * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
+        // int sign = dirX * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
+        int sign = -1 * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
 
         VecPtrHit& vph = vph_sec[sec];
         std::sort(
