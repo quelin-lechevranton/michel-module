@@ -800,9 +800,12 @@ void ana::MichelAnalysisMeta::analyze(art::Event const& e) {
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
-            ana::SortedHits sh_mcp = GetSortedHits_dirX(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu);
             LOG(sh_mcp);
             if (sh_mcp) {
+                bool is_up = mcp->Vx() > mcp->EndX();
+                if (!is_up) sh_mcp.reverse();
+
                 truStartHit = GetHit(sh_mcp.start());
                 truEndHit = GetHit(sh_mcp.end());
                 truReg = sh_mcp.end_reg(geoDet);

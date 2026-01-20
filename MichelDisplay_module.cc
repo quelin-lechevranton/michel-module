@@ -239,7 +239,7 @@ void ana::MichelDisplay::analyze(art::Event const& e) {
         // points at cathode crossing if any,
         // points at section crossing if any
         // (a section is a set of two adjacent TPCs)
-        ana::SortedHits sh_mu = GetSortedHits_dirX(vph_muon);
+        ana::SortedHits sh_mu = GetSortedHits(vph_muon);
         // possible cause of failure:
         // - no section with at least 4 (ana::LinearRegression::nmin) hits 
         ASSERT(sh_mu)

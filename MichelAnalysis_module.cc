@@ -431,9 +431,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (!muRegError) {
 
             // Track orientation
-            bool is_up;
-            switch (geoDet) {
-            case kPDVD:
+            bool is_up = true;
+            if (geoDet == kPDVD) {
                 int front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
                 is_up = sh_mu.is_cc()
                     ? front_side == 0
@@ -441,8 +440,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                         ? sh_mu.start()->PeakTime() < sh_mu.end()->PeakTime()
                         : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
                     );
-                break;
-            case kPDHD:
+            } else if (geoDet == kPDHD) {
                 size_t front_hit_track_idx = vhm_mu[map_hitkey2metaidx.at(sh_mu.start().key())]->Index();
                 float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
                     ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
@@ -452,7 +450,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
                     : util::kBogusF;
                 is_up = front_hit_y > back_hit_y;
-                break;
             }
             if (!is_up) sh_mu.reverse();
 
