@@ -20,18 +20,18 @@ some variables are prefixed by their type followed by an underscore:
 Top means X>0, Bot means X<0 (by reference to PDVD)
 */
 
-namespace ana { class MichelAnalysis; }
+namespace ana { class MichelAnalysisMeta; }
 
-class ana::MichelAnalysis: 
+class ana::MichelAnalysisMeta: 
     public art::EDAnalyzer, 
     private ana::MichelAnalyzer 
 {
 public:
-    explicit MichelAnalysis(fhicl::ParameterSet const& p);
-    MichelAnalysis(MichelAnalysis const&) = delete;
-    MichelAnalysis(MichelAnalysis&&) = delete;
-    MichelAnalysis& operator=(MichelAnalysis const&) = delete;
-    MichelAnalysis& operator=(MichelAnalysis&&) = delete;
+    explicit MichelAnalysisMeta(fhicl::ParameterSet const& p);
+    MichelAnalysisMeta(MichelAnalysisMeta const&) = delete;
+    MichelAnalysisMeta(MichelAnalysisMeta&&) = delete;
+    MichelAnalysisMeta& operator=(MichelAnalysisMeta const&) = delete;
+    MichelAnalysisMeta& operator=(MichelAnalysisMeta&&) = delete;
 
     void analyze(art::Event const& e) override;
     void beginJob() override;
@@ -138,7 +138,7 @@ private:
     void resetMuon(void);
 };
 
-ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) : 
+ana::MichelAnalysisMeta::MichelAnalysisMeta(fhicl::ParameterSet const& p) : 
     EDAnalyzer{p}, 
     MichelAnalyzer{p},
     fLog(p.get<bool>("Log", true)),
@@ -273,7 +273,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
     muTree->Branch("MichelBaryMuonAngle",   &miBaryMuonAngle); // rad
 }
 
-void ana::MichelAnalysis::analyze(art::Event const& e) {
+void ana::MichelAnalysisMeta::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
@@ -376,16 +376,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // sh_mu.cc.first -> last hit in the top volume (side1)
         // sh_mu.cc.second -> first hit in the bot volume (side0)
 
-        ana::SortedHits sh_mu = geoDet == kPDVD
-            ? GetSortedHits_dirX(vph_mu, -1) // PDVD: decreasing X <-> downward
-            // THIS DOES NOT WORK FOR PDHD: the dirX is accurate
-            : GetSortedHits_dirX(vph_mu, End.X() > Start.X() ? 1 : -1); // PDHD
-        muRegError = !sh_mu;
+        // ana::SortedHits sh_mu = geoDet == kPDVD
+        //     ? GetSortedHits_dirX(vph_mu, -1) // PDVD: decreasing X <-> downward
+        //     // THIS DOES NOT WORK FOR PDHD: the dirX is accurate
+        //     : GetSortedHits_dirX(vph_mu, End.X() > Start.X() ? 1 : -1); // PDHD
+        // muRegError = !sh_mu;
 
 
         // Sort Hits by their Index in the TrackHitMeta data
         // Never tested
-        /*
         ana::SortedHits sh_mu;
         sh_mu.vph = vph_mu; // collection hits with valid points
         std::sort(sh_mu.vph.begin(), sh_mu.vph.end(),
@@ -394,35 +393,31 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             }
         );
         int prev_sec = -1, prev_side = -1;
-        PtrHit& prev_ph = sh_mu.vph.front();
-        for (PtrHit const& ph : sh_mu.vph) {
+        for (size_t i=0; i<sh_mu.vph.size(); i++) {
+            PtrHit& ph = sh_mu.vph[i];
+
             int sec = ana::tpc2sec.at(geoDet).at(ph->WireID().TPC);
             int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-            if (prev_sec == -1 || sec != prev_sec) {
+            if (sec != prev_sec) {
                 sh_mu.secs.push_back(sec);
-                sh_mu.sc.push_back(prev_ph);
-                sh_mu.sc.push_back(ph);
+                sh_mu.secs_first.push_back(i);
             }
-            prev_sec = sec;
+            if (prev_side != -1 && side != prev_side) {
+                sh_mu.side_first = i;
+            }
+
             if (side != -1) {
                 double z = GetSpace(ph->WireID());
                 double t = ph->PeakTime() * fTick2cm;
                 sh_mu.regs[side].add(z, t);
             }
-            if (prev_side != -1 && side != prev_side) {
-                sh_mu.cc = std::make_pair(prev_ph, ph);
-            }
+
+            prev_sec = sec;
             prev_side = side;
-            prev_ph = ph;
-            // sh_mu.bot_index?
-            // sh_mu.endsec_index?
         }
         sh_mu.regs[0].compute();
         sh_mu.regs[1].compute();
 
-        sh_mu.start = sh_mu.vph.front();
-        sh_mu.end = sh_mu.vph.back();
-        */
 
 
         LOG(!muRegError);
@@ -877,15 +872,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     evIndex++;
 }
 
-void ana::MichelAnalysis::beginJob() {}
-void ana::MichelAnalysis::endJob() {}
+void ana::MichelAnalysisMeta::beginJob() {}
+void ana::MichelAnalysisMeta::endJob() {}
 
-void ana::MichelAnalysis::resetEvent() {
+void ana::MichelAnalysisMeta::resetEvent() {
     evMuonNumber = 0;
     evMuonIndices.clear();
     evHits.clear();
 }
-void ana::MichelAnalysis::resetMuon() {
+void ana::MichelAnalysisMeta::resetMuon() {
     muHits.clear();
     muStartHit = ana::Hit{};
     muStartHitX = util::kBogusF;
@@ -937,4 +932,4 @@ void ana::MichelAnalysis::resetMuon() {
     miBaryMuonAngle = util::kBogusF;
 }
 
-DEFINE_ART_MODULE(ana::MichelAnalysis)
+DEFINE_ART_MODULE(ana::MichelAnalysisMeta)
