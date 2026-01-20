@@ -366,9 +366,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         LOG(muLength >= inTrackLengthCut);
         if (!inKeepAll && muLength < inTrackLengthCut) continue;
 
-        bool is_up =  IsUpright(*pt_ev);
-        geo::Point_t Start = is_up ? pt_ev->Start() : pt_ev->End();
-        geo::Point_t End = is_up ? pt_ev->End() : pt_ev->Start();
+        bool track_is_up =  IsUpright(*pt_ev);
+        geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
+        geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
         muStartPoint = ana::Point(Start);
         muEndPoint = ana::Point(End);
 
