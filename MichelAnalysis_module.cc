@@ -185,7 +185,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) :
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
     std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
-        << "  Keep All Events: " << inKeepAll << std::endl
+        << "  Keep All Events: " << (inKeepAll ? "true" : "false") << std::endl
         << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
         << "  Barycenter Radius: " << inBarycenterRadius << " cm" << std::endl
@@ -855,9 +855,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
 
                     PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
-                    miTrackLength = pt_mi ? pt_mi->Length() : -1.F;
+                    miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
                     // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
-                    // MichelShowerLength = ps_mi ? ps_mi->Length() : -1.F;
+                    // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
 
                     truEndAngle = sh_mcp.end_reg(geoDet).theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
                     Hits bary_hits;
@@ -929,10 +929,10 @@ void ana::MichelAnalysis::resetMuon() {
     // muAnodeCrossing = false;
     muHitdQds.clear();
     muSphereHits.clear();
-    muSphereEnergy = -1.F;
-    muSphereEnergyTP = -1.F;
+    muSphereEnergy = util::kBogusF;
+    muSphereEnergyTP = util::kBogusF;
     muSphereHitMuonAngle.clear();
-    // muSphereMaxShowerEnergy = -1.F;
+    // muSphereMaxShowerEnergy = util::kBogusF;
 
     muBary = ana::Vec2{0,0};
     muBaryHits.clear();
@@ -944,20 +944,20 @@ void ana::MichelAnalysis::resetMuon() {
     truEndProcess = "";
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
-    truEndEnergy = -1.F;
+    truEndEnergy = util::kBogusF;
     truStartHit = ana::Hit{};
     truEndHit = ana::Hit{};
     truReg = ana::LinearRegression{};
     truEndAngle = util::kBogusF;
     truHasMichel = kHasNoMichel;
 
-    miTrueEnergy = -1.F;
-    miTrackLength = -1.F;
-    // miShowerLength = -1.F;
+    miTrueEnergy = util::kBogusF;
+    miTrackLength = util::kBogusF;
+    // miShowerLength = util::kBogusF;
     miHits.clear();
     miHitEnergyFrac.clear();
     miHitMuonAngle.clear();
-    miHitEnergy = -1.F;
+    miHitEnergy = util::kBogusF;
 
     miBaryNHit = 0;
     miBary = ana::Vec2{0,0};
