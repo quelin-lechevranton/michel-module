@@ -397,7 +397,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 return map_hitkey2metaidx.at(a.key()) < map_hitkey2metaidx.at(b.key());
             }
         );
-        int prev_sec = -1, prev_side = -1;
+        int prev_sec = -1, prev_side = kInvalidSide;
         PtrHit& prev_ph = sh_mu.vph.front();
         for (PtrHit const& ph : sh_mu.vph) {
             int sec = ana::tpc2sec.at(geoDet).at(ph->WireID().TPC);
@@ -408,12 +408,12 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 sh_mu.sc.push_back(ph);
             }
             prev_sec = sec;
-            if (side != -1) {
+            if (side != kInvalidSide) {
                 double z = GetSpace(ph->WireID());
                 double t = ph->PeakTime() * fTick2cm;
                 sh_mu.regs[side].add(z, t);
             }
-            if (prev_side != -1 && side != prev_side) {
+            if (prev_side != kInvalidSide && side != prev_side) {
                 sh_mu.cc = std::make_pair(prev_ph, ph);
             }
             prev_side = side;
@@ -421,8 +421,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // sh_mu.bot_index?
             // sh_mu.endsec_index?
         }
-        sh_mu.regs[0].compute();
-        sh_mu.regs[1].compute();
+        sh_mu.regs[kBot].compute();
+        sh_mu.regs[kTop].compute();
 
         sh_mu.start = sh_mu.vph.front();
         sh_mu.end = sh_mu.vph.back();
@@ -433,8 +433,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         if (geoDet == kPDVD) {
             int front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
             is_up = sh_mu.is_cc()
-                ? front_side == 0
-                : ( front_side == 0
+                ? front_side == kTop
+                : ( front_side == kTop
                     ? sh_mu.start()->PeakTime() < sh_mu.end()->PeakTime()
                     : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
                 );
@@ -472,8 +472,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         bool end_in_T = wireWindow.isInside(muEndHit.tick, inFiducialLength / fTick2cm);
 
         // Linear regression of hits, same side of the cathode as the end hit
-        muTopReg = sh_mu.regs[1];
-        muBotReg = sh_mu.regs[0];
+        muTopReg = sh_mu.regs[kTop];
+        muBotReg = sh_mu.regs[kBot];
         LOG(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5);
         if (!inKeepAll && !(muTopReg.r2 >= 0.5 && muBotReg.r2 >= 0.5)) continue;
 
@@ -830,7 +830,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu);
             LOG(sh_mcp);
             if (sh_mcp) {
-                bool is_up = mcp->Vx() > mcp->EndX();
+                bool is_up = geoDet == kPDVD
+                    ? mcp->Vx() > mcp->EndX()
+                    : mcp->Vy() > mcp->EndY();
                 if (!is_up) sh_mcp.reverse();
 
                 truStartHit = GetHit(sh_mcp.start());

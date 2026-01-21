@@ -74,6 +74,7 @@ namespace ana {
     */
 
     enum EnumDet { kPDVD, kPDHD };
+    enum EnumSide: int { kTop=1, kBot=0, kInvalidSide=-1 };
     std::vector<unsigned> const n_sec = {
         8, // PDVD
         2  // PDHD
@@ -445,12 +446,12 @@ namespace ana {
             for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
                 map_tid_ene[ide.trackID] += ide.energy;
 
-        float max_ene = -1;
+        float max_ene = util::kBogusF;
         int tid_max = 0;
         for (std::pair<int, float> p : map_tid_ene)
             if (p.second > max_ene)
                 max_ene = p.second, tid_max = p.first;
-        return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+        return max_ene == util::kBogusF ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
     }
 
     // Computationally intensive!!
@@ -518,12 +519,12 @@ namespace ana {
             for (sim::TrackIDE ide : bt_serv->HitToTrackIDEs(clockData, p_hit))
                 map_tid_ene[ide.trackID] += ide.energy;
 
-        float max_ene = -1;
+        float max_ene = util::kBogusF;
         int tid_max = 0;
         for (std::pair<int, float> p : map_tid_ene)
             if (p.second > max_ene)
                 max_ene = p.second, tid_max = p.first;
-        return max_ene == -1 ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
+        return max_ene == util::kBogusF ? nullptr : pi_serv->TrackIdToParticle_P(tid_max);
     }
     PtrShw mcp2shw(
         simb::MCParticle const* mcp, 
@@ -873,7 +874,7 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //     for (PtrHit const& ph : vph_unsorted) {
 //         if (ph->View() != view) continue;
 //         int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-//         if (side == -1) continue; // skip hits on the other side of the anodes
+//         if (side == kInvalidSide) continue; // skip hits on the other side of the anodes
 //         double z = GetSpace(ph->WireID());
 //         double t = ph->PeakTime() * fTick2cm;
 //         sh.regs[side].add(z, t);
@@ -881,8 +882,8 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //         vph_sec[sec].push_back(ph);
 //         sec_mz[sec] += z;
 //     }
-//     sh.regs[0].compute();
-//     sh.regs[1].compute();
+//     sh.regs[kBot].compute();
+//     sh.regs[kTop].compute();
 
 //     // sec order according to the direction in Z
 //     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
@@ -935,7 +936,7 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 
 //     sh.bot_index = 0;
 //     for (int sec : sh.secs) {
-//         if (ana::sec2side.at(geoDet).at(sec) == 1) 
+//         if (ana::sec2side.at(geoDet).at(sec) == kTop) 
 //             sh.bot_index += vph_sec[sec].size();
 //         if (sec == sh.secs.back())
 //             sh.endsec_index = sh.vph.size();
@@ -962,7 +963,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     for (PtrHit const& ph : vph_unsorted) {
         if (ph->View() != view) continue;
         int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-        if (side == -1) continue; // skip hits on the other side of the anodes in PDHD
+        if (side == kInvalidSide) continue; // skip hits on the other side of the anodes in PDHD
         double z = GetSpace(ph->WireID());
         double t = ph->PeakTime() * fTick2cm;
         sh.regs[side].add(z, t);
@@ -970,8 +971,8 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         vph_sec[sec].push_back(ph);
         sec_mt[sec] += t;
     }
-    sh.regs[0].compute();
-    sh.regs[1].compute();
+    sh.regs[kBot].compute();
+    sh.regs[kTop].compute();
 
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
         if (vph_sec[sec].size() < ana::LinearRegression::nmin) {
@@ -1016,10 +1017,10 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
         int side = ana::sec2side.at(geoDet).at(sec);
         ana::LinearRegression const& reg = sh.regs[side];
 
-        // top volume (side==1): increasing X <-> decreasing tick <-> decreasing s for m>0
-        // bot volume (side==0): increasing X <-> increasing tick <-> increasing s for m>0
-        // int sign = dirX * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
-        int sign = -1 * (side == 0 ? 1 : -1) * (reg.m > 0 ? 1 : -1);
+        // top volume (side==kTop): increasing X <-> decreasing tick <-> decreasing s for m>0
+        // bot volume (side==kBot): increasing X <-> increasing tick <-> increasing s for m>0
+        // int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
+        int sign = -1 * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
 
         VecPtrHit& vph = vph_sec[sec];
         std::sort(
@@ -1052,12 +1053,12 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     }
 
     sh.vph.clear();
-    int prev_side=-1;
+    int prev_side=kInvalidSide;
     for (int sec : sh.secs) {
         sh.secs_first.push_back(sh.vph.size());
 
         int side = ana::sec2side.at(geoDet).at(sec);
-        if (prev_side != -1 && side != prev_side)
+        if (prev_side != kInvalidSide && side != prev_side)
             sh.side_first = sh.vph.size();
         prev_side = side;
 
