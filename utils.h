@@ -48,7 +48,7 @@ using VecPtrShw = std::vector<art::Ptr<recob::Shower>>;
 
 namespace ana {
     /*
-    PDVD: (beam direction along Z, inside side1)
+    PDVD: (beam direction along Z, inside side1) (vertical: X up)
     ┌─────────┬─────────┬─────────┬─────────┐  X
     │ side1   │ side1   │ side1   │ side1   │  🡩
     │ sec0    │ sec1    │ sec2    │ sec3    │  │  TOP
@@ -62,7 +62,7 @@ namespace ana {
     └─────────┴─────────┴─────────┴─────────┘
      ─────────────────────────────────────> Y
 
-    PDHD: (beam direction along Z, inside side0)
+    PDHD: (beam direction along Z, inside side0) (vertical: Y up)
     ┌─────────┬─────────┐ Y
     │ side0   │ side1   │ 🡩
     │ sec0    │ sec1    │ │
@@ -239,7 +239,7 @@ namespace ana {
 
     struct Vec2 {
         float space, drift;
-        Vec2() : space(0), drift(0) {}
+        Vec2() : space(util::kBogusF), drift(util::kBogusF) {}
         Vec2(float s, float d) : space(s), drift(d) {}
         float norm() const { return sqrt(space*space + drift*drift); }
         float angle() const { return atan2(drift, space); }    
@@ -257,7 +257,13 @@ namespace ana {
         unsigned channel;
         float tick;
         float adc;
-        Hit() : tpc(0), section(0), space(0), channel(0), tick(0), adc(0) {}
+        Hit() : 
+            tpc(geo::TPCID::InvalidID), 
+            section(-1), 
+            space(util::kBogusF), 
+            channel(raw::InvalidChannelID), 
+            tick(util::kBogusF), 
+            adc(util::kBogusF) {}
         Hit(unsigned T, int S, float s, unsigned c, float t, float a) :
             tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
 
@@ -355,7 +361,7 @@ namespace ana {
     };
     struct Point {
         float x, y, z;
-        Point() : x(0), y(0), z(0) {}
+        Point() : x(util::kBogusF), y(util::kBogusF), z(util::kBogusF) {}
         Point(float x, float y, float z) : x(x), y(y), z(z) {}
         Point(double x, double y, double z) : x(float(x)), y(float(y)), z(float(z)) {}
         Point(geo::Point_t const& p) : x(float(p.x())), y(float(p.y())), z(float(p.z())) {}

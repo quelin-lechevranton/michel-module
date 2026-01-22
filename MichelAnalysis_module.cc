@@ -518,17 +518,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             int end_side = ana::tpc2side.at(geoDet).at(muEndHit.tpc);
 
             // side0: X<0 | side1: X>0
-            muStartHitX = start_side == 0
+            muStartHitX = start_side == kBot
                 ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muStartHit.tick) * fTick2cm
                 : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muStartHit.tick) * fTick2cm;
-            start_in_X = start_side == 0
+            start_in_X = start_side == kBot
                 ? geoBot.x.isInside(muStartHitX, inFiducialLength)
                 : geoTop.x.isInside(muStartHitX, inFiducialLength);
 
-            muEndHitX = end_side == 0
+            muEndHitX = end_side == kBot
                 ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muEndHit.tick) * fTick2cm
                 : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muEndHit.tick) * fTick2cm;
-            end_in_X = end_side == 0
+            end_in_X = end_side == kBot
                 ? geoBot.x.isInside(muEndHitX, inFiducialLength)
                 : geoTop.x.isInside(muEndHitX, inFiducialLength);
         }
@@ -830,10 +830,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu);
             LOG(sh_mcp);
             if (sh_mcp) {
-                bool is_up = geoDet == kPDVD
-                    ? mcp->Vx() > mcp->EndX()
-                    : mcp->Vy() > mcp->EndY();
-                if (!is_up) sh_mcp.reverse();
+                // GetSortedHits gives decreasing X orientation
+                if (mcp->EndX() > mcp->Vx()) sh_mcp.reverse();
 
                 truStartHit = GetHit(sh_mcp.start());
                 truEndHit = GetHit(sh_mcp.end());
