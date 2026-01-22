@@ -827,11 +827,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu);
+            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
             LOG(sh_mcp);
             if (sh_mcp) {
-                // GetSortedHits gives decreasing X orientation
-                if (mcp->EndX() > mcp->Vx()) sh_mcp.reverse();
 
                 truStartHit = GetHit(sh_mcp.start());
                 truEndHit = GetHit(sh_mcp.end());

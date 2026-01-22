@@ -697,6 +697,7 @@ namespace ana {
 
         SortedHits GetSortedHits(
             VecPtrHit const& vph_unsorted,
+            int dirX = -1, // decreasing X
             geo::View_t view = geo::kW
         ) const;
         // SortedHits GetSortedHits_dirX(
@@ -960,6 +961,7 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //     geo::View_t view
 ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     VecPtrHit const& vph_unsorted,
+    int dirX,
     geo::View_t view
 ) const {
     ana::SortedHits sh;
@@ -999,22 +1001,16 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
     std::sort(
         sh.secs.begin(), bot_it,
-        // [&sec_mt, &dirX](int sec1, int sec2) {
-        //     // in top volume, increasing X <-> decreasing tick
-        //     return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
-        // }
-        [&sec_mt](int sec1, int sec2) {
-            return sec_mt[sec1] < sec_mt[sec2];
+        [&sec_mt, &dirX](int sec1, int sec2) {
+            // in top volume, increasing X <-> decreasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
         }
     );
     std::sort(
         bot_it, sh.secs.end(),
-        // [&sec_mt, &dirX](int sec1, int sec2) {
-        //     // in bot volume, increasing X <-> increasing tick
-        //     return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
-        // }
-        [&sec_mt](int sec1, int sec2) {
-            return sec_mt[sec1] > sec_mt[sec2];
+        [&sec_mt, &dirX](int sec1, int sec2) {
+            // in bot volume, increasing X <-> increasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
         }
     );
 
@@ -1025,8 +1021,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 
         // top volume (side==kTop): increasing X <-> decreasing tick <-> decreasing s for m>0
         // bot volume (side==kBot): increasing X <-> increasing tick <-> increasing s for m>0
-        // int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
-        int sign = -1 * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
+        int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
 
         VecPtrHit& vph = vph_sec[sec];
         std::sort(
