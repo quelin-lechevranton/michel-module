@@ -168,9 +168,9 @@ void ana::MichelProd::produce(art::Event& e)
     ASSERT(!!sh_mu)
     ASSERT(sh_mu.is_cc())
 
-    bool track_is_up =  IsUpright(*pt_ev);
-    geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
-    geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
+    // bool track_is_up =  IsUpright(*pt_ev);
+    // geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
+    // geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
 
     bool is_up = true;
     if (geoDet == kPDVD) {
@@ -211,7 +211,7 @@ void ana::MichelProd::produce(art::Event& e)
     bool end_in_x = end_side == kBot
         ? geoBot.x.isInside(end_x, 20)
         : geoTop.x.isInside(end_x, 20);
-    ASSERT(end_in_x && end_in_y && end_in_x && end_in_t)
+    ASSERT(end_in_x && end_in_y && end_in_z && end_in_t)
 
 
     std::vector<float> dQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), 6);
@@ -253,8 +253,7 @@ void ana::MichelProd::produce(art::Event& e)
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
       if (pt_hit && pt_hit->Length() > 30) continue;
 
-      recob::Hit outMichelHit(*ph_ev);
-      outMichelHits->emplace_back(std::move(ph_ev));
+      outMichelHits->emplace_back(std::move(*ph_ev));
       art::Ptr<recob::Hit> ph_out = hitPtrMaker(outMichelHits->size()-1);
       outAssns->addSingle(pt_ev, ph_out);
     }
