@@ -19,7 +19,7 @@ some variables are prefixed by their type followed by an underscore:
 MichelAnalysis class properties are prefixed:
  - `as`  for art services
  - `geo` for geometric information
- - `in`  for input variable, taken from fhicl file (`fLog` is an exception)
+ - `in`  for input variable, taken from fhicl file
 
  - `ev`  for reco info about the full event (stored in `evTree`)
  - `mu`  for reco info about the track and michel electron (stored in `muTree`)
@@ -33,7 +33,7 @@ namespace ana { class MichelAnalysis; }
 
 class ana::MichelAnalysis: 
     public art::EDAnalyzer, 
-    private ana::MichelAnalyzer 
+    private ana::MichelModule 
 {
 public:
     explicit MichelAnalysis(fhicl::ParameterSet const& p);
@@ -52,7 +52,7 @@ private:
     float geoCathodeGap; // cm
 
     // Input Parameters
-    bool        fLog;
+    bool        inLog;
     bool        inKeepAll;
     float       inTrackLengthCut; // in cm
     float       inFiducialLength; // in cm
@@ -156,16 +156,16 @@ private:
     void resetMuon(void);
 };
 
-ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p) : 
-    EDAnalyzer{p}, 
-    MichelAnalyzer{p},
-    fLog(p.get<bool>("Log", true)),
-    inKeepAll(p.get<bool>("KeepAll", true)),
-    inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
-    inFiducialLength(p.get<float>("FiducialLength", 20.F)), // in cm
-    inBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)), // in cm
-    inMichelRadius(p.get<float>("MichelRadius", 20.F)), //in cm
-    inRegN(p.get<unsigned>("RegN", 6))
+ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
+    : EDAnalyzer{p} 
+    , MichelModule{p}
+    , inLog(p.get<bool>("Log", true))
+    , inKeepAll(p.get<bool>("KeepAll", true))
+    , inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)) // in cm
+    , inFiducialLength(p.get<float>("FiducialLength", 20.F)) // in cm
+    , inBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)) // in cm
+    , inMichelRadius(p.get<float>("MichelRadius", 20.F)) //in cm
+    , inRegN(p.get<unsigned>("RegN", 6))
 {
     auto const clockData = asDetClocks->DataForJob();
     auto const detProp = asDetProp->DataForJob(clockData);
@@ -346,7 +346,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
     // loop over tracks to find stopping muons
     for (PtrTrk const& pt_ev : vpt_ev) {
-        if (fLog) std::cout << "e" << evIndex << "t" << pt_ev->ID() << "\r" << std::flush;
+        if (inLog) std::cout << "e" << evIndex << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
 
         // get hits and metadata associated to the track
@@ -374,7 +374,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muRegError = !sh_mu;
         ASSERT(!muRegError)
 
-        if (fLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
+        if (inLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
 
         // get truth information about the track's particle and potential michel electron
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);

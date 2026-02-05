@@ -131,9 +131,9 @@ namespace ana {
     }
 
 
-    class MichelDisplayer : public MichelAnalyzer {
+    class MichelDisplayer : public MichelModule {
     public:
-        MichelDisplayer(fhicl::ParameterSet const& p) : MichelAnalyzer(p) {}
+        MichelDisplayer(fhicl::ParameterSet const& p) : MichelModule(p) {}
         void DrawMarker(TCanvas* c, PtrHit const& ph, MarkerStyle const& ms) const;
         void DrawGraph(TCanvas* c, VecPtrHit const& vph, char const* draw, MarkerStyle const& ms={}, LineStyle const& ls={}) const;
         void DrawGraph2D(TCanvas* c, PtrTrk const& pt, MarkerStyle const& ms={}, LineStyle const& ls={}) const; 

@@ -6,7 +6,7 @@ namespace ana {
 
 class ana::TrackAnalysis : 
     public art::EDAnalyzer, 
-    private ana::MichelAnalyzer 
+    private ana::MichelModule 
 {
 public:
     explicit TrackAnalysis(fhicl::ParameterSet const& p);
@@ -24,7 +24,7 @@ private:
     float geoCathodeGap; // cm
     float misalignmentTolerance = 3.F; // cm
 
-    bool fLog, fAssert, fRemoveBadHits;
+    bool inLog, fAssert, fRemoveBadHits;
 
     struct {
         TTree* tree;
@@ -168,8 +168,8 @@ void ana::TrackAnalysis::reset_mu(void) {
 
 ana::TrackAnalysis::TrackAnalysis(fhicl::ParameterSet const& p) : 
     EDAnalyzer{p}, 
-    MichelAnalyzer{p},
-    fLog(p.get<bool>("Log", true)),
+    MichelModule{p},
+    inLog(p.get<bool>("Log", true)),
     fAssert(p.get<bool>("Assert", false)),
     fRemoveBadHits(p.get<bool>("RemoveBadHits", false))
 {

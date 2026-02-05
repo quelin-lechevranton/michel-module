@@ -54,89 +54,81 @@ namespace ana {
   // };
 }
 
-class ana::MichelProd : public art::EDProducer {
+class ana::MichelProd : public art::EDProducer, private ana::MichelModule {
 public:
   explicit MichelProd(fhicl::ParameterSet const& p);
-  // The compiler-generated destructor is fine for non-base
-  // classes without bare pointers or other resource use.
-
-  // Plugins should not be copied or assigned.
   MichelProd(MichelProd const&) = delete;
   MichelProd(MichelProd&&) = delete;
   MichelProd& operator=(MichelProd const&) = delete;
   MichelProd& operator=(MichelProd&&) = delete;
 
-  // Required functions.
   void produce(art::Event& e) override;
-
-  // Selected optional functions.
   void beginJob() override;
-
 private:
+  ana::Bounds<float> wireWindow;
+  ana::Bounds3D<float> geoTop, geoBot;
+  float geoCathodeGap;
 
-  // Declare member data here.
-  const geo::GeometryCore* asGeo;
-  const geo::WireReadoutGeom* asWire;
-  const detinfo::DetectorPropertiesService* asDetProp;
-  const detinfo::DetectorClocksService* asDetClocks;
-  ana::Det_t geoDet;
-  art::InputTag tag_hit, tag_trk, tag_cal;
-  float fTick2cm;
-
+  bool inLog;
   TTree *tuple;
   std::vector<float> residual_range, dEds;
-
-  float GetDistance(PtrHit const& ph1, PtrHit const& ph2);
 };
 
 void ana::MichelProd::beginJob() {
-  art::ServiceHandle<art::TFileService> tfs;
-
-  tuple = tfs->make<TTree>("calo", "");
-  tuple->Branch("ResidualRange", &residual_range);
-  tuple->Branch("dEds", &dEds);
+  // tuple = asFile->make<TTree>("calo", "");
+  // tuple->Branch("ResidualRange", &residual_range);
+  // tuple->Branch("dEds", &dEds);
 }
-
 
 ana::MichelProd::MichelProd(fhicl::ParameterSet const& p)
   : EDProducer{p}
-  , tag_hit{"hitpdune"}
-  , tag_trk{"pandoraTrack"}
-  , tag_cal{"pandoraGnocalo"}
+  , MichelModule{p}
+  , inLog(p.get<bool>("Log", true))
 {
-  // Call appropriate produces<>() functions here.
-  // Call appropriate consumes<>() for any products to be retrieved by this module.
-
   // produces<std::vector<ana::Michel>>();
   // produces<art::Assns<recob::Track, ana::Michel>>();
   produces<std::vector<recob::Hit>>();
 
-  asGeo = &*art::ServiceHandle<geo::Geometry>{};
-  asWire = &art::ServiceHandle<geo::WireReadout>{}->Get();
-  asDetProp = &*art::ServiceHandle<detinfo::DetectorPropertiesService>{};    
-  asDetClocks = &*art::ServiceHandle<detinfo::DetectorClocksService>{};
-  if (asGeo->DetectorName().find("vd") != std::string::npos)
-      geoDet = kPDVD;
-  else if (asGeo->DetectorName().find("hd") != std::string::npos)
-      geoDet = kPDHD;
-  else {
-      std::cout << "\033[1;91m" "unknown geometry: "
-          << asGeo->DetectorName() << "\033[0m" << std::endl;
-      exit(1);
-  }
-
   auto const clockData = asDetClocks->DataForJob();
   auto const detProp = asDetProp->DataForJob(clockData);
   fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+  wireWindow = ana::Bounds<float>{0.F, (float) detProp.ReadOutWindowSize()};
+  switch (geoDet) {
+    case kPDVD:
+      geoBot = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 0}).Min(),
+        asGeo->TPC(geo::TPCID{0, 7}).Max()
+      };
+      geoTop = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 8}).Min(),
+        asGeo->TPC(geo::TPCID{0, 15}).Max()
+      };
+      break;
+    case kPDHD:
+      geoBot = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 1}).Min(),
+        asGeo->TPC(geo::TPCID{0, 5}).Max()
+      };
+      geoTop = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 2}).Min(),
+        asGeo->TPC(geo::TPCID{0, 6}).Max()
+      };
+      break;
+    default: break;
+  }
+  geoCathodeGap = geoTop.x.min - geoBot.x.max;
 }
 
 void ana::MichelProd::produce(art::Event& e)
 {
   // Output
-  // auto outMichels = std::make_unique<std::vector<ana::Michel>>();
-  // auto outAssns = std::make_unique<art::Assns<recob::Track, ana::Michel>>();
-  // art::PtrMaker<ana::Michel> michelPtrMaker(e);
   auto outMichelHits = std::make_unique<std::vector<recob::Hit>>();
+  auto outAssns = std::make_unique<art::Assns<recob::Track, recob::Hit>>();
+  art::PtrMaker<recob::Hit> hitPtrMaker(e);
+
+  auto const clockData = asDetClocks->DataFor(e);
+  auto const detProp = asDetProp->DataFor(e,clockData);
+  fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
   // Input
   auto const& vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
@@ -149,79 +141,128 @@ void ana::MichelProd::produce(art::Event& e)
 
   art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
   art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
-  art::FindManyP<anab::Calorimetry> fop_trk2cal(vh_trk, e, tag_cal);
 
   for (PtrTrk const& pt_ev: vpt_ev) {
-    if (pt_ev->Length() > 30) continue;
+    ASSERT(pt_ev->Length() < 30);
 
     VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
-    if (vph_trk.empty()) continue;
-
     std::vector<recob::TrackHitMeta const*> const& vhm_trk = fmp_trk2hit.data(pt_ev.key());
-    if (vph_trk.size() != vhm_trk.size()) continue;
+    std::map<size_t, unsigned> map_hitkey2metaidx;
+    ASSERT(vph_trk.empty())
+    ASSERT(vph_trk.size() != vhm_trk.size())
 
-    std::vector<art::Ptr<anab::Calorimetry>> vpc_trk = fop_trk2cal.at(pt_ev.key());
-    std::cout << "number of cal in tracks: " << vpc_trk.size() << std::endl;
-    if (vpc_trk.empty()) continue;
-    art::Ptr<anab::Calorimetry> cal_trk = vpc_trk.front();
-    residual_range = cal_trk->ResidualRange();
-
-    // get Track Index of the calo record with minimum residual range
-    size_t lastCal = std::distance(residual_range.begin(), std::min_element(
-      residual_range.begin(), residual_range.end()
-    ));
-    if (lastCal == residual_range.size()) continue;
-    size_t lastIndex = cal_trk->TpIndices().at(lastCal);
-    if (!pt_ev->HasValidPoint(lastIndex)) continue;
-
-    // get collection Hit Index corresponding to the Track Index
-    size_t lastHitIndex = vph_trk.size();
-    for (size_t i=0; i<vph_trk.size(); i++) {
-      if (vph_trk.at(i)->View() != geo::kW) continue;
-      if (vhm_trk.at(i)->Index() != lastIndex) continue;
-      lastHitIndex = i;
-      break;
+    // remove hits not associated to a track point (hit misassociated to the track?)
+    std::vector<unsigned> bad_hit_indices;
+    for (unsigned i=0; i<vph_trk.size(); i++) {
+        if (vph_trk[i]->View() != geo::kW) continue;
+        if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
+            bad_hit_indices.push_back(i);
+        } else {
+            map_hitkey2metaidx[vph_trk[i].key()] = i;
+        }
     }
-    if (lastHitIndex == vph_trk.size()) continue;
-    PtrHit const& lastHit = vph_trk.at(lastHitIndex);
+    for (int i=bad_hit_indices.size()-1; i>=0; i--)
+        vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
 
-    // NTuple output
-    // residual_range = cal_trk->ResidualRange();
-    dEds = cal_trk->dEdx();
-    tuple->Fill();
-    
-    // Producer outputs
-    // ana::Michel outMichel(lastHit);
-    // outMichels->emplace_back(std::move(outMichel));
-    // art::Ptr<ana::Michel> ptr_outMichel = michelPtrMaker(outMichels->size()-1);
-    // outAssns->addSingle(pt_ev, ptr_outMichel);
+    ana::SortedHits sh_mu = GetSortedHits(vph_trk);
+    ASSERT(!!sh_mu)
+    ASSERT(sh_mu.is_cc())
 
-    for (PtrHit const& ph_ev: vph_ev) {
-      if (GetDistance(ph_ev, lastHit) > 30) continue;
+    bool track_is_up =  IsUpright(*pt_ev);
+    geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
+    geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
+
+    bool is_up = true;
+    if (geoDet == kPDVD) {
+        Side_t front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
+        is_up = sh_mu.is_cc()
+            ? front_side == kTop
+            : ( front_side == kTop
+                ? sh_mu.start()->PeakTime() < sh_mu.end()->PeakTime()
+                : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
+            );
+    } else if (geoDet == kPDHD) {
+        size_t front_hit_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.start().key())]->Index();
+        float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
+            ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
+            : util::kBogusF;
+        size_t back_hit_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.end().key())]->Index();
+        float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
+            ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
+            : util::kBogusF;
+        is_up = front_hit_y > back_hit_y;
+    }
+    if (!is_up) sh_mu.reverse();
+
+    ana::Hit start_hit = GetHit(sh_mu.start());
+    ana::Hit end_hit = GetHit(sh_mu.end());
+    size_t end_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.end().key())]->Index();
+    float end_y = pt_ev->HasValidPoint(end_track_idx)
+        ? pt_ev->LocationAtPoint(end_track_idx).Y()
+        : util::kBogusF;
+    bool end_in_y = geoBot.y.isInside(end_y, 20) || geoTop.y.isInside(end_y, 20);
+    bool end_in_z = geoBot.z.isInside(end_hit.space, 20) || geoTop.z.isInside(end_hit.space, 20);
+    bool end_in_t = wireWindow.isInside(end_hit.tick, 20 / fTick2cm);
+
+    Side_t end_side = ana::tpc2side.at(geoDet).at(end_hit.tpc);
+    float end_x = end_side == kBot
+        ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
+        : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
+    bool end_in_x = end_side == kBot
+        ? geoBot.x.isInside(end_x, 20)
+        : geoTop.x.isInside(end_x, 20);
+    ASSERT(end_in_x && end_in_y && end_in_x && end_in_t)
+
+
+    std::vector<float> dQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), 6);
+    float ADC2fC = 1.60e-4 * 200; // el2fC * ADC2el
+    ASSERT(dQds.back() > 13.5 / ADC2fC)
+
+
+    VecPtrHit vph_ev_endsec;
+    for (PtrHit const& ph_ev : vph_ev) {
+      if (ph_ev->View() != geo::kW) continue;
+      Sec_t sec = ana::tpc2sec.at(geoDet).at(ph_ev->WireID().TPC);
+      if (sec != sh_mu.end_sec()) continue;
+      vph_ev_endsec.push_back(ph_ev);
+    }
+
+    ana::Hits bary_hits;
+    for (PtrHit const& ph_ev: vph_ev_endsec) {
+      if (GetDistance(ph_ev, sh_mu.end()) > 10) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
       if (pt_hit && pt_hit->Length() > 30) continue;
 
-      PtrHit outMichelHit(ph_ev);
-      outMichelHits->emplace_back(std::move(outMichelHit));
+      bary_hits.push_back(GetHit(ph_ev));
+    }
+
+    ASSERT(bary_hits.size() > 4) continue;
+    ana::Vec2 end_to_bary = bary_hits.barycenter(fTick2cm) - end_hit.vec(fTick2cm);
+    float mu_angle = sh_mu.regs
+      .at(ana::sec2side.at(geoDet).at(end_hit.section))
+      .theta(end_hit.space > start_hit.space ? 1 : -1);
+    float da = end_to_bary.angle() - mu_angle;
+    da = abs(da) > M_PI ? da - (da>0 ? 1 : -1)*2*M_PI : da;
+    da = 90 - abs(abs(da * TMath::RadToDeg()) - 90);
+    ASSERT(da > 30)
+
+    for (PtrHit const& ph_ev: vph_ev_endsec) {
+      if (GetDistance(ph_ev, sh_mu.end()) > 30) continue;
+
+      PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
+      if (pt_hit && pt_hit->Length() > 30) continue;
+
+      recob::Hit outMichelHit(*ph_ev);
+      outMichelHits->emplace_back(std::move(ph_ev));
+      art::Ptr<recob::Hit> ph_out = hitPtrMaker(outMichelHits->size()-1);
+      outAssns->addSingle(pt_ev, ph_out);
     }
   }
 
   // Put outputs in event
-  // e.put(std::move(outMichels));
-  // e.put(std::move(outAssns));
   e.put(std::move(outMichelHits));
-}
-
-float ana::MichelProd::GetDistance(PtrHit const& ph1, PtrHit const& ph2) {
-  ana::Sec_t sec1 = ana::tpc2sec.at(geoDet).at(ph1->WireID().TPC);
-  ana::Sec_t sec2 = ana::tpc2sec.at(geoDet).at(ph2->WireID().TPC);
-  if (sec1 != sec2) return std::numeric_limits<float>::max();
-  float z1 = asWire->Wire(ph1->WireID()).GetCenter().Z();
-  float z2 = asWire->Wire(ph2->WireID()).GetCenter().Z();
-  float t1 = ph1->PeakTime() * fTick2cm;
-  float t2 = ph2->PeakTime() * fTick2cm;
-  return sqrt(pow(z1-z2, 2) + pow(t1-t2, 2));
+  e.put(std::move(outAssns));
 }
 
 DEFINE_ART_MODULE(ana::MichelProd)

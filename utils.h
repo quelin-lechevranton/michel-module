@@ -34,9 +34,9 @@
 #include <cstdio>
 #include <algorithm>
 
-#define LOG(x)         (fLog ? printf("\tLOG " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
-#define ASSERT(x) if (!(fLog ? printf("\tAST " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
-#define DEBUG(x)  if  ((fLog ? printf("\tDBG " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(EXIT_FAILURE);
+#define LOG(x)         (inLog ? printf("\tLOG " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)
+#define ASSERT(x) if (!(inLog ? printf("\tAST " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?2:1, x?"true":"false") : 0, x)) continue; 
+#define DEBUG(x)  if  ((inLog ? printf("\tDBG " #x ": " "\033[1;9%dm" "%s" "\033[0m\n", x?1:2, x?"true":"false") : 0, x)) exit(EXIT_FAILURE);
 
 using PtrHit    = art::Ptr<recob::Hit>;
 using VecPtrHit = std::vector<art::Ptr<recob::Hit>>;
@@ -642,9 +642,10 @@ namespace ana {
         // VecPtrHit::iterator endsec_it() { return vph.begin() + endsec_index; }
     };
 
-    class MichelAnalyzer {
+
+    class MichelModule {
     public:
-        MichelAnalyzer(fhicl::ParameterSet const& p);
+        MichelModule(fhicl::ParameterSet const& p);
 
         // Utilities
         art::ServiceHandle<art::TFileService> asFile;
@@ -663,7 +664,8 @@ namespace ana {
 
         art::InputTag   tag_mcp, tag_sed, tag_wir,
                         tag_hit, tag_clu, tag_trk,
-                        tag_shw, tag_spt, tag_pfp;
+                        tag_shw, tag_spt, tag_pfp,
+                        tag_cal;
 
         // VecPtrHit vph_ev;
         // VecPtrTrk vpt_ev;
@@ -714,7 +716,7 @@ namespace ana {
     };
 }
 
-ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
+ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
     asFile()
 {
     asGeo = &*art::ServiceHandle<geo::Geometry>{};
@@ -740,6 +742,7 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
         else if (type == "recob::Shower")           tag_shw = tag;
         else if (type == "recob::SpacePoint")       tag_spt = tag;
         else if (type == "recob::PFParticle")       tag_pfp = tag;
+        else if (type == "anab::Calorimetry")       tag_cal = tag;
     }
 
     if (asGeo->DetectorName().find("vd") != std::string::npos)
@@ -758,14 +761,14 @@ ana::MichelAnalyzer::MichelAnalyzer(fhicl::ParameterSet const& p) :
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 }    
 
-bool ana::MichelAnalyzer::IsUpright(recob::Track const& T) {
+bool ana::MichelModule::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
     if (geoDet == kPDHD)
         return T.Start().Y() > T.End().Y();
     return false;
 }
-std::string ana::MichelAnalyzer::GetParticleName(int pdg) {
+std::string ana::MichelModule::GetParticleName(int pdg) {
     std::vector<std::string> static periodic_table = { "",
         "H",                                                                                                  "He", 
         "Li", "Be",                                                             "B",  "C",  "N",  "O",  "F",  "Ne",
@@ -803,17 +806,17 @@ std::string ana::MichelAnalyzer::GetParticleName(int pdg) {
     return Form("%d", pdg);
 }
 
-ana::Axis ana::MichelAnalyzer::GetAxis(geo::PlaneID pid) const {
+ana::Axis ana::MichelModule::GetAxis(geo::PlaneID pid) const {
     geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
     geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
     int dy = w1.GetCenter().Y() > w0.GetCenter().Y() ? 1 : -1;
     int dz = w1.GetCenter().Z() > w0.GetCenter().Z() ? 1 : -1;
     return { dy * w0.CosThetaZ(), dz * w0.SinThetaZ() };
 }
-double ana::MichelAnalyzer::GetSpace(geo::WireID wid) const {
+double ana::MichelModule::GetSpace(geo::WireID wid) const {
     return GetAxis(wid).space(asWire->Wire(wid));
 }
-ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
+ana::Hit ana::MichelModule::GetHit(PtrHit const& ph) const {
     geo::WireID wid = ph->WireID();
     return {
         wid.TPC,
@@ -826,10 +829,10 @@ ana::Hit ana::MichelAnalyzer::GetHit(PtrHit const& ph) const {
 }
 
 // 2D projected distance in cm
-double ana::MichelAnalyzer::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool allow_different_side=false) const {
+double ana::MichelModule::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool allow_different_side=false) const {
     return GetDistance(GetHit(ph1), GetHit(ph2), allow_different_side);
 }
-double ana::MichelAnalyzer::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool allow_different_side=false) const {
+double ana::MichelModule::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool allow_different_side=false) const {
     Side_t side1 = ana::sec2side.at(geoDet).at(h1.section);
     Side_t side2 = ana::sec2side.at(geoDet).at(h2.section);
     if (!allow_different_side && (side1 != side2))
@@ -837,7 +840,7 @@ double ana::MichelAnalyzer::GetDistance(ana::Hit const& h1, ana::Hit const& h2, 
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
 
-simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
+simb::MCParticle const* ana::MichelModule::GetMichelMCP(
     simb::MCParticle const* muon
 ) const {
     if (!muon) return nullptr;
@@ -870,7 +873,7 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //
 // cause of failure:
 // - no section with at least 4 (ana::LinearRegression::nmin) hits 
-// ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
+// ana::SortedHits ana::MichelModule::GetSortedHits(
 //     VecPtrHit const& vph_unsorted,
 //     int dirz,
 //     geo::View_t view
@@ -956,11 +959,11 @@ simb::MCParticle const* ana::MichelAnalyzer::GetMichelMCP(
 //     return sh;
 // }
 
-// ana::SortedHits ana::MichelAnalyzer::GetSortedHits_dirX(
+// ana::SortedHits ana::MichelModule::GetSortedHits_dirX(
 //     VecPtrHit const& vph_unsorted,
 //     int dirX, 
 //     geo::View_t view
-ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
+ana::SortedHits ana::MichelModule::GetSortedHits(
     VecPtrHit const& vph_unsorted,
     int dirX,
     geo::View_t view
@@ -1084,7 +1087,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
     return sh;
 }
 
-// ana::SortedHits ana::MichelAnalyzer::GetSortedHits_PDHD(
+// ana::SortedHits ana::MichelModule::GetSortedHits_PDHD(
 //     VecPtrHit const& vph_unsorted,
 //     int dirX,
 //     geo::View_t view
@@ -1177,7 +1180,7 @@ ana::SortedHits ana::MichelAnalyzer::GetSortedHits(
 //     return sh;
 // }
 
-std::vector<float> ana::MichelAnalyzer::GetdQds(
+std::vector<float> ana::MichelModule::GetdQds(
     VecPtrHit const& vph,
     unsigned smoothing_length,
     unsigned *i_max
@@ -1226,7 +1229,7 @@ std::vector<float> ana::MichelAnalyzer::GetdQds(
     return v_dQds;
 }
 
-std::vector<float> ana::MichelAnalyzer::GetdQds(
+std::vector<float> ana::MichelModule::GetdQds(
     VecPtrHit::const_iterator first,
     VecPtrHit::const_iterator last,
     unsigned smoothing_length,

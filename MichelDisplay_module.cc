@@ -21,7 +21,7 @@ private:
     float fCathodeGap; // cm
 
     // Input Parameters
-    bool fLog;
+    bool inLog;
     float fTrackLengthCut; // in cm
     float fNearbyRadius; // cm
     float fBodyDistance; // cm
@@ -51,7 +51,7 @@ private:
 
 ana::MichelDisplay::MichelDisplay(fhicl::ParameterSet const& p)
     : EDAnalyzer{p}, MichelDisplayer{p},
-    fLog(p.get<bool>("Log", true)),
+    inLog(p.get<bool>("Log", true)),
     fTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)), // in cm
     fNearbyRadius(p.get<float>("NearbyRadius", 40.F)), //in cm
     fBodyDistance(p.get<float>("BodyDistance", 20.F)), //in cm
