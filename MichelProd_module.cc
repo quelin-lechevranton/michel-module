@@ -85,9 +85,8 @@ ana::MichelProd::MichelProd(fhicl::ParameterSet const& p)
   , MichelModule{p}
   , inLog(p.get<bool>("Log", true))
 {
-  // produces<std::vector<ana::Michel>>();
-  // produces<art::Assns<recob::Track, ana::Michel>>();
   produces<std::vector<recob::Hit>>();
+  produces<art::Assns<recob::Track, recob::Hit>>();
 
   auto const clockData = asDetClocks->DataForJob();
   auto const detProp = asDetProp->DataForJob(clockData);
@@ -147,25 +146,25 @@ void ana::MichelProd::produce(art::Event& e)
 
     VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
     std::vector<recob::TrackHitMeta const*> const& vhm_trk = fmp_trk2hit.data(pt_ev.key());
-    std::map<size_t, unsigned> map_hitkey2metaidx;
-    ASSERT(vph_trk.empty())
-    ASSERT(vph_trk.size() != vhm_trk.size())
+    std::map<size_t, unsigned> map_hitkey2idx;
+    ASSERT(!vph_trk.empty())
+    ASSERT(vph_trk.size() == vhm_trk.size())
 
     // remove hits not associated to a track point (hit misassociated to the track?)
     std::vector<unsigned> bad_hit_indices;
     for (unsigned i=0; i<vph_trk.size(); i++) {
-        if (vph_trk[i]->View() != geo::kW) continue;
-        if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
-            bad_hit_indices.push_back(i);
-        } else {
-            map_hitkey2metaidx[vph_trk[i].key()] = i;
-        }
+      if (vph_trk[i]->View() != geo::kW) continue;
+      if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
+        bad_hit_indices.push_back(i);
+      } else {
+        map_hitkey2idx[vph_trk[i].key()] = i;
+      }
     }
     for (int i=bad_hit_indices.size()-1; i>=0; i--)
-        vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
+      vph_trk.erase(vph_trk.begin() + bad_hit_indices[i]);
 
     ana::SortedHits sh_mu = GetSortedHits(vph_trk);
-    ASSERT(!!sh_mu)
+    ASSERT(bool(sh_mu))
     ASSERT(sh_mu.is_cc())
 
     // bool track_is_up =  IsUpright(*pt_ev);
@@ -174,48 +173,49 @@ void ana::MichelProd::produce(art::Event& e)
 
     bool is_up = true;
     if (geoDet == kPDVD) {
-        Side_t front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
-        is_up = sh_mu.is_cc()
-            ? front_side == kTop
-            : ( front_side == kTop
-                ? sh_mu.start()->PeakTime() < sh_mu.end()->PeakTime()
-                : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
-            );
+      Side_t front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
+      is_up = sh_mu.is_cc()
+        ? front_side == kTop
+        : ( front_side == kTop
+          ? sh_mu.start()->PeakTime() < sh_mu.end()->PeakTime()
+          : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
+        );
     } else if (geoDet == kPDHD) {
-        size_t front_hit_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.start().key())]->Index();
-        float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
-            ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
-            : util::kBogusF;
-        size_t back_hit_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.end().key())]->Index();
-        float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
-            ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
-            : util::kBogusF;
-        is_up = front_hit_y > back_hit_y;
+      size_t front_hit_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.start().key())]->Index();
+      float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
+        ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
+        : util::kBogusF;
+      size_t back_hit_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.end().key())]->Index();
+      float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
+        ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
+        : util::kBogusF;
+      is_up = front_hit_y > back_hit_y;
     }
     if (!is_up) sh_mu.reverse();
 
     ana::Hit start_hit = GetHit(sh_mu.start());
     ana::Hit end_hit = GetHit(sh_mu.end());
-    size_t end_track_idx = vhm_trk[map_hitkey2metaidx.at(sh_mu.end().key())]->Index();
+    size_t end_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.end().key())]->Index();
     float end_y = pt_ev->HasValidPoint(end_track_idx)
-        ? pt_ev->LocationAtPoint(end_track_idx).Y()
-        : util::kBogusF;
+      ? pt_ev->LocationAtPoint(end_track_idx).Y()
+      : util::kBogusF;
     bool end_in_y = geoBot.y.isInside(end_y, 20) || geoTop.y.isInside(end_y, 20);
     bool end_in_z = geoBot.z.isInside(end_hit.space, 20) || geoTop.z.isInside(end_hit.space, 20);
     bool end_in_t = wireWindow.isInside(end_hit.tick, 20 / fTick2cm);
 
     Side_t end_side = ana::tpc2side.at(geoDet).at(end_hit.tpc);
-    float end_x = end_side == kBot
-        ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
-        : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
-    bool end_in_x = end_side == kBot
-        ? geoBot.x.isInside(end_x, 20)
-        : geoTop.x.isInside(end_x, 20);
+    float end_x = !sh_mu.is_cc() ? util::kBogusF : end_side == kBot
+      ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
+      : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
+    bool end_in_x = !sh_mu.is_cc() ? false 
+      : (end_side==kBot ? geoBot : geoTop).x.isInside(end_x, 20);
+    // LOG(end_in_x && end_in_y && end_in_z && end_in_t);
     ASSERT(end_in_x && end_in_y && end_in_z && end_in_t)
 
 
     std::vector<float> dQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), 6);
     float ADC2fC = 1.60e-4 * 200; // el2fC * ADC2el
+    // LOG(dQds.back() > 13.5 / ADC2fC);
     ASSERT(dQds.back() > 13.5 / ADC2fC)
 
 
@@ -228,7 +228,7 @@ void ana::MichelProd::produce(art::Event& e)
     }
 
     ana::Hits bary_hits;
-    for (PtrHit const& ph_ev: vph_ev_endsec) {
+    for (PtrHit const& ph_ev : vph_ev_endsec) {
       if (GetDistance(ph_ev, sh_mu.end()) > 10) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -237,7 +237,7 @@ void ana::MichelProd::produce(art::Event& e)
       bary_hits.push_back(GetHit(ph_ev));
     }
 
-    ASSERT(bary_hits.size() > 4) continue;
+    ASSERT(bary_hits.size() > 4)
     ana::Vec2 end_to_bary = bary_hits.barycenter(fTick2cm) - end_hit.vec(fTick2cm);
     float mu_angle = sh_mu.regs
       .at(ana::sec2side.at(geoDet).at(end_hit.section))
@@ -247,18 +247,20 @@ void ana::MichelProd::produce(art::Event& e)
     da = 90 - abs(abs(da * TMath::RadToDeg()) - 90);
     ASSERT(da > 30)
 
+    if (inLog) std::cout << "\033[93;1m" "michel" "\033[0m" << std::endl;
+
     for (PtrHit const& ph_ev: vph_ev_endsec) {
       if (GetDistance(ph_ev, sh_mu.end()) > 30) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
       if (pt_hit && pt_hit->Length() > 30) continue;
 
-      outMichelHits->emplace_back(std::move(*ph_ev));
+      outMichelHits->emplace_back(*ph_ev);
       art::Ptr<recob::Hit> ph_out = hitPtrMaker(outMichelHits->size()-1);
       outAssns->addSingle(pt_ev, ph_out);
     }
   }
-
+  
   // Put outputs in event
   e.put(std::move(outMichelHits));
   e.put(std::move(outAssns));
