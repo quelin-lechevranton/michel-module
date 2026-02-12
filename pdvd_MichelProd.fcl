@@ -21,7 +21,7 @@ source: {
 
 physics: {
     producers: {
-        michel: {
+        michelprod: {
             module_type:    "MichelProd"
             Products:       [
                 # process, label, instance, type
@@ -36,21 +36,69 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::SpacePoint"],
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
+            Log: true
+            TrackLengthCut: 30
+            FiducialLength: 20
+            SmoothingLength: 6
+            BraggCut: 13.5
+            MinBaryHits: 4
+            BarycenterRadius: 10
+            MichelRadius: 20
+            AngleCut: 30
         }
     }
+    # filters: {
+    #     michelfilter: {
+    #         module_type:    "MichelFilter"
+    #         Products:       [
+    #             # process, label, instance, type
+    #             ["SingleGen",  "cosmicgenerator", "",             "simb::MCTruth"],
+    #             ["G4Stage1",   "largeant",        "",             "simb::MCParticle"],
+    #             ["G4Stage1",   "largeant",        "IonAndScint",  "sim::SimEnergyDeposit"],
+    #             ["Reco",       "wclsdatavd",      "gauss",        "recob::Wire"],
+    #             ["Reco",       "hitpdune",        "",             "recob::Hit"],
+    #             ["Reco",       "pandora",         "",             "recob::Cluster"],
+    #             ["Reco",       "pandoraTrack",    "",             "recob::Track"],
+    #             ["Reco",       "pandoraShower",   "",             "recob::Shower"],
+    #             ["Reco",       "pandora",         "",             "recob::SpacePoint"],
+    #             ["Reco",       "pandora",         "",             "recob::PFParticle"]
+    #         ]
+    #         Log: true
+    #         TrackLengthCut: 30
+    #         FiducialLength: 20
+    #         SmoothingLength: 6
+    #         BraggCut: 13.5
+    #         MinBaryHits: 4
+    #         BarycenterRadius: 10
+    #         MichelRadius: 20
+    #         AngleCut: 30
+    #     }
+    # }
 
-    stream1: [ out1 ]
-    end_paths: [ stream1 ]
-    reco: [ michel ]
-    trigger_paths: [ reco ]
+    output: [ out1 ]
+    end_paths: [ output ]
+    # produce: [ michelfilter, michelprod ]
+    produce: [ michelprod ]
+    trigger_paths: [ produce ]
 }
 
 outputs: {
     out1: {
         module_type: RootOutput
-        fileName: "%ifb_michelreco.root"
+        fileName: "%ifb_michel.root"
         dataTier: "full-reconstructed"
         streamName: "stream-name"
+        outputCommands: [
+            "keep *",
+            "drop *_pandoraShower__*",
+            "drop *_pandoraGnocalo__*",
+            "drop *_pandoraStdcalo__*",
+            "drop *recob::SpacePoint*_*__*",
+            "drop *_reco3d__*",
+	        "drop sim::SimEnergyDeposit_*_*_*",
+            "drop raw::RawDigits_*_*_*",
+            "drop *_wclsdatavd_*_*"
+        ]
     }
 }
 

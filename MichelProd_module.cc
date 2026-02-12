@@ -41,17 +41,6 @@ using VecPtrTrk = std::vector<art::Ptr<recob::Track>>;
 
 namespace ana {
   class MichelProd;
-
-
-  // class Michel {
-  // private:
-  //   art::Ptr<recob::Hit> fMuonLastHit;
-
-  // public:
-  //   Michel(art::Ptr<recob::Hit> muonLastHit): fMuonLastHit(muonLastHit) {}
-
-  //   inline art::Ptr<recob::Hit> MuonLastHit() const { return fMuonLastHit; } 
-  // };
 }
 
 class ana::MichelProd : public art::EDProducer, private ana::MichelModule {
@@ -69,9 +58,15 @@ private:
   ana::Bounds3D<float> geoTop, geoBot;
   float geoCathodeGap;
 
-  bool inLog;
-  TTree *tuple;
-  std::vector<float> residual_range, dEds;
+  bool      inLog;
+  float     inTrackLengthCut; // in cm
+  float     inFiducialLength; // in cm
+  unsigned  inSmoothingLength;
+  float     inBraggCut; // in fC/cm
+  unsigned  inMinBaryHits;
+  float     inBarycenterRadius; // in cm
+  float     inMichelRadius; // in cm
+  float     inAngleCut; // in deg
 };
 
 void ana::MichelProd::beginJob() {
@@ -83,7 +78,15 @@ void ana::MichelProd::beginJob() {
 ana::MichelProd::MichelProd(fhicl::ParameterSet const& p)
   : EDProducer{p}
   , MichelModule{p}
-  , inLog(p.get<bool>("Log", true))
+  , inLog             (p.get<bool>    ("Log", true))
+  , inTrackLengthCut  (p.get<float>   ("TrackLengthCut", 30.F)) // in cm
+  , inFiducialLength  (p.get<float>   ("FiducialLength", 20.F)) // in cm
+  , inSmoothingLength (p.get<unsigned>("SmoothingLength", 6))
+  , inBraggCut        (p.get<float>   ("BraggCut", 13.5F)) // in fC/cm
+  , inMinBaryHits     (p.get<unsigned>("MinBaryHits", 4))
+  , inBarycenterRadius(p.get<float>   ("BarycenterRadius", 10.F)) // in cm
+  , inMichelRadius    (p.get<float>   ("MichelRadius", 20.F)) //in cm
+  , inAngleCut        (p.get<float>   ("AngleCut", 30.F)) //in cm
 {
   produces<std::vector<recob::Hit>>();
   produces<art::Assns<recob::Track, recob::Hit>>();
@@ -116,6 +119,24 @@ ana::MichelProd::MichelProd(fhicl::ParameterSet const& p)
     default: break;
   }
   geoCathodeGap = geoTop.x.min - geoBot.x.max;
+
+  std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+    << "  Detector Geometry: " << asGeo->DetectorName()
+    << "  (" << (!geoDet ? "PDVD" : "PDHD") << ")" << std::endl
+    << "  Tick Window: " << wireWindow << std::endl
+    << "  Top Bounds: " << geoTop << std::endl
+    << "  Bot Bounds: " << geoBot << std::endl;
+  std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+    << "  Track Length Cut: "     << inTrackLengthCut << " cm" << std::endl
+    << "  Fiducial Length: "      << inFiducialLength << " cm" << std::endl
+    << "  Smoothing Length: "     << inSmoothingLength << std::endl
+    << "  Bragg Cut: "            << inBraggCut << " fC/cm" << std::endl
+    << "  Min Bary Hits: "        << inMinBaryHits << std::endl
+    << "  Barycenter Radius: "    << inBarycenterRadius << " cm" << std::endl
+    << "  Bary Center Radius: "   << inBarycenterRadius << " cm" << std::endl
+    << "  Michel Radius: "        << inMichelRadius << " cm" << std::endl
+    << "  Michel Space Radius: "  << inMichelRadius << " cm" << std::endl
+    << "  Angle Cut: "            << inAngleCut << " deg" << std::endl;
 }
 
 void ana::MichelProd::produce(art::Event& e)
@@ -131,24 +152,33 @@ void ana::MichelProd::produce(art::Event& e)
 
   // Input
   auto const& vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
-  if (!vh_hit.isValid()) return;
-  VecPtrHit vph_ev; art::fill_ptr_vector(vph_ev, vh_hit);
-
   auto const& vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
-  if (!vh_trk.isValid()) return;
-  VecPtrTrk vpt_ev; art::fill_ptr_vector(vpt_ev, vh_trk);
-
   art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
   art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+  if (!vh_hit.isValid()
+   || !vh_trk.isValid()
+   || !fmp_trk2hit.isValid()
+   || !fop_hit2trk.isValid()
+  ) {
+    if (inLog) std::cout << "\033[91;1m" "missing required product" "\033[0m" << std::endl;
+    e.put(std::move(outMichelHits));
+    e.put(std::move(outAssns));
+    return;
+  }
 
+  VecPtrHit vph_ev; art::fill_ptr_vector(vph_ev, vh_hit);
+  VecPtrTrk vpt_ev; art::fill_ptr_vector(vpt_ev, vh_trk);
+
+  size_t trk_idx=0;
   for (PtrTrk const& pt_ev: vpt_ev) {
-    ASSERT(pt_ev->Length() < 30);
+    if (inLog) std::cout << "t" << ++trk_idx << "/" << vpt_ev.size() << "\r" << std::flush;
+    ASSERT(pt_ev->Length() > inTrackLengthCut)
 
     VecPtrHit vph_trk = fmp_trk2hit.at(pt_ev.key());
-    std::vector<recob::TrackHitMeta const*> const& vhm_trk = fmp_trk2hit.data(pt_ev.key());
-    std::map<size_t, unsigned> map_hitkey2idx;
     ASSERT(!vph_trk.empty())
+    std::vector<recob::TrackHitMeta const*> const& vhm_trk = fmp_trk2hit.data(pt_ev.key());
     ASSERT(vph_trk.size() == vhm_trk.size())
+    std::map<size_t, unsigned> map_hitkey2idx;
 
     // remove hits not associated to a track point (hit misassociated to the track?)
     std::vector<unsigned> bad_hit_indices;
@@ -166,10 +196,6 @@ void ana::MichelProd::produce(art::Event& e)
     ana::SortedHits sh_mu = GetSortedHits(vph_trk);
     ASSERT(bool(sh_mu))
     ASSERT(sh_mu.is_cc())
-
-    // bool track_is_up =  IsUpright(*pt_ev);
-    // geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
-    // geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
 
     bool is_up = true;
     if (geoDet == kPDVD) {
@@ -199,25 +225,40 @@ void ana::MichelProd::produce(art::Event& e)
     float end_y = pt_ev->HasValidPoint(end_track_idx)
       ? pt_ev->LocationAtPoint(end_track_idx).Y()
       : util::kBogusF;
-    bool end_in_y = geoBot.y.isInside(end_y, 20) || geoTop.y.isInside(end_y, 20);
-    bool end_in_z = geoBot.z.isInside(end_hit.space, 20) || geoTop.z.isInside(end_hit.space, 20);
-    bool end_in_t = wireWindow.isInside(end_hit.tick, 20 / fTick2cm);
+    bool end_in_y = geoBot.y.isInside(end_y, inFiducialLength) || geoTop.y.isInside(end_y, inFiducialLength);
+    bool end_in_z = geoBot.z.isInside(end_hit.space, inFiducialLength) || geoTop.z.isInside(end_hit.space, inFiducialLength);
+    bool end_in_t = wireWindow.isInside(end_hit.tick, inFiducialLength / fTick2cm);
 
     Side_t end_side = ana::tpc2side.at(geoDet).at(end_hit.tpc);
-    float end_x = !sh_mu.is_cc() ? util::kBogusF : end_side == kBot
-      ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
-      : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
-    bool end_in_x = !sh_mu.is_cc() ? false 
-      : (end_side==kBot ? geoBot : geoTop).x.isInside(end_x, 20);
-    // LOG(end_in_x && end_in_y && end_in_z && end_in_t);
+    float end_x = util::kBogusF;
+    bool end_in_x = false;
+    if (sh_mu.is_cc()) {
+      end_x = end_side == kBot
+        ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
+        : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
+      end_in_x = (end_side==kBot ? geoBot : geoTop).x.isInside(end_x, inFiducialLength);
+    }
     ASSERT(end_in_x && end_in_y && end_in_z && end_in_t)
 
+    bool track_is_up =  IsUpright(*pt_ev);
+    geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
+    geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
+    float cosY = 1 / sqrt(1 + pow(Start.Y()-End.Y(), 2) / (pow(Start.X()-End.X(), 2) + pow(Start.Z()-End.Z(), 2)));
 
-    std::vector<float> dQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), 6);
+    size_t queue = 0;
+    float dist;
+    do {
+      PtrHit const& ph = sh_mu.vph.at(sh_mu.vph.size() - ++queue);
+      dist = GetDistance(ph, sh_mu.end());
+    } while (queue < sh_mu.vph.size() && dist < 2);
+
+    std::vector<float> dQds = GetdQds(sh_mu.after_cathode_it(), sh_mu.vph.end(), inSmoothingLength);
     float ADC2fC = 1.60e-4 * 200; // el2fC * ADC2el
-    // LOG(dQds.back() > 13.5 / ADC2fC);
-    ASSERT(dQds.back() > 13.5 / ADC2fC)
-
+    float end_dQds = cosY * ADC2fC * std::accumulate(
+      dQds.end()-queue, dQds.end(), 0.F
+    ) / queue;
+    if (inLog) std::cout << "\tqueue: " << queue << std::endl;
+    ASSERT(end_dQds > inBraggCut)
 
     VecPtrHit vph_ev_endsec;
     for (PtrHit const& ph_ev : vph_ev) {
@@ -229,15 +270,15 @@ void ana::MichelProd::produce(art::Event& e)
 
     ana::Hits bary_hits;
     for (PtrHit const& ph_ev : vph_ev_endsec) {
-      if (GetDistance(ph_ev, sh_mu.end()) > 10) continue;
+      if (GetDistance(ph_ev, sh_mu.end()) > inBarycenterRadius) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-      if (pt_hit && pt_hit->Length() > 30) continue;
+      if (pt_hit && pt_hit->Length() > inTrackLengthCut) continue;
 
       bary_hits.push_back(GetHit(ph_ev));
     }
 
-    ASSERT(bary_hits.size() > 4)
+    ASSERT(bary_hits.size() >= inMinBaryHits)
     ana::Vec2 end_to_bary = bary_hits.barycenter(fTick2cm) - end_hit.vec(fTick2cm);
     float mu_angle = sh_mu.regs
       .at(ana::sec2side.at(geoDet).at(end_hit.section))
@@ -245,21 +286,23 @@ void ana::MichelProd::produce(art::Event& e)
     float da = end_to_bary.angle() - mu_angle;
     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1)*2*M_PI : da;
     da = 90 - abs(abs(da * TMath::RadToDeg()) - 90);
-    ASSERT(da > 30)
+    ASSERT(da > inAngleCut)
 
-    if (inLog) std::cout << "\033[93;1m" "michel" "\033[0m" << std::endl;
+    if (inLog) std::cout << "\t\033[93;1m" "michel" "\033[0m" << std::endl;
 
     for (PtrHit const& ph_ev: vph_ev_endsec) {
-      if (GetDistance(ph_ev, sh_mu.end()) > 30) continue;
+      if (GetDistance(ph_ev, sh_mu.end()) > inMichelRadius) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
-      if (pt_hit && pt_hit->Length() > 30) continue;
+      if (pt_hit && pt_hit->Length() > inTrackLengthCut) continue;
 
       outMichelHits->emplace_back(*ph_ev);
       art::Ptr<recob::Hit> ph_out = hitPtrMaker(outMichelHits->size()-1);
       outAssns->addSingle(pt_ev, ph_out);
     }
   }
+
+  if (inLog) std::cout << "\033[93;1m" << outMichelHits->size() << " michel(s) found" "\033[0m" << std::endl;
   
   // Put outputs in event
   e.put(std::move(outMichelHits));
