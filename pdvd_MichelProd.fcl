@@ -36,7 +36,7 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::SpacePoint"],
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
-            Log: true
+            Log: false
             TrackLengthCut: 30
             FiducialLength: 20
             SmoothingLength: 6
@@ -97,7 +97,8 @@ outputs: {
             "drop *_reco3d__*",
 	        "drop sim::SimEnergyDeposit_*_*_*",
             "drop raw::RawDigits_*_*_*",
-            "drop *_wclsdatavd_*_*"
+            "drop *_wclsdatavd_wiener_*",
+            "drop *_wclsdatavd_gaus_*"
         ]
     }
 }

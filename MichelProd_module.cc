@@ -262,7 +262,6 @@ void ana::MichelProd::produce(art::Event& e)
 
     VecPtrHit vph_ev_endsec;
     for (PtrHit const& ph_ev : vph_ev) {
-      if (ph_ev->View() != geo::kW) continue;
       Sec_t sec = ana::tpc2sec.at(geoDet).at(ph_ev->WireID().TPC);
       if (sec != sh_mu.end_sec()) continue;
       vph_ev_endsec.push_back(ph_ev);
@@ -270,6 +269,7 @@ void ana::MichelProd::produce(art::Event& e)
 
     ana::Hits bary_hits;
     for (PtrHit const& ph_ev : vph_ev_endsec) {
+      if (ph_ev->View() != geo::kW) continue;
       if (GetDistance(ph_ev, sh_mu.end()) > inBarycenterRadius) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
@@ -291,7 +291,7 @@ void ana::MichelProd::produce(art::Event& e)
     if (inLog) std::cout << "\t\033[93;1m" "michel" "\033[0m" << std::endl;
 
     for (PtrHit const& ph_ev: vph_ev_endsec) {
-      if (GetDistance(ph_ev, sh_mu.end()) > inMichelRadius) continue;
+      if (GetDistance(ph_ev, end_side, end_y, end_hit.space, end_hit.tick) > inMichelRadius) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
       if (pt_hit && pt_hit->Length() > inTrackLengthCut) continue;

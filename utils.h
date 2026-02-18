@@ -234,8 +234,11 @@ namespace ana {
     // axis of equation ay*Y - az*Z = 0
     struct Axis {
         double ay, az;
-        double space(geo::WireGeo wiregeo) {
-            return ay * wiregeo.GetCenter().Y() + az * wiregeo.GetCenter().Z();
+        double space(geo::WireGeo wiregeo) const {
+            return space(wiregeo.GetCenter().Y(), wiregeo.GetCenter().Z());
+        }
+        double space(float y, float z) const {
+            return ay * y + az * z;
         }
     };
 
@@ -253,6 +256,7 @@ namespace ana {
         }
     };
     struct Hit {
+        // int view;
         unsigned tpc;
         int section;
         float space;
@@ -260,14 +264,15 @@ namespace ana {
         float tick;
         float adc;
         Hit() : 
+            // view(geo::kUnknown),
             tpc(geo::TPCID::InvalidID), 
             section(kInvalidSec), 
             space(util::kBogusF), 
             channel(raw::InvalidChannelID), 
             tick(util::kBogusF), 
             adc(util::kBogusF) {}
-        Hit(unsigned T, int S, float s, unsigned c, float t, float a) :
-            tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
+        Hit(/*int v,*/ unsigned T, int S, float s, unsigned c, float t, float a) :
+            /*view(v),*/ tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
 
         Vec2 vec(float tick2cm=1) const { return Vec2{space, tick * tick2cm}; }
         // double operator-(Hit const& h) const {
@@ -275,9 +280,10 @@ namespace ana {
         //     return sqrt(pow(space - h.space, 2) + pow(tick - h.tick, 2));
         // }
         friend std::ostream& operator<<(std::ostream& os, const Hit& hit) {
-            return os << "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
+            return os << /*"view:" << hit.view <<*/ "tpc:" << hit.tpc << " space:" << hit.space << " ch:" << hit.channel << " tick:" << hit.tick << " ADC:" << hit.adc;
         }
         void SetBranches(TTree* t, const char* pre="") {
+            // t->Branch(Form("%sHitView", pre), &view);
             t->Branch(Form("%sHitTPC", pre), &tpc);
             t->Branch(Form("%sHitSection", pre), &section);
             t->Branch(Form("%sHitSpace", pre), &space);
@@ -288,15 +294,17 @@ namespace ana {
     };
     struct Hits {
         unsigned N;
+        // std::vector<int> view;
         std::vector<unsigned> tpc;
         std::vector<int> section;
         std::vector<float> space;
         std::vector<unsigned> channel;
         std::vector<float> tick;
         std::vector<float> adc;
-        Hits() : N(0), tpc(), section(), space(), channel(), tick(), adc() {}
+        Hits() : N(0), /*view(),*/ tpc(), section(), space(), channel(), tick(), adc() {}
         void push_back(Hit const& hit) {
             N++;
+            // view.push_back(hit.view);
             tpc.push_back(hit.tpc);
             section.push_back(hit.section);
             space.push_back(hit.space);
@@ -306,6 +314,7 @@ namespace ana {
         }
         void clear() {
             N = 0;
+            // view.clear();
             tpc.clear();
             section.clear();
             space.clear();
@@ -573,12 +582,12 @@ namespace ana {
     // Analysis Module Subclass
     struct SortedHits {
         // std::vector<VecPtrHit> vph_sec; // sorted hits per section
-        VecPtrHit vph; // sorted hits
-        std::vector<Sec_t> secs; // sorted sections
-        std::vector<LinearRegression> regs; // regressions per side
+        VecPtrHit vph = {}; // sorted hits
+        std::vector<Sec_t> secs = {}; // sorted sections
+        std::vector<LinearRegression> regs = std::vector<LinearRegression>(2, LinearRegression()); // regressions per side
 
-        std::vector<size_t> secs_first;
-        size_t side_first;
+        std::vector<size_t> secs_first = {};
+        size_t side_first=0;
 
         operator bool() const { return !vph.empty(); }
         PtrHit start() const { return vph.front(); }
@@ -603,9 +612,6 @@ namespace ana {
         }
         VecPtrHit::iterator after_cathode_it() { return vph.begin() + side_first; }
         VecPtrHit::iterator endsec_it() { return vph.begin() + secs_first.back(); }
-
-        SortedHits() : vph(0), secs(0), regs(2), secs_first(0), side_first(0) {}
-
 
         void reverse() {
             std::reverse(vph.begin(), vph.end());
@@ -685,6 +691,7 @@ namespace ana {
         Hit GetHit(PtrHit const&) const;
         double GetDistance(PtrHit const&, PtrHit const&, bool) const;
         double GetDistance(ana::Hit const&, ana::Hit const&, bool) const;
+        double GetDistance(PtrHit const&, Side_t, float, float, float, bool) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
         std::vector<float> GetdQds(
             VecPtrHit const& vph,
@@ -830,20 +837,35 @@ ana::Hit ana::MichelModule::GetHit(PtrHit const& ph) const {
 
 // 2D projected distance in cm
 double ana::MichelModule::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool allow_different_side=false) const {
+    if (ph1->View() != geo::kW || ph2->View() != geo::kW)
+        return std::numeric_limits<double>::max(); 
     return GetDistance(GetHit(ph1), GetHit(ph2), allow_different_side);
 }
 double ana::MichelModule::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool allow_different_side=false) const {
     Side_t side1 = ana::sec2side.at(geoDet).at(h1.section);
     Side_t side2 = ana::sec2side.at(geoDet).at(h2.section);
-    if (!allow_different_side && (side1 != side2))
+    if (!allow_different_side && side1 != side2)
         return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
+}
+double ana::MichelModule::GetDistance(PtrHit const& ph, Side_t side, float y, float z, float t, bool allow_different_side=false) const {
+    Side_t ph_side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
+    if (!allow_different_side && ph_side != side)
+        return std::numeric_limits<double>::max();
+    float ph_space = GetSpace(ph->WireID());
+    float space = GetAxis(ph->WireID()).space(y, z);
+    return sqrt(pow(ph_space - space, 2) + pow((ph->PeakTime() - t) * fTick2cm, 2));
 }
 
 simb::MCParticle const* ana::MichelModule::GetMichelMCP(
     simb::MCParticle const* muon
 ) const {
     if (!muon) return nullptr;
+    if (abs(muon->PdgCode()) != 13) return nullptr;
+    if (muon->EndProcess() != "Decay" 
+     || muon->EndProcess() != "muMinusCaptureAtRest" 
+     || muon->EndProcess() != "muPlusCaptureAtRest"
+    ) return nullptr;
     if (muon->NumberDaughters() < 3) return nullptr;
 
     simb::MCParticle const* michel = nullptr;
