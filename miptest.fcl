@@ -1,0 +1,30 @@
+#include "services_dune.fcl"
+#include "services_protodunevd.fcl"
+
+process_name: RunMiptest
+
+services: {
+    TFileService: { fileName: "miptest.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::protodunevd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::protodunevd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "miptest"
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}
