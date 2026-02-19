@@ -37,14 +37,15 @@ physics: {
                 ["Reco",       "pandora",         "",             "recob::PFParticle"]
             ]
             Log: false
-            TrackLengthCut: 30
-            FiducialLength: 20
-            SmoothingLength: 6
-            BraggCut: 13.5
-            MinBaryHits: 4
-            BarycenterRadius: 10
-            MichelRadius: 20
-            AngleCut: 30
+            TrackLengthCut: 40    # min length for muon
+                                  # remove hits from track longer than that around muon endpoint
+            FiducialLength: 20    # cut endpoint this close to the volume borders
+            SmoothingLength: 6    # length used to compute the dQ/ds
+            BraggCut: 13.5        # min dQ/ds near the endpoint (in fC/cm)
+            MinBaryHits: 4        # min nb of hits around endpoint
+            BarycenterRadius: 20  # sphere for barycenter of hits nearby endpoint
+            MichelRadius: 40      # sphere of integration around endpoint
+            AngleCut: 30          # min angle between muon and barycenter
         }
     }
     # filters: {
