@@ -87,8 +87,9 @@ outputs: {
     out1: {
         module_type: RootOutput
         fileName: "%ifb_michel.root"
-        dataTier: "full-reconstructed"
-        streamName: "stream-name"
+        dataTier: "reconstructed"
+        streamName: "out1"
+        compressionLevel: 1
         outputCommands: [
             "keep *",
             "drop *_pandoraShower__*",
