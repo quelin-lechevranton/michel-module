@@ -119,10 +119,10 @@ namespace ana {
     };
     std::vector<std::map<geo::TPCID::TPCID_t, Side_t>> const tpc2side = {
         { // PDVD
-            { 0, kBot }, { 1, kBot }, { 2, kBot }, { 3, kBot },
-            { 4, kBot }, { 5, kBot }, { 6, kBot }, { 7, kBot },
-            { 8, kTop }, { 9, kTop }, {10, kTop }, {11, kTop },
-            {12, kTop }, {13, kTop }, {14, kTop }, {15, kTop },
+            {10, kTop }, {11, kTop }, {14, kTop }, {15, kTop },
+            { 8, kTop }, { 9, kTop }, {13, kTop }, {13, kTop },
+            { 2, kBot }, { 3, kBot }, { 6, kBot }, { 7, kBot },
+            { 0, kBot }, { 1, kBot }, { 4, kBot }, { 5, kBot },
             { geo::TPCID::InvalidID, kInvalidSide }
         }, { // PDHD
             { 0, kInvalidSide }, { 1, kBot }, { 2, kTop }, { 3, kInvalidSide },
@@ -143,7 +143,7 @@ namespace ana {
         { // PDVD
             {0, kTop}, {1, kTop}, {2, kTop}, {3, kTop},
             {4, kBot}, {5, kBot}, {6, kBot}, {7, kBot},
-            { kInvalidSec, kInvalidSide }
+            {kInvalidSec, kInvalidSide }
         }, { // PDHD
             {0, kBot}, {1, kTop},
             { kInvalidSec, kInvalidSide }
@@ -692,6 +692,8 @@ namespace ana {
         double GetDistance(PtrHit const&, PtrHit const&, bool) const;
         double GetDistance(ana::Hit const&, ana::Hit const&, bool) const;
         double GetDistance(PtrHit const&, Side_t, float, float, float, bool) const;
+        float GetX(PtrHit const&, PtrHit const&, PtrHit const&, float) const;
+        float GetX(ana::Hit const&, PtrHit const&, PtrHit const&, float) const;
         simb::MCParticle const* GetMichelMCP(simb::MCParticle const*) const;
         std::vector<float> GetdQds(
             VecPtrHit const& vph,
@@ -855,6 +857,18 @@ double ana::MichelModule::GetDistance(PtrHit const& ph, Side_t side, float y, fl
     float ph_space = GetSpace(ph->WireID());
     float space = GetAxis(ph->WireID()).space(y, z);
     return sqrt(pow(ph_space - space, 2) + pow((ph->PeakTime() - t) * fTick2cm, 2));
+}
+float ana::MichelModule::GetX(PtrHit const& ph, PtrHit const& cc_bot, PtrHit const& cc_top, float cathode_gap) const {
+    int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
+    return side == kBot
+        ? -(cathode_gap/2) - (cc_bot->PeakTime() - ph->PeakTime()) * fTick2cm
+        : +(cathode_gap/2) + (cc_top->PeakTime() - ph->PeakTime()) * fTick2cm;
+}
+float ana::MichelModule::GetX(ana::Hit const& hit, PtrHit const& cc_bot, PtrHit const& cc_top, float cathode_gap) const {
+    int side = ana::tpc2side.at(geoDet).at(hit.tpc);
+    return side == kBot
+        ? -(cathode_gap/2) - (cc_bot->PeakTime() - hit.tick) * fTick2cm
+        : +(cathode_gap/2) + (cc_top->PeakTime() - hit.tick) * fTick2cm;
 }
 
 simb::MCParticle const* ana::MichelModule::GetMichelMCP(

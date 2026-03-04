@@ -187,7 +187,7 @@ void ana::MichelProd::produce(art::Event& e)
       if (!pt_ev->HasValidPoint(vhm_trk[i]->Index())) {
         bad_hit_indices.push_back(i);
       } else {
-        map_hitkey2idx[vph_trk[i].key()] = i;
+        map_hitkey2idx.at(vph_trk[i].key()) = i;
       }
     }
     for (int i=bad_hit_indices.size()-1; i>=0; i--)
@@ -207,11 +207,11 @@ void ana::MichelProd::produce(art::Event& e)
           : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
         );
     } else if (geoDet == kPDHD) {
-      size_t front_hit_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.start().key())]->Index();
+      size_t front_hit_track_idx = vhm_trk.at(map_hitkey2idx.at(sh_mu.start().key()))->Index();
       float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
         ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
         : util::kBogusF;
-      size_t back_hit_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.end().key())]->Index();
+      size_t back_hit_track_idx = vhm_trk.at(map_hitkey2idx.at(sh_mu.end().key()))->Index();
       float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
         ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
         : util::kBogusF;
@@ -221,7 +221,7 @@ void ana::MichelProd::produce(art::Event& e)
 
     ana::Hit start_hit = GetHit(sh_mu.start());
     ana::Hit end_hit = GetHit(sh_mu.end());
-    size_t end_track_idx = vhm_trk[map_hitkey2idx.at(sh_mu.end().key())]->Index();
+    size_t end_track_idx = vhm_trk.at(map_hitkey2idx.at(sh_mu.end().key()))->Index();
     float end_y = pt_ev->HasValidPoint(end_track_idx)
       ? pt_ev->LocationAtPoint(end_track_idx).Y()
       : util::kBogusF;
