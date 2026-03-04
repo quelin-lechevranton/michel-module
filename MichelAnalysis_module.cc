@@ -368,7 +368,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) {
                 bad_hit_indices.push_back(i);
             } else {
-                map_hitkey2metaidx.at(vph_mu[i].key()) = i;
+                map_hitkey2metaidx[vph_mu[i].key()] = i;
             }
         }
         for (int i=bad_hit_indices.size()-1; i>=0; i--)
@@ -427,7 +427,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         sh_mu.vph = vph_mu; // collection hits with valid points
         std::sort(sh_mu.vph.begin(), sh_mu.vph.end(),
             [&map_hitkey2metaidx](PtrHit const& a, PtrHit const& b) {
-                return map_hitkey2metaidx.at(a.key()) < map_hitkey2metaidx.at(b.key());
+                return map_hitkey2metaidx[a.key()] < map_hitkey2metaidx[b.key()];
             }
         );
         Sec_t prev_sec = kInvalidSec, prev_side = kInvalidSide;
@@ -472,11 +472,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
                 );
         } else if (geoDet == kPDHD) {
-            size_t front_hit_track_idx = vhm_mu.at(map_hitkey2metaidx.at(sh_mu.start().key()))->Index();
+            size_t front_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
             float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
                 ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
                 : util::kBogusF;
-            size_t back_hit_track_idx = vhm_mu.at(map_hitkey2metaidx.at(sh_mu.end().key()))->Index();
+            size_t back_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
             float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
                 ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
                 : util::kBogusF;
@@ -486,7 +486,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump first hit of the track:
         muStartHit = GetHit(sh_mu.start());
-        size_t start_track_idx = vhm_mu.at(map_hitkey2metaidx.at(sh_mu.start().key()))->Index();
+        size_t start_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
         muStartHitY = pt_ev->HasValidPoint(start_track_idx)
             ? pt_ev->LocationAtPoint(start_track_idx).Y()
             : util::kBogusF;
@@ -496,7 +496,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump last hit of the track:
         muEndHit = GetHit(sh_mu.end());
-        size_t end_track_idx = vhm_mu.at(map_hitkey2metaidx.at(sh_mu.end().key()))->Index();
+        size_t end_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
         muEndHitY = pt_ev->HasValidPoint(end_track_idx)
             ? pt_ev->LocationAtPoint(end_track_idx).Y()
             : util::kBogusF;
@@ -592,7 +592,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (ph_mu->View() != geo::kW) continue;
             ana::Hit hit = GetHit(ph_mu);
             muHits.push_back(hit);
-            size_t hit_track_idx = vhm_mu.at(map_hitkey2metaidx.at(ph_mu.key()))->Index();
+            size_t hit_track_idx = vhm_mu.at(map_hitkey2metaidx[ph_mu.key()])->Index();
             muHitY.push_back(pt_ev->HasValidPoint(hit_track_idx)
                 ? pt_ev->LocationAtPoint(hit_track_idx).Y()
                 : util::kBogusF
