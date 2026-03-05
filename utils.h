@@ -120,7 +120,7 @@ namespace ana {
     std::vector<std::map<geo::TPCID::TPCID_t, Side_t>> const tpc2side = {
         { // PDVD
             {10, kTop }, {11, kTop }, {14, kTop }, {15, kTop },
-            { 8, kTop }, { 9, kTop }, {13, kTop }, {13, kTop },
+            { 8, kTop }, { 9, kTop }, {12, kTop }, {13, kTop },
             { 2, kBot }, { 3, kBot }, { 6, kBot }, { 7, kBot },
             { 0, kBot }, { 1, kBot }, { 4, kBot }, { 5, kBot },
             { geo::TPCID::InvalidID, kInvalidSide }
