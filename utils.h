@@ -684,6 +684,12 @@ namespace ana {
         // art::FindManyP<recob::Hit> *fmp_shw2hit;
         // art::FindOneP<recob::Shower> *fop_hit2shw;
 
+        std::pair<geo::TPCID::TPCID_t, geo::TPCID::TPCID_t> GetTPCs(Sec_t sec) const { return sec2tpc.at(geoDet).at(sec); }
+        Sec_t GetSec(geo::TPCID::TPCID_t tpc) const { return tpc2sec.at(geoDet).at(tpc); }
+        std::vector<Sec_t> GetSecs(Side_t side) const { return side2secs.at(geoDet).at(side); }
+        Side_t GetSide(Sec_t sec) const { return sec2side.at(geoDet).at(sec); }
+        Side_t GetSide(geo::TPCID::TPCID_t tpc) const { return tpc2side.at(geoDet).at(tpc); }
+
         bool IsUpright(recob::Track const& T);
         std::string GetParticleName(int pdg);
         Axis GetAxis(geo::PlaneID) const;
@@ -815,6 +821,7 @@ std::string ana::MichelModule::GetParticleName(int pdg) {
     return Form("%d", pdg);
 }
 
+
 ana::Axis ana::MichelModule::GetAxis(geo::PlaneID pid) const {
     geo::WireGeo w0 = asWire->Wire(geo::WireID{pid, 0});
     geo::WireGeo w1 = asWire->Wire(geo::WireID{pid, 1});
@@ -829,7 +836,7 @@ ana::Hit ana::MichelModule::GetHit(PtrHit const& ph) const {
     geo::WireID wid = ph->WireID();
     return {
         wid.TPC,
-        ana::tpc2sec.at(geoDet).at(wid.TPC),
+        GetSec(wid.TPC),
         float(GetSpace(wid)),
         ph->Channel(),
         ph->PeakTime(),
@@ -844,29 +851,24 @@ double ana::MichelModule::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool
     return GetDistance(GetHit(ph1), GetHit(ph2), allow_different_side);
 }
 double ana::MichelModule::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool allow_different_side=false) const {
-    Side_t side1 = ana::sec2side.at(geoDet).at(h1.section);
-    Side_t side2 = ana::sec2side.at(geoDet).at(h2.section);
-    if (!allow_different_side && side1 != side2)
+    if (!allow_different_side && GetSide((Sec_t)h1.section) != GetSide((Sec_t)h2.section))
         return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
 double ana::MichelModule::GetDistance(PtrHit const& ph, Side_t side, float y, float z, float t, bool allow_different_side=false) const {
-    Side_t ph_side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-    if (!allow_different_side && ph_side != side)
+    if (!allow_different_side && GetSide(ph->WireID().TPC) != side)
         return std::numeric_limits<double>::max();
     float ph_space = GetSpace(ph->WireID());
     float space = GetAxis(ph->WireID()).space(y, z);
     return sqrt(pow(ph_space - space, 2) + pow((ph->PeakTime() - t) * fTick2cm, 2));
 }
 float ana::MichelModule::GetX(PtrHit const& ph, PtrHit const& cc_bot, PtrHit const& cc_top, float cathode_gap) const {
-    int side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
-    return side == kBot
+    return GetSide(ph->WireID().TPC) == kBot
         ? -(cathode_gap/2) - (cc_bot->PeakTime() - ph->PeakTime()) * fTick2cm
         : +(cathode_gap/2) + (cc_top->PeakTime() - ph->PeakTime()) * fTick2cm;
 }
 float ana::MichelModule::GetX(ana::Hit const& hit, PtrHit const& cc_bot, PtrHit const& cc_top, float cathode_gap) const {
-    int side = ana::tpc2side.at(geoDet).at(hit.tpc);
-    return side == kBot
+    return GetSide((geo::TPCID::TPCID_t)hit.tpc) == kBot
         ? -(cathode_gap/2) - (cc_bot->PeakTime() - hit.tick) * fTick2cm
         : +(cathode_gap/2) + (cc_top->PeakTime() - hit.tick) * fTick2cm;
 }
@@ -1010,12 +1012,13 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     std::vector<float> sec_mt(ana::n_sec[geoDet], 0);
     for (PtrHit const& ph : vph_unsorted) {
         if (ph->View() != view) continue;
-        Side_t side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
+        geo::WireID wid = ph->WireID();
+        Side_t side = GetSide(wid.TPC);
         if (side == kInvalidSide) continue; // skip hits on the other side of the anodes in PDHD
-        double z = GetSpace(ph->WireID());
+        double z = GetSpace(wid);
         double t = ph->PeakTime() * fTick2cm;
         sh.regs[side].add(z, t);
-        Sec_t sec = ana::tpc2sec.at(geoDet).at(ph->WireID().TPC);
+        Sec_t sec = GetSec(wid.TPC);
         vph_sec[sec].push_back(ph);
         sec_mt[sec] += t;
     }
@@ -1036,7 +1039,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     // first section in the bot volume
     std::vector<Sec_t>::iterator bot_it = std::find_if(
         sh.secs.begin(), sh.secs.end(),
-        [&](Sec_t sec) { return ana::sec2side.at(geoDet).at(sec) == 0; }
+        [&](Sec_t sec) { return GetSide(sec) == 0; }
     );
 
     std::sort(
@@ -1056,7 +1059,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
 
     for (unsigned i=0; i<sh.secs.size(); i++) {
         Sec_t sec = sh.secs[i];
-        Side_t side = ana::sec2side.at(geoDet).at(sec);
+        Side_t side = GetSide(sec);
         ana::LinearRegression const& reg = sh.regs[side];
 
         // top volume (side==kTop): increasing X <-> decreasing tick <-> decreasing s for m>0
@@ -1076,7 +1079,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
         // if (sec==sh.secs.front())
         //     sh.start = vph.front();
         // else {
-        //     Side_t prev_side = ana::sec2side.at(geoDet).at(sh.secs[i-1]);
+        //     Side_t prev_side = GetSide(sh.secs[i-1]);
         //     if (prev_side != side) {
         //         sh.cc.second = vph.front(); 
         //     } else
@@ -1085,7 +1088,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
         // if (sec==sh.secs.back())
         //     sh.end = vph.back();
         // else {
-        //     Side_t next_side = ana::sec2side.at(geoDet).at(sh.secs[i+1]);
+        //     Side_t next_side = GetSide(sh.secs[i+1]);
         //     if (side != next_side) {
         //         sh.cc.first = vph.back(); 
         //     } else
@@ -1098,7 +1101,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     for (Sec_t sec : sh.secs) {
         sh.secs_first.push_back(sh.vph.size());
 
-        Side_t side = ana::sec2side.at(geoDet).at(sec);
+        Side_t side = GetSide(sec);
         if (prev_side != kInvalidSide && side != prev_side)
             sh.side_first = sh.vph.size();
         prev_side = side;
@@ -1110,7 +1113,7 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     // sh.bot_index = 0;
     // sh.vph.clear();
     // for (Sec_t sec : sh.secs) {
-    //     Side_t side = ana::sec2side.at(geoDet).at(sec);
+    //     Side_t side = GetSide(sec);
     //     if (side == 1) 
     //         sh.bot_index += vph_sec[sec].size();
     //     if (sec == sh.secs.back())

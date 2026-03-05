@@ -355,24 +355,21 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         resetMuon();
 
         // get hits and metadata associated to the track
-        VecPtrHit vph_mu = fmp_trk2hit.at(pt_ev.key());
+        VecPtrHit vph_mu_all = fmp_trk2hit.at(pt_ev.key());
         std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
         std::map<size_t, unsigned> map_hitkey2metaidx;
-        ASSERT(vph_mu.size())
-        ASSERT(vph_mu.size() == vhm_mu.size())
+        ASSERT(vph_mu_all.size())
+        ASSERT(vph_mu_all.size() == vhm_mu.size())
 
         // remove hits not associated to a track point (hit misassociated to the track?)
-        std::vector<unsigned> bad_hit_indices;
-        for (unsigned i=0; i<vph_mu.size(); i++) {
-            if (vph_mu[i]->View() != geo::kW) continue;
-            if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) {
-                bad_hit_indices.push_back(i);
-            } else {
-                map_hitkey2metaidx[vph_mu[i].key()] = i;
-            }
+        VecPtrHit vph_mu;
+        for (unsigned i=0; i<vph_mu_all.size(); i++) {
+            if (vph_mu_all[i]->View() != geo::kW) continue;
+            if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) continue;
+            map_hitkey2metaidx[vph_mu_all[i].key()] = i;
+            vph_mu.push_back(vph_mu_all[i]);
         }
-        for (int i=bad_hit_indices.size()-1; i>=0; i--)
-            vph_mu.erase(vph_mu.begin() + bad_hit_indices[i]);
+        vph_mu_all.clear();
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
         ana::SortedHits sh_mu = GetSortedHits(vph_mu);
@@ -433,8 +430,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         Sec_t prev_sec = kInvalidSec, prev_side = kInvalidSide;
         PtrHit& prev_ph = sh_mu.vph.front();
         for (PtrHit const& ph : sh_mu.vph) {
-            Sec_t sec = ana::tpc2sec.at(geoDet).at(ph->WireID().TPC);
-            Side_t side = ana::tpc2side.at(geoDet).at(ph->WireID().TPC);
+            Sec_t sec = GetSec(ph->WireID().TPC);
+            Side_t side = GetSide(ph->WireID().TPC);
             if (prev_sec == kInvalidSec || sec != prev_sec) {
                 sh_mu.secs.push_back(sec);
                 sh_mu.sc.push_back(prev_ph);
@@ -464,7 +461,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // get track orientation (assuming downward), update orientation of sorted hits
         bool is_up = true;
         if (geoDet == kPDVD) {
-            Side_t front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
+            Side_t front_side = GetSide(sh_mu.start()->WireID().TPC);
             is_up = sh_mu.is_cc()
                 ? front_side == kTop
                 : ( front_side == kTop
@@ -548,19 +545,14 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muStartInX=false;
         muEndInX=false;
         if (muCathodeCrossing) {
-            Side_t side_first = ana::tpc2side.at(geoDet).at(sh_mu.cc_first()->WireID().TPC);
-            Side_t side_second = ana::tpc2side.at(geoDet).at(sh_mu.cc_second()->WireID().TPC);
-            if (side_first == side_second)
-            std::cout << "\033[1;91m" "crossers on same side: " << side_first << "\033[0m" << std::endl;
+            Side_t side_cc_first = GetSide(sh_mu.cc_first()->WireID().TPC);
+            PtrHit const& cc_bot = side_cc_first == kBot ? sh_mu.cc_first() : sh_mu.cc_second();
+            PtrHit const& cc_top = side_cc_first == kTop ? sh_mu.cc_first() : sh_mu.cc_second();
 
-            PtrHit const& cc_bot = side_first == kBot ? sh_mu.cc_first() : sh_mu.cc_second();
-            PtrHit const& cc_top = side_first == kTop ? sh_mu.cc_first() : sh_mu.cc_second();
+            Side_t start_side = GetSide(muStartHit.tpc);
+            Side_t end_side = GetSide(muEndHit.tpc);
+
             muStartHitX = GetX(muStartHit, cc_bot, cc_top, geoCathodeGap);
-            muEndHitX = GetX(muEndHit, cc_bot, cc_top, geoCathodeGap);
-
-            Side_t start_side = ana::tpc2side.at(geoDet).at(muStartHit.tpc);
-            Side_t end_side = ana::tpc2side.at(geoDet).at(muEndHit.tpc);
-
             // muStartHitX = start_side == kBot
             //     ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muStartHit.tick) * fTick2cm
             //     : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muStartHit.tick) * fTick2cm;
@@ -568,6 +560,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ? geoBot.x.isInside(muStartHitX, inFiducialLength)
                 : geoTop.x.isInside(muStartHitX, inFiducialLength);
 
+            muEndHitX = GetX(muEndHit, cc_bot, cc_top, geoCathodeGap);
             // muEndHitX = end_side == kBot
             //     ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muEndHit.tick) * fTick2cm
             //     : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muEndHit.tick) * fTick2cm;
@@ -603,13 +596,12 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         VecPtrHit vph_ev_endsec;
         for (PtrHit const& ph_ev : vph_ev) {
             if (ph_ev->View() != geo::kW) continue;
-            Sec_t sec = ana::tpc2sec.at(geoDet).at(ph_ev->WireID().TPC);
-            if (sec != sh_mu.end_sec()) continue;
+            if (GetSec(ph_ev->WireID().TPC) != sh_mu.end_sec()) continue;
             vph_ev_endsec.push_back(ph_ev);
         }
 
         muEndAngle = sh_mu.regs
-            .at(ana::sec2side.at(geoDet).at(muEndHit.section))
+            .at(GetSide(muEndHit.section))
             .theta(muEndHit.space > muStartHit.space ? 1 : -1);
         // integrate charges around muon endpoint
         muSphereEnergy = 0;

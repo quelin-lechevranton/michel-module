@@ -199,7 +199,7 @@ void ana::MichelProd::produce(art::Event& e)
 
     bool is_up = true;
     if (geoDet == kPDVD) {
-      Side_t front_side = ana::tpc2side.at(geoDet).at(sh_mu.start()->WireID().TPC);
+      Side_t front_side = GetSide(sh_mu.start()->WireID().TPC);
       is_up = sh_mu.is_cc()
         ? front_side == kTop
         : ( front_side == kTop
@@ -229,7 +229,7 @@ void ana::MichelProd::produce(art::Event& e)
     bool end_in_z = geoBot.z.isInside(end_hit.space, inFiducialLength) || geoTop.z.isInside(end_hit.space, inFiducialLength);
     bool end_in_t = wireWindow.isInside(end_hit.tick, inFiducialLength / fTick2cm);
 
-    Side_t end_side = ana::tpc2side.at(geoDet).at(end_hit.tpc);
+    Side_t end_side = GetSide(end_hit.tpc);
     float end_x = util::kBogusF;
     bool end_in_x = false;
     if (sh_mu.is_cc()) {
@@ -262,8 +262,7 @@ void ana::MichelProd::produce(art::Event& e)
 
     VecPtrHit vph_ev_endsec;
     for (PtrHit const& ph_ev : vph_ev) {
-      Sec_t sec = ana::tpc2sec.at(geoDet).at(ph_ev->WireID().TPC);
-      if (sec != sh_mu.end_sec()) continue;
+      if (GetSec(ph_ev->WireID().TPC) != sh_mu.end_sec()) continue;
       vph_ev_endsec.push_back(ph_ev);
     }
 
@@ -281,7 +280,7 @@ void ana::MichelProd::produce(art::Event& e)
     ASSERT(bary_hits.size() >= inMinBaryHits)
     ana::Vec2 end_to_bary = bary_hits.barycenter(fTick2cm) - end_hit.vec(fTick2cm);
     float mu_angle = sh_mu.regs
-      .at(ana::sec2side.at(geoDet).at(end_hit.section))
+      .at(GetSide(end_hit.section))
       .theta(end_hit.space > start_hit.space ? 1 : -1);
     float da = end_to_bary.angle() - mu_angle;
     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1)*2*M_PI : da;
