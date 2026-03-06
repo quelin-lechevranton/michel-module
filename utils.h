@@ -718,16 +718,11 @@ namespace ana {
             int dirX = -1, // decreasing X
             geo::View_t view = geo::kW
         ) const;
-        // SortedHits GetSortedHits_dirX(
-        //     VecPtrHit const& vph_unsorted,
-        //     int dirX = -1, // decreasing X
-        //     geo::View_t view = geo::kW
-        // ) const;
-        // SortedHits GetSortedHits_PDHD(
-        //     VecPtrHit const& vph_unsorted,
-        //     int dirX,
-        //     geo::View_t view = geo::kW
-        // ) const;
+        SortedHits GetSortedHits_PDHD(
+            VecPtrHit const& vph_unsorted,
+            int dirX,
+            geo::View_t view = geo::kW
+        ) const;
     };
 }
 
@@ -879,8 +874,8 @@ simb::MCParticle const* ana::MichelModule::GetMichelMCP(
     if (!muon) return nullptr;
     if (abs(muon->PdgCode()) != 13) return nullptr;
     if (muon->EndProcess() != "Decay" 
-     || muon->EndProcess() != "muMinusCaptureAtRest" 
-     || muon->EndProcess() != "muPlusCaptureAtRest"
+     && muon->EndProcess() != "muMinusCaptureAtRest" 
+     && muon->EndProcess() != "muPlusCaptureAtRest"
     ) return nullptr;
     if (muon->NumberDaughters() < 3) return nullptr;
 
@@ -997,10 +992,64 @@ simb::MCParticle const* ana::MichelModule::GetMichelMCP(
 //     return sh;
 // }
 
-// ana::SortedHits ana::MichelModule::GetSortedHits_dirX(
-//     VecPtrHit const& vph_unsorted,
-//     int dirX, 
-//     geo::View_t view
+ana::SortedHits ana::MichelModule::GetSortedHits_PDHD(
+    VecPtrHit const& vph_unsorted,
+    int dirX,
+    geo::View_t view
+) const {
+    ana::SortedHits sh;
+    std::vector<VecPtrHit> vph_side(2);
+    for (PtrHit const& ph : vph_unsorted) {
+        if (ph->View() != view) continue;
+        Side_t side = GetSide(ph->WireID().TPC);
+        if (side == kInvalidSide) continue;
+        double z = GetSpace(ph->WireID());
+        double t = ph->PeakTime() * fTick2cm;
+        sh.regs[side].add(z, t);
+        vph_side[side].push_back(ph);
+    }
+    sh.regs[kBot].compute();
+    sh.regs[kTop].compute();
+
+    if (vph_side[kBot].size() >= ana::LinearRegression::nmin) {
+        sh.secs.push_back(GetSec(kBot));
+    }
+    if (vph_side[kTop].size() >= ana::LinearRegression::nmin) {
+        if (dirX > 0) sh.secs.push_back(GetSec(kTop));
+        else sh.secs.insert(sh.secs.begin(), GetSec(kTop));
+    }
+    if (sh.secs.empty()) return ana::SortedHits{};
+
+    for (Sec_t side : sh.secs) {
+        ana::LinearRegression const& reg = sh.regs[side];
+        VecPtrHit& vph = vph_side[side];
+        int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
+        std::sort(
+            vph.begin(), vph.end(),
+            [&](PtrHit const& ph1, PtrHit const& ph2) {
+                double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
+                double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
+                return (s2 - s1) * sign > 0;
+            }
+        );
+    }
+    sh.vph.clear();
+    Side_t prev_side=kInvalidSide;
+    for (Sec_t sec : sh.secs) {
+        sh.secs_first.push_back(sh.vph.size());
+
+        Side_t side = GetSide(sec);
+        if (prev_side != kInvalidSide && side != prev_side)
+            sh.side_first = sh.vph.size();
+        prev_side = side;
+
+        for (PtrHit const& ph : vph_side[side])
+            sh.vph.push_back(ph);
+    }
+    return sh;
+}
+
+
 ana::SortedHits ana::MichelModule::GetSortedHits(
     VecPtrHit const& vph_unsorted,
     int dirX,
@@ -1072,12 +1121,9 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
         // bot volume (side==kBot): increasing X <-> increasing tick <-> increasing s for m>0
         int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
         
-        // don't ask me why this is necessary
-        if (geoDet == kPDHD) sign = -sign;
-
         VecPtrHit& vph = vph_sec[sec];
         std::sort(
-        vph.begin(), vph.end(),
+            vph.begin(), vph.end(),
             [&](PtrHit const& ph1, PtrHit const& ph2) {
                 double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
                 double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);

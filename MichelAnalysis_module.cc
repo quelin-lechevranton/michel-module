@@ -379,7 +379,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
         int dirX = Start.X() < End.X() ? 1 : -1;
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
+        // ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
+        ana::SortedHits sh_mu = GetSortedHits_PDHD(vph_mu, dirX);
         muRegError = !sh_mu;
         ASSERT(!muRegError)
 
@@ -564,6 +565,24 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             for (PtrHit const& ph_mu : sh_mu.vph) {
                 if (ph_mu->View() != geo::kW) continue;
                 muHitX.push_back(GetX(ph_mu, cc_bot, cc_top, geoCathodeGap));
+            }
+
+            if (mcp) {
+                ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
+                if (sh_mcp && sh_mcp.is_cc()) {
+                    Side_t tru_start_side = GetSide(sh_mcp.end()->WireID().TPC);
+                    PtrHit const& tru_cc_bot = tru_start_side == kBot ? sh_mcp.cc_first() : sh_mcp.cc_second();
+                    PtrHit const& tru_cc_top = tru_start_side == kTop ? sh_mcp.cc_first() : sh_mcp.cc_second();
+                    std::cout << "TRUTH" << std::endl;
+                    std::cout << "\t" "start side: " << tru_start_side << std::endl;
+                    std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
+                    std::cout << "\t" "start_T: " << sh_mcp.start()->PeakTime() << "\t" "end_T: " << sh_mcp.end()->PeakTime() << std::endl;
+
+                    std::cout << "RECO" << std::endl;
+                    std::cout << "\t" "start_side: " << start_side << std::endl;
+                    std::cout << "\t" "cc_bot_T: " << cc_bot->PeakTime() << "\t" "cc_top_T: " << cc_top->PeakTime() << std::endl;
+                    std::cout << std::endl;
+                }
             }
         }
 
