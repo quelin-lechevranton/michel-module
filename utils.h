@@ -1025,37 +1025,41 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     sh.regs[kBot].compute();
     sh.regs[kTop].compute();
 
+    Side_t first_side = dirX>0 ? kBot : kTop;
     for (unsigned sec=0; sec<ana::n_sec[geoDet]; sec++) {
         if (vph_sec[sec].size() < ana::LinearRegression::nmin) {
-            vph_sec[sec].clear();
             sec_mt[sec] = 0;
+            vph_sec[sec].clear();
         } else {
-            sh.secs.push_back(sec);
             sec_mt[sec] /= vph_sec[sec].size();
+            // keep side sorted
+            // first side at the begining, last side at the end
+            if (GetSide(sec) == first_side)
+                sh.secs.insert(sh.secs.begin(), sec);
+            else
+                sh.secs.push_back(sec);
         }
     }
     if (sh.secs.empty()) return ana::SortedHits{};
-    
-    // first section in the bot volume
-    std::vector<Sec_t>::iterator bot_it = std::find_if(
-        sh.secs.begin(), sh.secs.end(),
-        [&](Sec_t sec) { return GetSide(sec) == 0; }
-    );
 
-    std::sort(
-        sh.secs.begin(), bot_it,
-        [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
-            // in top volume, increasing X <-> decreasing tick
-            return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
-        }
+    std::function<bool(Sec_t, Sec_t)> top_sort = 
+    [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
+        // in top volume, increasing X <-> decreasing tick
+        return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
+    };
+    std::function<bool(Sec_t, Sec_t)> bot_sort = 
+    [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
+        // in bot volume, increasing X <-> increasing tick
+        return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
+    };
+
+    // first section in the last side
+    std::vector<Sec_t>::iterator cc_it = std::find_if(
+        sh.secs.begin(), sh.secs.end(),
+        [&](Sec_t sec) { return GetSide(sec) != first_side; }
     );
-    std::sort(
-        bot_it, sh.secs.end(),
-        [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
-            // in bot volume, increasing X <-> increasing tick
-            return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
-        }
-    );
+    std::sort(sh.secs.begin(), cc_it, first_side == kBot ? bot_sort : top_sort);
+    std::sort(cc_it, sh.secs.end(), first_side == kTop ? bot_sort : top_sort);
 
     for (unsigned i=0; i<sh.secs.size(); i++) {
         Sec_t sec = sh.secs[i];
