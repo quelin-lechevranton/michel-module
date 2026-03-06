@@ -371,8 +371,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         }
         vph_mu_all.clear();
 
+        bool track_is_up =  IsUpright(*pt_ev);
+        geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
+        geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
+        muStartPoint = ana::Point(Start);
+        muEndPoint = ana::Point(End);
+
         // sort hits and retrieve some info: mainly if it crosses the cathode
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu);
+        int dirX = Start.X() < End.X() ? 1 : -1;
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
         muRegError = !sh_mu;
         ASSERT(!muRegError)
 
@@ -396,12 +403,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         LOG(muLength >= inTrackLengthCut);
         if (!inKeepAll && muLength < inTrackLengthCut) continue;
-
-        bool track_is_up =  IsUpright(*pt_ev);
-        geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();
-        geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
-        muStartPoint = ana::Point(Start);
-        muEndPoint = ana::Point(End);
 
         // sorting hits according to give X direction
         // in PDVD that assums downward muons
@@ -545,25 +546,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muStartInX=false;
         muEndInX=false;
         if (muCathodeCrossing) {
-            Side_t side_cc_first = GetSide(sh_mu.cc_first()->WireID().TPC);
-            PtrHit const& cc_bot = side_cc_first == kBot ? sh_mu.cc_first() : sh_mu.cc_second();
-            PtrHit const& cc_top = side_cc_first == kTop ? sh_mu.cc_first() : sh_mu.cc_second();
-
             Side_t start_side = GetSide(muStartHit.tpc);
             Side_t end_side = GetSide(muEndHit.tpc);
+            PtrHit const& cc_bot = start_side == kBot ? sh_mu.cc_first() : sh_mu.cc_second();
+            PtrHit const& cc_top = start_side == kTop ? sh_mu.cc_first() : sh_mu.cc_second();
 
             muStartHitX = GetX(muStartHit, cc_bot, cc_top, geoCathodeGap);
-            // muStartHitX = start_side == kBot
-            //     ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muStartHit.tick) * fTick2cm
-            //     : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muStartHit.tick) * fTick2cm;
             muStartInX = start_side == kBot
                 ? geoBot.x.isInside(muStartHitX, inFiducialLength)
                 : geoTop.x.isInside(muStartHitX, inFiducialLength);
 
             muEndHitX = GetX(muEndHit, cc_bot, cc_top, geoCathodeGap);
-            // muEndHitX = end_side == kBot
-            //     ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - muEndHit.tick) * fTick2cm
-            //     : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - muEndHit.tick) * fTick2cm;
             muEndInX = end_side == kBot
                 ? geoBot.x.isInside(muEndHitX, inFiducialLength)
                 : geoTop.x.isInside(muEndHitX, inFiducialLength);
