@@ -1042,24 +1042,26 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     }
     if (sh.secs.empty()) return ana::SortedHits{};
 
-    std::function<bool(Sec_t, Sec_t)> top_sort = 
-    [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
-        // in top volume, increasing X <-> decreasing tick
-        return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
-    };
-    std::function<bool(Sec_t, Sec_t)> bot_sort = 
-    [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
-        // in bot volume, increasing X <-> increasing tick
-        return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
-    };
-
-    // first section in the last side
-    std::vector<Sec_t>::iterator cc_it = std::find_if(
-        sh.secs.begin(), sh.secs.end(),
-        [&](Sec_t sec) { return GetSide(sec) != first_side; }
-    );
-    std::sort(sh.secs.begin(), cc_it, first_side == kBot ? bot_sort : top_sort);
-    std::sort(cc_it, sh.secs.end(), first_side == kTop ? bot_sort : top_sort);
+    // sorting sections per side (not necessary in PDHD)
+    if (geoDet == kPDVD) {
+        // first section in the last side
+        std::vector<Sec_t>::iterator cc_it = std::find_if(
+            sh.secs.begin(), sh.secs.end(),
+            [&](Sec_t sec) { return GetSide(sec) != first_side; }
+        );
+        std::function<bool(Sec_t, Sec_t)> top_sort = 
+        [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
+            // in top volume, increasing X <-> decreasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) > 0;
+        };
+        std::function<bool(Sec_t, Sec_t)> bot_sort = 
+        [&sec_mt, &dirX](Sec_t sec1, Sec_t sec2) {
+            // in bot volume, increasing X <-> increasing tick
+            return dirX * (sec_mt[sec1]-sec_mt[sec2]) < 0;
+        };
+        std::sort(sh.secs.begin(), cc_it, first_side == kBot ? bot_sort : top_sort);
+        std::sort(cc_it, sh.secs.end(), first_side == kTop ? bot_sort : top_sort);
+    }
 
     for (unsigned i=0; i<sh.secs.size(); i++) {
         Sec_t sec = sh.secs[i];
@@ -1069,10 +1071,13 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
         // top volume (side==kTop): increasing X <-> decreasing tick <-> decreasing s for m>0
         // bot volume (side==kBot): increasing X <-> increasing tick <-> increasing s for m>0
         int sign = dirX * (side == kBot ? kTop : -1) * (reg.m > 0 ? 1 : -1);
+        
+        // don't ask me why this is necessary
+        if (geoDet == kPDHD) sign = -sign;
 
         VecPtrHit& vph = vph_sec[sec];
         std::sort(
-            vph.begin(), vph.end(),
+        vph.begin(), vph.end(),
             [&](PtrHit const& ph1, PtrHit const& ph2) {
                 double s1 = reg.projection(GetSpace(ph1->WireID()), ph1->PeakTime() * fTick2cm);
                 double s2 = reg.projection(GetSpace(ph2->WireID()), ph2->PeakTime() * fTick2cm);
