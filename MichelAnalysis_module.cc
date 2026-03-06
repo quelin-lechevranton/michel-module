@@ -379,8 +379,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
         int dirX = Start.X() < End.X() ? 1 : -1;
-        // ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
-        ana::SortedHits sh_mu = GetSortedHits_PDHD(vph_mu, dirX);
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
         muRegError = !sh_mu;
         ASSERT(!muRegError)
 
