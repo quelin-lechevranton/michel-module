@@ -577,7 +577,21 @@ namespace ana {
     }
 
 
+    // class SH {
+    //     VecPtrHit vph = {};
+    // public:
+    //     operator bool() const {}
+    //     VecPtrHit const& hits() const {}
+    //     std::vector<Sec_t> const sections() const {}
+    //     std::vector<Side_t> const sides() const {}
+    //     PtrHit const start() const {}
+    //     PtrHit const end() const {}
 
+    //     bool isCathodeCrossing() const { return sides().size() >= 2; }
+    //     std::map<Side_t, VecPtrHit::iterator> crossingHits() const {}
+    //     bool isSectionCrossing() const { return sections().size() >= 2; }
+    //     std::map<Sec_t, VecPtrHit::iterator> sectionLimitsHits() const {}
+    // };
 
     // Analysis Module Subclass
     struct SortedHits {
@@ -681,14 +695,17 @@ namespace ana {
 
         std::pair<geo::TPCID::TPCID_t, geo::TPCID::TPCID_t> GetTPCs(Sec_t sec) const { return sec2tpc.at(geoDet).at(sec); }
         Sec_t GetSec(geo::TPCID::TPCID_t tpc) const { return tpc2sec.at(geoDet).at(tpc); }
+        Sec_t GetSec(PtrHit const&) const { return GetSec(ph->WireID().TPC); }
         std::vector<Sec_t> GetSecs(Side_t side) const { return side2secs.at(geoDet).at(side); }
         Side_t GetSide(Sec_t sec) const { return sec2side.at(geoDet).at(sec); }
         Side_t GetSide(geo::TPCID::TPCID_t tpc) const { return tpc2side.at(geoDet).at(tpc); }
+        Side_t GetSide(PtrHit const& ph) const { return GetSide(ph->WireID().TPC); }
 
         bool IsUpright(recob::Track const& T);
         std::string GetParticleName(int pdg);
         Axis GetAxis(geo::PlaneID) const;
         double GetSpace(geo::WireID) const;
+        double GetSpace(PtrHit const&) const;
         Hit GetHit(PtrHit const&) const;
         double GetDistance(PtrHit const&, PtrHit const&, bool) const;
         double GetDistance(ana::Hit const&, ana::Hit const&, bool) const;
@@ -816,6 +833,9 @@ ana::Axis ana::MichelModule::GetAxis(geo::PlaneID pid) const {
 }
 double ana::MichelModule::GetSpace(geo::WireID wid) const {
     return GetAxis(wid).space(asWire->Wire(wid));
+}
+double ana::MichelModule::GetSpace(PtrHit const& ph) const {
+    return GetSpace(ph->WireID());
 }
 ana::Hit ana::MichelModule::GetHit(PtrHit const& ph) const {
     geo::WireID wid = ph->WireID();
