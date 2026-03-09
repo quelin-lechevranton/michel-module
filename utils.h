@@ -586,20 +586,20 @@ namespace ana {
         std::vector<Sec_t> secs = {}; // sorted sections
         std::vector<LinearRegression> regs = std::vector<LinearRegression>(2, LinearRegression()); // regressions per side
 
-        std::vector<size_t> secs_first = {};
-        size_t side_first=0;
+        std::vector<size_t> secs_index = {};
+        size_t side_index = kInvalidSide;
 
         operator bool() const { return !vph.empty(); }
         PtrHit start() const { return vph.front(); }
         PtrHit end() const { return vph.back(); }
-        bool is_cc() const { return side_first != 0; }
-        PtrHit cc_first() const { return is_cc() ? vph[side_first - 1] : PtrHit(); }
-        PtrHit cc_second() const { return is_cc() ? vph[side_first] : PtrHit(); }
-        bool is_sc() const { return !secs_first.empty(); }
+        bool is_cc() const { return side_index != 0; }
+        PtrHit cc_first() const { return is_cc() ? vph[side_index - 1] : PtrHit(); }
+        PtrHit cc_second() const { return is_cc() ? vph[side_index] : PtrHit(); }
+        bool is_sc() const { return !secs_index.empty(); }
         VecPtrHit scs() const {
             VecPtrHit res(0);
-            for (size_t i : secs_first) {
-                if (i != 0 and i != side_first) {
+            for (size_t i : secs_index) {
+                if (i != side_index) {
                     res.push_back(vph[i-1]);
                     res.push_back(vph[i]);
                 }
@@ -610,23 +610,18 @@ namespace ana {
         LinearRegression end_reg(Det_t det) const {
             return regs[ana::sec2side.at(det).at(end_sec())];
         }
-        VecPtrHit::iterator after_cathode_it() { return vph.begin() + side_first; }
-        VecPtrHit::iterator endsec_it() { return vph.begin() + secs_first.back(); }
+        VecPtrHit::iterator after_cathode_it() { return vph.begin() + side_index; }
+        VecPtrHit::iterator endsec_it() { return vph.begin() + secs_index.back(); }
 
         void reverse() {
             std::reverse(vph.begin(), vph.end());
             std::reverse(secs.begin(), secs.end());
-            if (!secs_first.empty()) {
-                if (secs_first.front() == 0) {
-                    secs_first.erase(secs_first.begin());
-                    secs_first.push_back(vph.size());
-                }
-                for (size_t& i : secs_first) {
+            if (!secs_index.empty()) {
+                for (size_t& i : secs_index)
                     i = vph.size() - i;
-                }
-                std::reverse(secs_first.begin(), secs_first.end());
+                std::reverse(secs_index.begin(), secs_index.end());
             }
-            side_first = side_first==0 ? 0 : vph.size()-side_first;
+            side_index = side_index==0 ? 0 : vph.size()-side_index;
         }
 
         // PtrHit start, end;
@@ -988,18 +983,21 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
     }
 
     sh.vph.clear();
-    Side_t prev_side=kInvalidSide;
+    Side_t prev_side = kInvalidSide;
     for (Sec_t sec : sh.secs) {
-        sh.secs_first.push_back(sh.vph.size());
+        if (!sh.vph.empty())
+            sh.secs_index.push_back(sh.vph.size());
 
         Side_t side = GetSide(sec);
         if (prev_side != kInvalidSide && side != prev_side)
-            sh.side_first = sh.vph.size();
+            sh.side_index = sh.vph.size();
         prev_side = side;
 
         for (PtrHit const& ph : vph_sec[sec])
             sh.vph.push_back(ph);
     }
+    if (sh.side_index == kInvalidSide) 
+        sh.side_index = 0;
     return sh;
 }
 

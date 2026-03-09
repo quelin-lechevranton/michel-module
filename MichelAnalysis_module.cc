@@ -357,7 +357,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // get hits and metadata associated to the track
         VecPtrHit vph_mu_all = fmp_trk2hit.at(pt_ev.key());
         std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
-        std::map<size_t, unsigned> map_hitkey2metaidx;
+        // std::map<size_t, unsigned> map_hitkey2metaidx;
+        std::map<size_t, size_t> map_hitkey2trkidx;
         ASSERT(vph_mu_all.size())
         ASSERT(vph_mu_all.size() == vhm_mu.size())
 
@@ -366,7 +367,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         for (unsigned i=0; i<vph_mu_all.size(); i++) {
             if (vph_mu_all[i]->View() != geo::kW) continue;
             if (!pt_ev->HasValidPoint(vhm_mu[i]->Index())) continue;
-            map_hitkey2metaidx[vph_mu_all[i].key()] = i;
+            // map_hitkey2metaidx[vph_mu_all[i].key()] = i;
+            map_hitkey2trkidx[vph_mu_all[i].key()] = vhm_mu[i]->Index();
             vph_mu.push_back(vph_mu_all[i]);
         }
         vph_mu_all.clear();
@@ -378,8 +380,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muEndPoint = ana::Point(End);
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
-        int dirX = Start.X() < End.X() ? 1 : -1;
-        ana::SortedHits sh_mu = GetSortedHits(vph_mu, dirX);
+        ana::SortedHits sh_mu = GetSortedHits(vph_mu);
         muRegError = !sh_mu;
         ASSERT(!muRegError)
 
@@ -403,20 +404,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         LOG(muLength >= inTrackLengthCut);
         if (!inKeepAll && muLength < inTrackLengthCut) continue;
-
-        // sorting hits according to give X direction
-        // in PDVD that assums downward muons
-        //
-        // in case of hits on both sides (cathode crossing): 
-        // sh_mu.cc.first -> last hit in the top volume (side1)
-        // sh_mu.cc.second -> first hit in the bot volume (side0)
-
-        // ana::SortedHits sh_mu = geoDet == kPDVD
-        //     ? GetSortedHits_dirX(vph_mu, -1) // PDVD: decreasing X <-> downward
-        //     // THIS DOES NOT WORK FOR PDHD: the dirX from Pandora is bullshit
-        //     : GetSortedHits_dirX(vph_mu, End.X() > Start.X() ? 1 : -1); // PDHD
-        // muRegError = !sh_mu;
-
 
         // Sort Hits by their Index in the TrackHitMeta data
         // Never tested
@@ -470,11 +457,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     : sh_mu.start()->PeakTime() > sh_mu.end()->PeakTime()
                 );
         } else if (geoDet == kPDHD) {
-            size_t front_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
+            // size_t front_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
+            size_t front_hit_track_idx = map_hitkey2trkidx.at(sh_mu.start().key());
             float front_hit_y = pt_ev->HasValidPoint(front_hit_track_idx)
                 ? pt_ev->LocationAtPoint(front_hit_track_idx).Y()
                 : util::kBogusF;
-            size_t back_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
+            // size_t back_hit_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
+            size_t back_hit_track_idx = map_hitkey2trkidx.at(sh_mu.end().key());
             float back_hit_y = pt_ev->HasValidPoint(back_hit_track_idx)
                 ? pt_ev->LocationAtPoint(back_hit_track_idx).Y()
                 : util::kBogusF;
@@ -484,7 +473,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump first hit of the track:
         muStartHit = GetHit(sh_mu.start());
-        size_t start_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
+        // size_t start_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.start().key()])->Index();
+        size_t start_track_idx = map_hitkey2trkidx.at(sh_mu.start().key());
         muStartHitY = pt_ev->HasValidPoint(start_track_idx)
             ? pt_ev->LocationAtPoint(start_track_idx).Y()
             : util::kBogusF;
@@ -494,7 +484,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump last hit of the track:
         muEndHit = GetHit(sh_mu.end());
-        size_t end_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
+        // size_t end_track_idx = vhm_mu.at(map_hitkey2metaidx[sh_mu.end().key()])->Index();
+        size_t end_track_idx = map_hitkey2trkidx.at(sh_mu.end().key());
         muEndHitY = pt_ev->HasValidPoint(end_track_idx)
             ? pt_ev->LocationAtPoint(end_track_idx).Y()
             : util::kBogusF;
@@ -573,12 +564,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     PtrHit const& tru_cc_bot = tru_start_side == kBot ? sh_mcp.cc_first() : sh_mcp.cc_second();
                     PtrHit const& tru_cc_top = tru_start_side == kTop ? sh_mcp.cc_first() : sh_mcp.cc_second();
                     std::cout << "TRUTH" << std::endl;
+                    std::cout << "\t" "(Y, Z): " << mcp->Vy() << ", " << mcp->Vz() << " -> " << mcp->EndY() << ", " << mcp->EndZ() << std::endl;
                     std::cout << "\t" "start side: " << tru_start_side << std::endl;
-                    std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
                     std::cout << "\t" "start_T: " << sh_mcp.start()->PeakTime() << "\t" "end_T: " << sh_mcp.end()->PeakTime() << std::endl;
+                    std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
 
                     std::cout << "RECO" << std::endl;
                     std::cout << "\t" "start_side: " << start_side << std::endl;
+                    std::cout << "\t" "start_T: " << sh_mu.start()->PeakTime() << "\t" "end_T: " << sh_mu.end()->PeakTime() << std::endl;
+                    std::cout << "\t" "start_X: " << muStartHitX << "\t" "end_X: " << muEndHitX << std::endl;
                     std::cout << "\t" "cc_bot_T: " << cc_bot->PeakTime() << "\t" "cc_top_T: " << cc_top->PeakTime() << std::endl;
                     std::cout << std::endl;
                 }
@@ -596,7 +590,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             if (ph_mu->View() != geo::kW) continue;
             ana::Hit hit = GetHit(ph_mu);
             muHits.push_back(hit);
-            size_t hit_track_idx = vhm_mu.at(map_hitkey2metaidx[ph_mu.key()])->Index();
+            // size_t hit_track_idx = vhm_mu.at(map_hitkey2metaidx[ph_mu.key()])->Index();
+            size_t hit_track_idx = map_hitkey2trkidx.at(ph_mu.key());
             muHitY.push_back(pt_ev->HasValidPoint(hit_track_idx)
                 ? pt_ev->LocationAtPoint(hit_track_idx).Y()
                 : util::kBogusF
