@@ -587,7 +587,7 @@ namespace ana {
         std::vector<LinearRegression> regs = std::vector<LinearRegression>(2, LinearRegression()); // regressions per side
 
         std::vector<size_t> secs_index = {};
-        size_t side_index = kInvalidSide;
+        size_t side_index = 0;
 
         operator bool() const { return !vph.empty(); }
         PtrHit start() const { return vph.front(); }
@@ -996,8 +996,6 @@ ana::SortedHits ana::MichelModule::GetSortedHits(
         for (PtrHit const& ph : vph_sec[sec])
             sh.vph.push_back(ph);
     }
-    if (sh.side_index == kInvalidSide) 
-        sh.side_index = 0;
     return sh;
 }
 
