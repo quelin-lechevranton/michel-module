@@ -564,12 +564,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     PtrHit const& tru_cc_bot = tru_start_side == kBot ? sh_mcp.cc_first() : sh_mcp.cc_second();
                     PtrHit const& tru_cc_top = tru_start_side == kTop ? sh_mcp.cc_first() : sh_mcp.cc_second();
                     std::cout << "TRUTH" << std::endl;
-                    std::cout << "\t" "(Y, Z): " << mcp->Vy() << ", " << mcp->Vz() << " -> " << mcp->EndY() << ", " << mcp->EndZ() << std::endl;
+                    std::cout << "\t" "(X, Y, Z): " << mcp->Vx() << ", " << mcp->Vy() << ", " << mcp->Vz() << " -> " << mcp->EndX() << ", " << mcp->EndY() << ", " << mcp->EndZ() << std::endl;
                     std::cout << "\t" "start side: " << tru_start_side << std::endl;
                     std::cout << "\t" "start_T: " << sh_mcp.start()->PeakTime() << "\t" "end_T: " << sh_mcp.end()->PeakTime() << std::endl;
                     std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
 
                     std::cout << "RECO" << std::endl;
+                    std::cout << "\t" "(X, Y, Z): " << Start.X() << ", " << Start.Y() << ", " << Start.Z() << " -> " << End.X() << ", " << End.Y() << ", " << End.Z() << std::endl;
                     std::cout << "\t" "start_side: " << start_side << std::endl;
                     std::cout << "\t" "start_T: " << sh_mu.start()->PeakTime() << "\t" "end_T: " << sh_mu.end()->PeakTime() << std::endl;
                     std::cout << "\t" "start_X: " << muStartHitX << "\t" "end_X: " << muEndHitX << std::endl;
