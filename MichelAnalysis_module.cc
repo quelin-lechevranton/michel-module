@@ -359,7 +359,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
         // std::map<size_t, unsigned> map_hitkey2metaidx;
         std::map<size_t, size_t> map_hitkey2trkidx;
-        ASSERT(vph_mu_all.size())
+        ASSERT(!vph_mu_all.empty())
         ASSERT(vph_mu_all.size() == vhm_mu.size())
 
         // remove hits not associated to a track point (hit misassociated to the track?)
@@ -372,6 +372,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             vph_mu.push_back(vph_mu_all[i]);
         }
         vph_mu_all.clear();
+        ASSERT(!vph_mu.empty())
 
         bool track_is_up =  IsUpright(*pt_ev);
         geo::Point_t Start = track_is_up ? pt_ev->Start() : pt_ev->End();

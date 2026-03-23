@@ -695,7 +695,7 @@ namespace ana {
 
         std::pair<geo::TPCID::TPCID_t, geo::TPCID::TPCID_t> GetTPCs(Sec_t sec) const { return sec2tpc.at(geoDet).at(sec); }
         Sec_t GetSec(geo::TPCID::TPCID_t tpc) const { return tpc2sec.at(geoDet).at(tpc); }
-        Sec_t GetSec(PtrHit const&) const { return GetSec(ph->WireID().TPC); }
+        Sec_t GetSec(PtrHit const& ph) const { return GetSec(ph->WireID().TPC); }
         std::vector<Sec_t> GetSecs(Side_t side) const { return side2secs.at(geoDet).at(side); }
         Side_t GetSide(Sec_t sec) const { return sec2side.at(geoDet).at(sec); }
         Side_t GetSide(geo::TPCID::TPCID_t tpc) const { return tpc2side.at(geoDet).at(tpc); }
