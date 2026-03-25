@@ -127,10 +127,10 @@ private:
     ana::Point              truStartPoint;
     ana::Point              truEndPoint;
     float                   truEndEnergy;
-    ana::Hit                truStartHit;
-    ana::Hit                truEndHit;
-    ana::LinearRegression   truReg;
-    float                   truEndAngle;
+    // ana::Hit                truStartHit;
+    // ana::Hit                truEndHit;
+    // ana::LinearRegression   truReg;
+    // float                   truEndAngle;
     enum EnumHasMichel: int { 
         kHasNoMichel        = 0, 
         kHasMichelOutside   = 1, 
@@ -145,14 +145,14 @@ private:
     // float               miShowerLength;
     ana::Hits           miHits;
     std::vector<float>  miHitEnergyFrac;
-    std::vector<float>  miHitMuonAngle;
+    // std::vector<float>  miHitMuonAngle;
     float               miHitEnergy;
 
     // Truth information: Hits nearby muon's end
-    unsigned            miBaryNHit;
-    ana::Vec2           miBary;
-    float               miBaryAngle;
-    float               miBaryMuonAngle;
+    // unsigned            miBaryNHit;
+    // ana::Vec2           miBary;
+    // float               miBaryAngle;
+    // float               miBaryMuonAngle;
 
     void resetEvent(void);
     void resetMuon(void);
@@ -285,23 +285,23 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "TrueStart",        &truStartPoint);
     SetBranches(muTree, "TrueEnd",          &truEndPoint);
     muTree->Branch("TrueEndEnergy",         &truEndEnergy);
-    SetBranches(muTree, "TrueStart",        &truStartHit);
-    SetBranches(muTree, "TrueEnd",          &truEndHit);
-    SetBranches(muTree, "True",             &truReg);
-    muTree->Branch("TrueEndAngle",          &truEndAngle);
+    // SetBranches(muTree, "TrueStart",        &truStartHit);
+    // SetBranches(muTree, "TrueEnd",          &truEndHit);
+    // SetBranches(muTree, "True",             &truReg);
+    // muTree->Branch("TrueEndAngle",          &truEndAngle);
     muTree->Branch("TrueHasMichel",   (int*)&truHasMichel);
     muTree->Branch("MichelTrueEnergy",      &miTrueEnergy); // MeV
     muTree->Branch("MichelTrackLength",     &miTrackLength); // cm
     // muTree->Branch("MichelShowerLength",    &miShowerLength); // cm
     SetBranches(muTree, "Michel",           &miHits);
     muTree->Branch("MichelHitEnergyFrac",   &miHitEnergyFrac);
-    muTree->Branch("MichelHitMuonAngle",    &miHitMuonAngle);
+    // muTree->Branch("MichelHitMuonAngle",    &miHitMuonAngle);
     muTree->Branch("MichelHitEnergy",       &miHitEnergy); // ADC
 
-    muTree->Branch("MichelBaryNHit",        &miBaryNHit);
-    SetBranches(muTree, "MichelBary",       &miBary); 
-    muTree->Branch("MichelBaryAngle",       &miBaryAngle); // rad
-    muTree->Branch("MichelBaryMuonAngle",   &miBaryMuonAngle); // rad
+    // muTree->Branch("MichelBaryNHit",        &miBaryNHit);
+    // SetBranches(muTree, "MichelBary",       &miBary); 
+    // muTree->Branch("MichelBaryAngle",       &miBaryAngle); // rad
+    // muTree->Branch("MichelBaryMuonAngle",   &miBaryMuonAngle); // rad
 }
 
 void ana::MichelAnalysis::analyze(art::Event const& e) {
@@ -600,27 +600,27 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 muHitX.push_back(GetX(ph_mu, cc_bot, cc_top, geoCathodeGap));
             }
 
-            if (mcp) {
-                ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
-                if (sh_mcp && sh_mcp.is_cc()) {
-                    Side_t tru_start_side = GetSide(sh_mcp.start());
-                    PtrHit const& tru_cc_bot = tru_start_side == kBot ? sh_mcp.cc_first() : sh_mcp.cc_second();
-                    PtrHit const& tru_cc_top = tru_start_side == kTop ? sh_mcp.cc_first() : sh_mcp.cc_second();
-                    // std::cout << "TRUTH" << std::endl;
-                    // std::cout << "\t" "(X, Y, Z): " << mcp->Vx() << ", " << mcp->Vy() << ", " << mcp->Vz() << " -> " << mcp->EndX() << ", " << mcp->EndY() << ", " << mcp->EndZ() << std::endl;
-                    // std::cout << "\t" "start side: " << tru_start_side << std::endl;
-                    // std::cout << "\t" "start_T: " << sh_mcp.start()->PeakTime() << "\t" "end_T: " << sh_mcp.end()->PeakTime() << std::endl;
-                    // std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
+            // if (mcp) {
+            //     ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
+            //     if (sh_mcp && sh_mcp.is_cc()) {
+            //         Side_t tru_start_side = GetSide(sh_mcp.start());
+            //         PtrHit const& tru_cc_bot = tru_start_side == kBot ? sh_mcp.cc_first() : sh_mcp.cc_second();
+            //         PtrHit const& tru_cc_top = tru_start_side == kTop ? sh_mcp.cc_first() : sh_mcp.cc_second();
+            //         std::cout << "TRUTH" << std::endl;
+            //         std::cout << "\t" "(X, Y, Z): " << mcp->Vx() << ", " << mcp->Vy() << ", " << mcp->Vz() << " -> " << mcp->EndX() << ", " << mcp->EndY() << ", " << mcp->EndZ() << std::endl;
+            //         std::cout << "\t" "start side: " << tru_start_side << std::endl;
+            //         std::cout << "\t" "start_T: " << sh_mcp.start()->PeakTime() << "\t" "end_T: " << sh_mcp.end()->PeakTime() << std::endl;
+            //         std::cout << "\t" "cc_bot_T: " << tru_cc_bot->PeakTime() << "\t" "cc_top_T: " << tru_cc_top->PeakTime() << std::endl;
 
-                    // std::cout << "RECO" << std::endl;
-                    // std::cout << "\t" "(X, Y, Z): " << Start.X() << ", " << Start.Y() << ", " << Start.Z() << " -> " << End.X() << ", " << End.Y() << ", " << End.Z() << std::endl;
-                    // std::cout << "\t" "start_side: " << start_side << std::endl;
-                    // std::cout << "\t" "start_T: " << vph_mu.front()->PeakTime() << "\t" "end_T: " << vph_mu.back()->PeakTime() << std::endl;
-                    // std::cout << "\t" "start_X: " << muStartHitX << "\t" "end_X: " << muEndHitX << std::endl;
-                    // std::cout << "\t" "cc_bot_T: " << cc_bot->PeakTime() << "\t" "cc_top_T: " << cc_top->PeakTime() << std::endl;
-                    // std::cout << std::endl;
-                }
-            }
+            //         std::cout << "RECO" << std::endl;
+            //         std::cout << "\t" "(X, Y, Z): " << Start.X() << ", " << Start.Y() << ", " << Start.Z() << " -> " << End.X() << ", " << End.Y() << ", " << End.Z() << std::endl;
+            //         std::cout << "\t" "start_side: " << start_side << std::endl;
+            //         std::cout << "\t" "start_T: " << vph_mu.front()->PeakTime() << "\t" "end_T: " << vph_mu.back()->PeakTime() << std::endl;
+            //         std::cout << "\t" "start_X: " << muStartHitX << "\t" "end_X: " << muEndHitX << std::endl;
+            //         std::cout << "\t" "cc_bot_T: " << cc_bot->PeakTime() << "\t" "cc_top_T: " << cc_top->PeakTime() << std::endl;
+            //         std::cout << std::endl;
+            //     }
+            // }
         }
 
         muStartInXYZT = muStartInX && muStartInY && muStartInZ && muStartInT;
@@ -926,68 +926,95 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
-            ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
-            LOG(sh_mcp);
-            if (sh_mcp) {
+            LOG(mcp_mi);
+            if (mcp_mi) {
+                truHasMichel = (
+                    geoTop.isInside(mcp_mi->Position().Vect(), 20.F)
+                    || geoBot.isInside(mcp_mi->Position().Vect(), 20.F)
+                ) ? kHasMichelFiducial : (
+                    geoTop.isInside(mcp_mi->Position().Vect())
+                    || geoBot.isInside(mcp_mi->EndPosition().Vect())
+                    ? kHasMichelInside
+                    : kHasMichelOutside
+                );
+                miTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
+                PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+                miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
+                // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+                // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
 
-                truStartHit = GetHit(sh_mcp.start());
-                truEndHit = GetHit(sh_mcp.end());
-                truReg = sh_mcp.end_reg(geoDet);
-
-                LOG(mcp_mi);
-                if (mcp_mi) {
-                    truHasMichel = (
-                        geoTop.isInside(mcp_mi->Position().Vect(), 20.F)
-                        || geoBot.isInside(mcp_mi->Position().Vect(), 20.F)
-                    ) ? kHasMichelFiducial : (
-                        geoTop.isInside(mcp_mi->Position().Vect())
-                        || geoBot.isInside(mcp_mi->EndPosition().Vect())
-                        ? kHasMichelInside
-                        : kHasMichelOutside
-                    );
-                    miTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
-
-
-                    PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
-                    miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
-                    // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
-                    // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
-
-                    truEndAngle = sh_mcp.end_reg(geoDet).theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
-                    Hits bary_hits;
-                    for (size_t i=0; i<vph_mi.size(); i++) {
-                        PtrHit const& ph_mi = vph_mi[i];
-                        float energyFrac = energyFracs_mi[i];
-
-                        if (ph_mi->View() != geo::kW) continue;
-                        Hit hit = GetHit(ph_mi);
-                        miHits.push_back(hit);
-                        miHitEnergyFrac.push_back(energyFrac);
-
-                        if (hit.section != truEndHit.section) {
-                            miHitMuonAngle.push_back(100);
-                        } else {
-                            float da = (hit.vec(fTick2cm) - truEndHit.vec(fTick2cm)).angle() - truEndAngle;
-                            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-                            miHitMuonAngle.push_back(da);
-                        }
-
-                        if (GetDistance(ph_mi, sh_mcp.end()) > inBarycenterRadius) continue;
-                        bary_hits.push_back(GetHit(ph_mi));
-                    }
-                    miHitEnergy = miHits.energy();
-
-                    LOG(miBaryNHit);
-                    if (bary_hits.size()) {
-                        miBary = bary_hits.barycenter(fTick2cm);
-                        ana::Vec2 end_bary = miBary - truEndHit.vec(fTick2cm);
-                        miBaryAngle = end_bary.angle();
-                        float da = miBaryAngle - truEndAngle;
-                        da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-                        miBaryMuonAngle = da;
-                    }
+                for (size_t i=0; i<vph_mi.size(); i++) {
+                    PtrHit const& ph_mi = vph_mi[i];
+                    float energyFrac = energyFracs_mi[i];
+                    if (ph_mi->View() != geo::kW) continue;
+                    miHits.push_back(GetHit(ph_mi));
+                    miHitEnergyFrac.push_back(energyFrac);
                 }
+                miHitEnergy = miHits.energy();
             }
+
+            // ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
+            // LOG(sh_mcp);
+            // if (sh_mcp) {
+
+            //     truStartHit = GetHit(sh_mcp.start());
+            //     truEndHit = GetHit(sh_mcp.end());
+            //     truReg = sh_mcp.end_reg(geoDet);
+
+            //     LOG(mcp_mi);
+            //     if (mcp_mi) {
+            //         truHasMichel = (
+            //             geoTop.isInside(mcp_mi->Position().Vect(), 20.F)
+            //             || geoBot.isInside(mcp_mi->Position().Vect(), 20.F)
+            //         ) ? kHasMichelFiducial : (
+            //             geoTop.isInside(mcp_mi->Position().Vect())
+            //             || geoBot.isInside(mcp_mi->EndPosition().Vect())
+            //             ? kHasMichelInside
+            //             : kHasMichelOutside
+            //         );
+            //         miTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
+
+
+            //         PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+            //         miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
+            //         // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+            //         // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
+
+            //         truEndAngle = sh_mcp.end_reg(geoDet).theta(mcp->EndZ() > mcp->Vz() ? 1 : -1);
+            //         Hits bary_hits;
+            //         for (size_t i=0; i<vph_mi.size(); i++) {
+            //             PtrHit const& ph_mi = vph_mi[i];
+            //             float energyFrac = energyFracs_mi[i];
+
+            //             if (ph_mi->View() != geo::kW) continue;
+            //             Hit hit = GetHit(ph_mi);
+            //             miHits.push_back(hit);
+            //             miHitEnergyFrac.push_back(energyFrac);
+
+            //             if (hit.section != truEndHit.section) {
+            //                 miHitMuonAngle.push_back(100);
+            //             } else {
+            //                 float da = (hit.vec(fTick2cm) - truEndHit.vec(fTick2cm)).angle() - truEndAngle;
+            //                 da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            //                 miHitMuonAngle.push_back(da);
+            //             }
+
+            //             if (GetDistance(ph_mi, sh_mcp.end()) > inBarycenterRadius) continue;
+            //             bary_hits.push_back(GetHit(ph_mi));
+            //         }
+            //         miHitEnergy = miHits.energy();
+
+            //         LOG(miBaryNHit);
+            //         if (bary_hits.size()) {
+            //             miBary = bary_hits.barycenter(fTick2cm);
+            //             ana::Vec2 end_bary = miBary - truEndHit.vec(fTick2cm);
+            //             miBaryAngle = end_bary.angle();
+            //             float da = miBaryAngle - truEndAngle;
+            //             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            //             miBaryMuonAngle = da;
+            //         }
+            //     }
+            // }
         }
 
         muTree->Fill();
@@ -1051,10 +1078,10 @@ void ana::MichelAnalysis::resetMuon() {
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
     truEndEnergy = util::kBogusF;
-    truStartHit = ana::Hit{};
-    truEndHit = ana::Hit{};
-    truReg = ana::LinearRegression{};
-    truEndAngle = util::kBogusF;
+    // truStartHit = ana::Hit{};
+    // truEndHit = ana::Hit{};
+    // truReg = ana::LinearRegression{};
+    // truEndAngle = util::kBogusF;
     truHasMichel = kHasNoMichel;
 
     miTrueEnergy = util::kBogusF;
@@ -1062,13 +1089,13 @@ void ana::MichelAnalysis::resetMuon() {
     // miShowerLength = util::kBogusF;
     miHits.clear();
     miHitEnergyFrac.clear();
-    miHitMuonAngle.clear();
+    // miHitMuonAngle.clear();
     miHitEnergy = util::kBogusF;
 
-    miBaryNHit = 0;
-    miBary = ana::Vec2{0,0};
-    miBaryAngle = util::kBogusF;
-    miBaryMuonAngle = util::kBogusF;
+    // miBaryNHit = 0;
+    // miBary = ana::Vec2{0,0};
+    // miBaryAngle = util::kBogusF;
+    // miBaryMuonAngle = util::kBogusF;
 }
 
 DEFINE_ART_MODULE(ana::MichelAnalysis)
