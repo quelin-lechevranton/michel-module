@@ -1,0 +1,70 @@
+# #include "services_dune.fcl"
+#include "services_refactored_pdune.fcl"
+#include "caldata_dune.fcl"
+#include "wirecell_dune.fcl"
+#include "hitfindermodules_dune.fcl"
+#include "SpacePointSolver_dune.fcl"
+#include "cluster_dune.fcl"
+#include "trackfindermodules_dune.fcl"
+#include "pandoramodules_dune.fcl"
+#include "calorimetry_pdune.fcl"
+#include "calibration_dune.fcl"
+#include "featurelabelingmodules.fcl"
+#include "particleid.fcl"
+#include "mctrutht0matching.fcl"
+#include "t0reco.fcl"
+#include "opticaldetectormodules_dune.fcl"
+#include "showerfindermodules_dune.fcl"
+#include "emshower3d.fcl"
+#include "ProtoDUNETriggerFilter.fcl"
+#include "OpSlicer.fcl"
+#include "CRT.fcl"
+#include "T0RecoAnodePiercers.fcl"
+#include "numberofhitsfilter.fcl"
+#include "cluster3dalgorithms_dune.fcl"
+#include "protodune_tools_dune.fcl"
+
+process_name: RunDetchecks
+
+services: {
+    TFileService: { fileName: "pdsp_Detchecks.root" }
+    TimeTracker:            @local::dune_time_tracker
+    MemoryTracker:          @local::dune_memory_tracker
+    RandomNumberGenerator: {}
+    message:                @local::dune_message_services_prod
+    FileCatalogMetadata:    @local::art_file_catalog_mc
+                            @table::protodune_reco_services
+    IFDH: {}
+}
+services.Geometry.SortingParameters.ChannelsPerOpDet: 12
+services.Geometry.GDML: "protodune_v7.gdml"
+services.AuxDetGeometry.GDML: @local::services.Geometry.GDML
+services.BackTrackerService.BackTracker.G4ModuleLabel: "largeant"
+services.BackTrackerService.BackTracker.SimChannelModuleLabel: "tpcrawdecoder:simpleSC"
+services.DetectorPropertiesService: @local::protodunesp_detproperties
+services.DetectorPropertiesService.GetHVDriftfromSamweb:           false
+services.DetectorPropertiesService.GetReadOutWindowSizefromSamweb: false
+services.DetectorPropertiesService.UseRunDependentTemperature:     false
+services.RawDigitPrepService.ToolNames: @local::pdsim_dataprep_tools_wirecell
+
+source: {
+    module_type: RootInput
+    maxEvents: 1
+}
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "Detchecks"
+            WireGeo: true
+            WireEnds: false
+            TPCBounds: true
+            TPCChannels: false
+            pCollectionZ: false
+            ViewUCoord: false
+            ViewVCoord: false
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}

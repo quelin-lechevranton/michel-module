@@ -72,14 +72,16 @@ namespace ana {
        BOT       TOP
     */
 
-    enum Det_t: int { kPDVD, kPDHD };
+    enum Det_t: int { kPDVD, kPDHD, kPDSP };
+    std::vector<std::string> const det_name = { "PDVD", "PDHD", "PDSP" };
     enum Side_t: int { kTop=1, kBot=0, kInvalidSide=-1 };
     using Sec_t = int;
     static constexpr Sec_t kInvalidSec = -1;
 
     std::vector<unsigned> const n_sec = {
         8, // PDVD
-        2  // PDHD
+        2, // PDHD
+        2  // PDSP
     };
     std::vector<std::map<geo::TPCID::TPCID_t, Sec_t>> const tpc2sec = {
         { // PDVD
@@ -98,9 +100,15 @@ namespace ana {
             {6, 1}, {2, 1},
             {7, kInvalidSec}, {3, kInvalidSec},
             { geo::TPCID::InvalidID, kInvalidSec }
+        }, { // PDSP
+            {8, kInvalidSide}, {4, kInvalidSec}, {0, kInvalidSec},
+            {9, 0},  {5, 0}, {1, 0},
+            {10, 0}, {6, 1}, {2, 1},
+            {11, kInvalidSide}, {7, kInvalidSec}, {3, kInvalidSec},
+            { geo::TPCID::InvalidID, kInvalidSec }
         }
     };
-    std::vector<std::map<Sec_t, std::pair<geo::TPCID::TPCID_t, geo::TPCID::TPCID_t>>> const sec2tpc = {
+    std::vector<std::map<Sec_t, std::vector<geo::TPCID::TPCID_t>>> const sec2tpcs = {
         { // PDVD
             {0, {8, 10} },
             {1, {9, 11} },
@@ -110,11 +118,15 @@ namespace ana {
             {5, {1, 3} },
             {6, {4, 6} },
             {7, {5, 7} },
-            {kInvalidSec, { geo::TPCID::InvalidID, geo::TPCID::InvalidID } }
+            {kInvalidSec, { geo::TPCID::InvalidID } }
         }, { // PDHD
             {0, {1, 5} },
             {1, {2, 6} },
-            {kInvalidSec, { geo::TPCID::InvalidID, geo::TPCID::InvalidID } }
+            {kInvalidSec, { geo::TPCID::InvalidID } }
+        }, { // PDSP
+            {0, {1, 5, 9} },
+            {1, {2, 6, 10} },
+            {kInvalidSec, { geo::TPCID::InvalidID } }
         }
     };
     std::vector<std::map<geo::TPCID::TPCID_t, Side_t>> const tpc2side = {
@@ -128,6 +140,11 @@ namespace ana {
             { 0, kInvalidSide }, { 1, kBot }, { 2, kTop }, { 3, kInvalidSide },
             { 4, kInvalidSide }, { 5, kBot }, { 6, kTop }, { 7, kInvalidSide },
             { geo::TPCID::InvalidID, kInvalidSide }
+        }, { // PDSP
+            { 0, kInvalidSide }, { 1, kBot }, { 2, kTop }, { 3, kInvalidSide },
+            { 4, kInvalidSide }, { 5, kBot }, { 6, kTop }, { 7, kInvalidSide },
+            { 8, kInvalidSide }, { 9, kBot }, { 10, kTop }, { 11, kInvalidSide },
+            { geo::TPCID::InvalidID, kInvalidSide }
         }
     };
     std::vector<std::map<Side_t, std::vector<Sec_t>>> const side2secs = {
@@ -135,6 +152,9 @@ namespace ana {
             { kBot, {4, 5, 6, 7} }, { kTop, {0, 1, 2, 3} },
             { kInvalidSide, {} }
         }, { // PDHD
+            { kBot, {0} }, { kTop, {1} },
+            { kInvalidSide, {} }
+        }, { // PDSP
             { kBot, {0} }, { kTop, {1} },
             { kInvalidSide, {} }
         }
@@ -145,6 +165,9 @@ namespace ana {
             {4, kBot}, {5, kBot}, {6, kBot}, {7, kBot},
             {kInvalidSec, kInvalidSide }
         }, { // PDHD
+            {0, kBot}, {1, kTop},
+            { kInvalidSec, kInvalidSide }
+        }, { // PDSP 
             {0, kBot}, {1, kTop},
             { kInvalidSec, kInvalidSide }
         }
@@ -693,7 +716,7 @@ namespace ana {
         // art::FindManyP<recob::Hit> *fmp_shw2hit;
         // art::FindOneP<recob::Shower> *fop_hit2shw;
 
-        std::pair<geo::TPCID::TPCID_t, geo::TPCID::TPCID_t> GetTPCs(Sec_t sec) const { return sec2tpc.at(geoDet).at(sec); }
+        std::vector<geo::TPCID::TPCID_t> GetTPCs(Sec_t sec) const { return sec2tpcs.at(geoDet).at(sec); }
         Sec_t GetSec(geo::TPCID::TPCID_t tpc) const { return tpc2sec.at(geoDet).at(tpc); }
         Sec_t GetSec(PtrHit const& ph) const { return GetSec(ph->WireID().TPC); }
         std::vector<Sec_t> GetSecs(Side_t side) const { return side2secs.at(geoDet).at(side); }
@@ -766,8 +789,10 @@ ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
         geoDet = kPDVD;
     else if (asGeo->DetectorName().find("hd") != std::string::npos)
         geoDet = kPDHD;
+    else if (asGeo->DetectorName() == "protodunev7")
+        geoDet = kPDSP;
     else {
-        std::cout << "\033[1;91m" "unknown geometry: "
+        std::cout << "MiAna: " "\033[1;91m" "unknown geometry: "
             << asGeo->DetectorName() << "\033[0m" << std::endl;
         exit(1);
     }
@@ -781,7 +806,7 @@ ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
 bool ana::MichelModule::IsUpright(recob::Track const& T) {
     if (geoDet == kPDVD)
         return T.Start().X() > T.End().X();
-    if (geoDet == kPDHD)
+    if (geoDet == kPDHD || geoDet == kPDSP)
         return T.Start().Y() > T.End().Y();
     return false;
 }

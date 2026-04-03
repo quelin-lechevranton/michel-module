@@ -1,6 +1,5 @@
 #include "services_dune.fcl"
 #include "services_protodunevd.fcl" 
-#include "tools_dune.fcl"	
 
 process_name: RunDetchecks
 
@@ -17,9 +16,8 @@ services: {
 
 source: {
     module_type: RootInput
-    maxEvents: -1
+    maxEvents: 1
 }
-
 
 physics: {
     analyzers: {

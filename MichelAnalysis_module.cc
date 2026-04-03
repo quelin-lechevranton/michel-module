@@ -100,9 +100,9 @@ private:
     bool                    muEndInZ;
     bool                    muEndInT;
     bool                    muEndInXYZT;
-    bool                    muRegError;
-    ana::LinearRegression   muTopReg;
-    ana::LinearRegression   muBotReg;
+    // bool                    muRegError;
+    // ana::LinearRegression   muTopReg;
+    // ana::LinearRegression   muBotReg;
     float                   muEndAngle;
     bool                    muCathodeCrossing;
     bool                    muCathodeMisaligned;
@@ -194,17 +194,27 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
                 asGeo->TPC(geo::TPCID{0, 6}).Max()
             };
             break;
+        case kPDSP:
+            geoBot = ana::Bounds3D<float>{
+                asGeo->TPC(geo::TPCID{0, 1}).Min(),
+                asGeo->TPC(geo::TPCID{0, 9}).Max()
+            };
+            geoTop = ana::Bounds3D<float>{
+                asGeo->TPC(geo::TPCID{0, 2}).Min(),
+                asGeo->TPC(geo::TPCID{0, 10}).Max()
+            };
+            break;
         default: break;
     }
     geoCathodeGap = geoTop.x.min - geoBot.x.max;
 
-    std::cout << "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+    std::cout << "MiAna: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Detector Geometry: " << asGeo->DetectorName()
-        << "  (" << (!geoDet ? "PDVD" : "PDHD") << ")" << std::endl
+        << "  (" << ana::det_name[geoDet] << ")" << std::endl
         << "  Tick Window: " << wireWindow << std::endl
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
-    std::cout << "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+    std::cout << "MiAna: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Keep All Events: " << (inKeepAll ? "true" : "false") << std::endl
         << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
@@ -240,7 +250,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "End",      &muEndPoint);
 
     // Hit
-    muTree->Branch("RegError",                  &muRegError);
+    // muTree->Branch("RegError",                  &muRegError);
     muTree->Branch("CathodeCrossing",           &muCathodeCrossing);
     muTree->Branch("CathodeMisaligned",         &muCathodeMisaligned);
     // muTree->Branch("AnodeCrossing",             &muAnodeCrossing);
@@ -264,8 +274,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "",                     &muHits);
     muTree->Branch("HitX",                      &muHitX);
     muTree->Branch("HitY",                      &muHitY);
-    SetBranches(muTree, "Top",                  &muTopReg);
-    SetBranches(muTree, "Bot",                  &muBotReg);
+    // SetBranches(muTree, "Top",                  &muTopReg);
+    // SetBranches(muTree, "Bot",                  &muBotReg);
     muTree->Branch("HitdQds",                   &muHitdQds);
     SetBranches(muTree, "Sphere",               &muSphereHits);
     muTree->Branch("SphereHitMuonAngle",        &muSphereHitMuonAngle);
@@ -311,7 +321,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
-        std::cout << "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
+        std::cout << "MiAna: " "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrHit vph_ev;
@@ -319,7 +329,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) {
-        std::cout << "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
+        std::cout << "MiAna: " "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrTrk vpt_ev;
@@ -327,7 +337,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
     // auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
     // if (!vh_shw.isValid()) {
-    //     std::cout << "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
+    //     std::cout << "MiAna: " "\033[1;91m" "No valid recob::Shower handle" "\033[0m" << std::endl;
     //     return;
     // }
     // VecPtrShw vps_ev;
@@ -407,46 +417,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         LOG(muLength >= inTrackLengthCut);
         if (!inKeepAll && muLength < inTrackLengthCut) continue;
 
-        // Sort Hits by their Index in the TrackHitMeta data
-        // Never tested
-        // ana::SortedHits sh_mu;
-        // sh_mu.vph = vph_mu; // collection hits with valid points
-        // std::sort(sh_mu.vph.begin(), sh_mu.vph.end(),
-        //     [&map_hitkey2metaidx](PtrHit const& a, PtrHit const& b) {
-        //         return map_hitkey2metaidx[a.key()] < map_hitkey2metaidx[b.key()];
-        //     }
-        // );
-        // Sec_t prev_sec = kInvalidSec, prev_side = kInvalidSide;
-        // PtrHit& prev_ph = sh_mu.vph.front();
-        // for (PtrHit const& ph : sh_mu.vph) {
-        //     Sec_t sec = GetSec(ph->WireID().TPC);
-        //     Side_t side = GetSide(ph->WireID().TPC);
-        //     if (prev_sec == kInvalidSec || sec != prev_sec) {
-        //         sh_mu.secs.push_back(sec);
-        //         sh_mu.sc.push_back(prev_ph);
-        //         sh_mu.sc.push_back(ph);
-        //     }
-        //     prev_sec = sec;
-        //     if (side != kInvalidSide) {
-        //         double z = GetSpace(ph->WireID());
-        //         double t = ph->PeakTime() * fTick2cm;
-        //         sh_mu.regs[side].add(z, t);
-        //     }
-        //     if (prev_side != kInvalidSide && side != prev_side) {
-        //         sh_mu.cc = std::make_pair(prev_ph, ph);
-        //     }
-        //     prev_side = side;
-        //     prev_ph = ph;
-        //     // sh_mu.bot_index?
-        //     // sh_mu.endsec_index?
-        // }
-        // sh_mu.regs[kBot].compute();
-        // sh_mu.regs[kTop].compute();
-
-        // sh_mu.start = sh_mu.vph.front();
-        // sh_mu.end = sh_mu.vph.back();
-
-
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
             return map_hitkey2trkidx.at(ph1.key()) < map_hitkey2trkidx.at(ph2.key());
@@ -469,7 +439,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 is_up = vph_mu.front()->PeakTime() < vph_mu.back()->PeakTime();
             else
                 is_up = vph_mu.front()->PeakTime() > vph_mu.back()->PeakTime();
-        } else if (geoDet == kPDHD) {
+        } else if (geoDet == kPDHD || geoDet == kPDSP) {
             float front_y = pt_ev->LocationAtPoint(map_hitkey2trkidx.at(vph_mu.front().key())).Y();
             float back_y = pt_ev->LocationAtPoint(map_hitkey2trkidx.at(vph_mu.back().key())).Y();
             is_up = front_y > back_y;
@@ -1054,8 +1024,8 @@ void ana::MichelAnalysis::resetMuon() {
     muEndInZ = false;
     muEndInT = false;
     muEndInXYZT = false;
-    muTopReg = ana::LinearRegression{};
-    muBotReg = ana::LinearRegression{};
+    // muTopReg = ana::LinearRegression{};
+    // muBotReg = ana::LinearRegression{};
     muEndAngle = util::kBogusF;
     muCathodeCrossing = false;
     muCathodeMisaligned = false;
