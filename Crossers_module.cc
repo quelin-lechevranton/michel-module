@@ -399,9 +399,9 @@ void ana::Crossers::analyze(art::Event const& e) {
                 && geoTop.z.isInside(start_z, inFiducialLength)
                 && wireWindow.isInside(vph_mu.front()->PeakTime(), inFiducialLength/fTick2cm);
             break;
-        // case kPDSP:
-        //     trAnodeCrossing;
-        //     break;
+        case kPDSP:
+            trAnodeCrossing = false;
+            break;
         }
         LOG(trAnodeCrossing);
 
@@ -421,7 +421,6 @@ void ana::Crossers::analyze(art::Event const& e) {
 
         if (trCathodeCrossing) {
             Side_t start_side = GetSide(vph_mu.front());
-            Side_t end_side = GetSide(vph_mu.back());
             PtrHit const& cc_bot = start_side == kBot ? cc_first : cc_second;
             PtrHit const& cc_top = start_side == kTop ? cc_first : cc_second;
 
