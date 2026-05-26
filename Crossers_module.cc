@@ -53,10 +53,7 @@ private:
 
     // Input Parameters
     bool        inLog;
-    float       inTrackLengthCut; // in cm
     float       inFiducialLength; // in cm
-    float       inBarycenterRadius; // in cm
-    float       inMichelRadius; // in cm
     unsigned    inRegN;
 
     // Output Variables
@@ -88,6 +85,12 @@ private:
     bool                    trCathodeCrossing;
     float                   trCathodeAlignment;
     bool                    trAnodeCrossing;
+
+    ana::LinearRegression   trStartReg;
+    ana::LinearRegression   trGhostReg;
+
+    bool                    trGhostTrack;
+
     std::vector<float>      trHitdQds;
     
     // Truth information: Muon
@@ -131,10 +134,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     : EDAnalyzer{p} 
     , MichelModule{p}
     , inLog(p.get<bool>("Log", true))
-    , inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)) // in cm
     , inFiducialLength(p.get<float>("FiducialLength", 20.F)) // in cm
-    , inBarycenterRadius(p.get<float>("BarycenterRadius", 10.F)) // in cm
-    , inMichelRadius(p.get<float>("MichelRadius", 20.F)) //in cm
     , inRegN(p.get<unsigned>("RegN", 6))
 {
     auto const clockData = asDetClocks->DataForJob();
@@ -183,10 +183,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
     std::cout << "Crossers: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
-        << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
-        << "  Barycenter Radius: " << inBarycenterRadius << " cm" << std::endl
-        << "  Michel Space Radius: " << inMichelRadius << " cm" << std::endl
         << "  Smoothing Length: " << inRegN << " points" << std::endl;
 
     evTree = asFile->make<TTree>("event","");
@@ -220,6 +217,9 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("CathodeCrossing",           &trCathodeCrossing);
     trTree->Branch("CathodeAlignment",          &trCathodeAlignment);
     trTree->Branch("AnodeCrossing",             &trAnodeCrossing);
+    SetBranches(trTree, "Start",    &trStartReg);
+    SetBranches(trTree, "Ghost",    &trGhostReg);
+    trTree->Branch("GhostTrack",                &trGhostTrack);
     // trTree->Branch("EndAngle",                  &trEndAngle);
     SetBranches(trTree, "",                     &trHits);
     trTree->Branch("HitAX",                     &trHitAX);
@@ -382,6 +382,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         trCathodeAlignment = is_cc ? abs(cc_first->PeakTime()-cc_second->PeakTime())*fTick2cm : -1.F;
         LOG(trCathodeCrossing);
 
+        float start_t = vph_mu.front()->PeakTime();
         float start_y = pt_ev->HasValidPoint(map_hitkey2trkidx.at(vph_mu.front().key()))
             ? pt_ev->LocationAtPoint(map_hitkey2trkidx.at(vph_mu.front().key())).Y()
             : util::kBogusF;
@@ -391,13 +392,13 @@ void ana::Crossers::analyze(art::Event const& e) {
             trAnodeCrossing = GetSide(vph_mu.front()) == kTop
                 && geoTop.y.isInside(start_y, inFiducialLength)
                 && geoTop.z.isInside(start_z, inFiducialLength)
-                && wireWindow.isInside(vph_mu.front()->PeakTime(), inFiducialLength/fTick2cm);
+                && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
             break;
         case kPDHD:
             trAnodeCrossing =
                 geoTop.y.isInside(start_y, inFiducialLength)
                 && geoTop.z.isInside(start_z, inFiducialLength)
-                && wireWindow.isInside(vph_mu.front()->PeakTime(), inFiducialLength/fTick2cm);
+                && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
             break;
         case kPDSP:
             trAnodeCrossing = false;
@@ -408,7 +409,6 @@ void ana::Crossers::analyze(art::Event const& e) {
 
         // dump hits
         for (PtrHit const& ph_mu : vph_mu) {
-            if (ph_mu->View() != geo::kW) continue;
             ana::Hit hit = GetHit(ph_mu);
             trHits.push_back(hit);
 
@@ -425,7 +425,6 @@ void ana::Crossers::analyze(art::Event const& e) {
             PtrHit const& cc_top = start_side == kTop ? cc_first : cc_second;
 
             for (PtrHit const& ph_mu : vph_mu) {
-                if (ph_mu->View() != geo::kW) continue;
                 trHitCX.push_back(GetSide(ph_mu) == kBot
                     ? -(geoCathodeGap/2) - (cc_bot->PeakTime() - ph_mu->PeakTime()) * fTick2cm
                     : +(geoCathodeGap/2) + (cc_top->PeakTime() - ph_mu->PeakTime()) * fTick2cm
@@ -436,17 +435,42 @@ void ana::Crossers::analyze(art::Event const& e) {
             Side_t start_side = GetSide(vph_mu.front());
 
             for (PtrHit const& ph_mu : vph_mu) {
-                if (ph_mu->View() != geo::kW) continue;
-
                 if (GetSide(ph_mu) == start_side)
                     trHitAX.push_back(GetSide(ph_mu) == kTop
-                        ? geoTop.x.max - (ph_mu->PeakTime() - vph_mu.front()->PeakTime()) * fTick2cm
-                        : geoBot.x.min + (ph_mu->PeakTime() - vph_mu.front()->PeakTime()) * fTick2cm
+                        ? geoTop.x.max - (ph_mu->PeakTime() - start_t) * fTick2cm
+                        : geoBot.x.min + (ph_mu->PeakTime() - start_t) * fTick2cm
                     );
                 else
                     trHitAX.push_back(util::kBogusF);
             }
         }
+
+        // Search for ghost track
+        int n = 0;
+        for (PtrHit const& ph_mu : vph_mu) {
+            if (n++ == 10) break;
+            trStartReg.add( GetSpace(ph_mu), ph_mu->PeakTime()*fTick2cm );
+        }
+        trStartReg.compute();
+
+        int induction_hits = 0;
+        for (PtrHit const& ph_ev : vph_ev) {
+            PtrTrk const& pt = fop_hit2trk.at(ph_ev.key());
+            if (pt.isNonnull() && pt.key() == pt_ev.key()) continue;
+
+            if (ph_ev->View() != geo::kW) {
+                if (GetDistance(ph_ev, (Side_t)-1, start_y, start_z, start_t, true) < 20)
+                    induction_hits++;
+                continue;
+            }
+            if (GetDistance(ph_ev, vph_mu.front()) > 20) continue;
+            trGhostReg.add( GetSpace(ph_ev), ph_ev->PeakTime()*fTick2cm );
+        }
+        trGhostReg.compute();
+
+        trGhostTrack = trGhostReg.r2 > 0.8 
+            && abs( (trGhostReg.m - trStartReg.m) / trStartReg.m ) < 10 
+            && (trGhostReg.n - induction_hits) > 0;
 
         // Truth Information
         // LOG(mcp);
@@ -513,6 +537,9 @@ void ana::Crossers::resetMuon() {
     trCathodeCrossing = false;
     trCathodeAlignment = -1.F;
     trAnodeCrossing = false;
+    trStartReg.clear();
+    trGhostReg.clear();
+    trGhostTrack = false;
     trHitdQds.clear();
 
     // truPdg = 0;
