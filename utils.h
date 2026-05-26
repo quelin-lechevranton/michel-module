@@ -27,6 +27,7 @@
 #include "canvas/Persistency/Common/FindOneP.h"
 
 #include "lardataobj/RecoBase/TrackHitMeta.h"
+#include "lardataobj/RecoBase/Wire.h"
 
 #include <TTree.h>
 #include <TBranch.h>
@@ -74,7 +75,7 @@ namespace ana {
 
     enum Det_t: int { kPDVD, kPDHD, kPDSP };
     std::vector<std::string> const det_name = { "PDVD", "PDHD", "PDSP" };
-    enum Side_t: int { kTop=1, kBot=0, kInvalidSide=-1 };
+    enum Side_t: int { kBot=0, kTop=1, kInvalidSide=-1 };
     using Sec_t = int;
     static constexpr Sec_t kInvalidSec = -1;
 
@@ -205,9 +206,17 @@ namespace ana {
         double theta(int dirx) const {
             return atan2(dirx*cov, dirx*(lp-vary));
         }
+        void clear() {
+            n=0;
+            mx=0; my=0; mx2=0; my2=0; mxy=0;
+            varx=0; vary=0; cov=0;
+            m=0; p=0; r2=0;
+            lp=0; corr=0;
+        }
         void SetBranches(TTree* t, const char* pre="") {
-            t->Branch(Form("%sRegM", pre), &m);
-            t->Branch(Form("%sRegP", pre), &p);
+            t->Branch(Form("%sRegN", pre),  &n);
+            t->Branch(Form("%sRegM", pre),  &m);
+            t->Branch(Form("%sRegP", pre),  &p);
             t->Branch(Form("%sRegR2", pre), &r2);
         }
     };
@@ -347,11 +356,7 @@ namespace ana {
         }
         unsigned size() const { return N; }
         bool empty() const { return !N; }
-        float energy() const {
-            float e = 0;
-            for (float a : adc) e+=a;
-            return e;
-        }
+        float energy() const { return std::accumulate(adc.begin(), adc.end(), 0.F); }
         Vec2 barycenter(float tick2cm=1) const {
             float bs=0, bt=0;
             unsigned bn=0;
@@ -536,7 +541,7 @@ namespace ana {
     ) {
         if (!mcp) return VecPtrHit{};
         VecPtrHit vph_mcp;
-        for (PtrHit ph_ev : vph_ev)
+        for (PtrHit ph_ev : vph_ev) {
             for (sim::TrackIDE ide : (use_eve
                 ? bt_serv->HitToEveTrackIDEs(clockData, ph_ev)
                 : bt_serv->HitToTrackIDEs(clockData, ph_ev)
@@ -546,6 +551,7 @@ namespace ana {
                     if (energyFracs) energyFracs->push_back(ide.energyFrac);
                 }
             }
+        }
         return vph_mcp;
     }
 
@@ -723,6 +729,7 @@ namespace ana {
         Side_t GetSide(Sec_t sec) const { return sec2side.at(geoDet).at(sec); }
         Side_t GetSide(geo::TPCID::TPCID_t tpc) const { return tpc2side.at(geoDet).at(tpc); }
         Side_t GetSide(PtrHit const& ph) const { return GetSide(ph->WireID().TPC); }
+        Side_t GetSide(ana::Hit const& h) const { return GetSide(h.tpc); }
 
         bool IsUpright(recob::Track const& T);
         std::string GetParticleName(int pdg);
