@@ -53,6 +53,7 @@ private:
 
     // Input Parameters
     bool        inLog;
+    float       inTrackLengthCut; // in cm
     float       inFiducialLength; // in cm
     unsigned    inRegN;
 
@@ -94,11 +95,17 @@ private:
     std::vector<float>      trHitdQds;
     
     // Truth information: Muon
-    // int                     truPdg;
-    // std::string             truEndProcess;
-    // ana::Point              truStartPoint;
-    // ana::Point              truEndPoint;
-    // float                   truEndEnergy;
+    int                     truPdg;
+    std::string             truEndProcess;
+    ana::Point              truStartPoint;
+    ana::Point              truEndPoint;
+    float                   truEndEnergy;
+
+    ana::Point              truCathodePoint;
+    bool                    truCathodeCrossing;
+    ana::Point              truAnodePoint;
+    bool                    truAnodeCrossing;
+
     // ana::Hit                truStartHit;
     // ana::Hit                truEndHit;
     // ana::LinearRegression   truReg;
@@ -134,6 +141,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     : EDAnalyzer{p} 
     , MichelModule{p}
     , inLog(p.get<bool>("Log", true))
+    , inTrackLengthCut(p.get<float>("TrackLengthCut", 30.F)) // in cm
     , inFiducialLength(p.get<float>("FiducialLength", 20.F)) // in cm
     , inRegN(p.get<unsigned>("RegN", 6))
 {
@@ -183,6 +191,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
     std::cout << "Crossers: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+        << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
         << "  Smoothing Length: " << inRegN << " points" << std::endl;
 
@@ -197,7 +206,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     evTree->Branch("IsData",        &evIsData);
     SetBranches(evTree, "",         &evHits);
 
-    trTree = asFile->make<TTree>("muon","");
+    trTree = asFile->make<TTree>("track","");
 
     // Event
     trTree->Branch("EventRun",      &evRun);
@@ -228,11 +237,17 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("HitdQds",                   &trHitdQds);
 
     // Truth
-    // trTree->Branch("TruePdg",               &truPdg);
-    // trTree->Branch("TrueEndProcess",        &truEndProcess);
-    // SetBranches(trTree, "TrueStart",        &truStartPoint);
-    // SetBranches(trTree, "TrueEnd",          &truEndPoint);
-    // trTree->Branch("TrueEndEnergy",         &truEndEnergy);
+    trTree->Branch("TruePdg",               &truPdg);
+    trTree->Branch("TrueEndProcess",        &truEndProcess);
+    SetBranches(trTree, "TrueStart",        &truStartPoint);
+    SetBranches(trTree, "TrueEnd",          &truEndPoint);
+    trTree->Branch("TrueEndEnergy",         &truEndEnergy);
+
+    SetBranches(trTree, "TrueCathode",      &truCathodePoint);
+    trTree->Branch("TrueCathodeCrossing",   &truCathodeCrossing);
+    SetBranches(trTree, "TrueAnode",        &truAnodePoint);
+    trTree->Branch("TrueAnodeCrossing",     &truAnodeCrossing);
+
     // SetBranches(trTree, "TrueStart",        &truStartHit);
     // SetBranches(trTree, "TrueEnd",          &truEndHit);
     // SetBranches(trTree, "True",             &truReg);
@@ -315,19 +330,9 @@ void ana::Crossers::analyze(art::Event const& e) {
 
         if (inLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evTrackNumber << " (" << trIndex << ")" "\033[0m" << std::endl;
 
-        // get truth information about the track's particle and potential michel electron
-        // simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
-        // simb::MCParticle const* mcp_mi = nullptr;
-        // VecPtrHit vph_mcp_mu, vph_mi;
-        // std::vector<float> energyFracs_mi;
-        // if (mcp) {
-        //     mcp_mi = GetMichelMCP(mcp);
-        //     vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
-        //     vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
-        // }
-
         // dump basic track information
         trLength = pt_ev->Length();
+        ASSERT(trLength > inTrackLengthCut)
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
             return map_hitkey2trkidx.at(ph1.key()) < map_hitkey2trkidx.at(ph2.key());
@@ -448,7 +453,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         // Search for ghost track
         int n = 0;
         for (PtrHit const& ph_mu : vph_mu) {
-            if (n++ == 10) break;
+            if (n++ == 20) break;
             trStartReg.add( GetSpace(ph_mu), ph_mu->PeakTime()*fTick2cm );
         }
         trStartReg.compute();
@@ -456,7 +461,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         int induction_hits = 0;
         for (PtrHit const& ph_ev : vph_ev) {
             PtrTrk const& pt = fop_hit2trk.at(ph_ev.key());
-            if (pt.isNonnull() && pt.key() == pt_ev.key()) continue;
+            if (pt.isNonnull() && pt->Length() > inTrackLengthCut) continue;
 
             if (ph_ev->View() != geo::kW) {
                 if (GetDistance(ph_ev, (Side_t)-1, start_y, start_z, start_t, true) < 20)
@@ -472,44 +477,72 @@ void ana::Crossers::analyze(art::Event const& e) {
             && abs( (trGhostReg.m - trStartReg.m) / trStartReg.m ) < 10 
             && (trGhostReg.n - induction_hits) > 0;
 
+
         // Truth Information
-        // LOG(mcp);
+        simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
+        // simb::MCParticle const* mcp_mi = nullptr;
+        // VecPtrHit vph_mcp_mu, vph_mi;
+        // std::vector<float> energyFracs_mi;
         // if (mcp) {
-        //     truPdg = mcp->PdgCode();
-        //     truEndProcess = mcp->EndProcess();
-        //     truStartPoint = ana::Point(mcp->Position().Vect());
-        //     truEndPoint = ana::Point(mcp->EndPosition().Vect());
-        //     truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
-
-        //     LOG(mcp_mi);
-        //     if (mcp_mi) {
-        //         truHasMichel = (
-        //             geoTop.isInside(mcp_mi->Position().Vect(), 20.F)
-        //             || geoBot.isInside(mcp_mi->Position().Vect(), 20.F)
-        //         ) ? kHasMichelFiducial : (
-        //             geoTop.isInside(mcp_mi->Position().Vect())
-        //             || geoBot.isInside(mcp_mi->EndPosition().Vect())
-        //             ? kHasMichelInside
-        //             : kHasMichelOutside
-        //         );
-        //         miTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
-        //         PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
-        //         miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
-        //         // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
-        //         // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
-
-        //         for (size_t i=0; i<vph_mi.size(); i++) {
-        //             PtrHit const& ph_mi = vph_mi[i];
-        //             float energyFrac = energyFracs_mi[i];
-        //             if (ph_mi->View() != geo::kW) continue;
-        //             miHits.push_back(GetHit(ph_mi));
-        //             miHitEnergyFrac.push_back(energyFrac);
-        //         }
-        //         miHitEnergy = std::accumulate(miHits.adc.begin(), miHits.adc.end(), 0.F);
-        //     }
+        //     mcp_mi = GetMichelMCP(mcp);
+        //     vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+        //     vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
         // }
 
-        
+        LOG(mcp);
+        if (mcp) {
+            truPdg = mcp->PdgCode();
+            truEndProcess = mcp->EndProcess();
+            truStartPoint = ana::Point(mcp->Position().Vect());
+            truEndPoint = ana::Point(mcp->EndPosition().Vect());
+            truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
+
+
+            // truCathodeCrossing 
+            for (size_t i=0; i<mcp->NumberTrajectoryPoints(); i++) {
+                TVector3 const& pt = mcp->Position(i).Vect();
+
+                if (abs(pt.X()) < 10) {
+                    truCathodePoint = ana::Point(pt);
+                    truCathodeCrossing = geoTop.y.isInside(pt.Y(), 5.F)
+                        && geoTop.z.isInside(pt.Z(), 5.F);
+                }
+                if (abs(pt.X()-geoTop.x.max) < 10) {
+                    truAnodePoint = ana::Point(pt);
+                    truAnodeCrossing = geoTop.y.isInside(pt.Y(), 5.F)
+                        && geoTop.z.isInside(pt.Z(), 5.F);
+                }
+            }
+
+
+
+            // LOG(mcp_mi);
+            // if (mcp_mi) {
+            //     truHasMichel = (
+            //         geoTop.isInside(mcp_mi->Position().Vect(), 20.F)
+            //         || geoBot.isInside(mcp_mi->Position().Vect(), 20.F)
+            //     ) ? kHasMichelFiducial : (
+            //         geoTop.isInside(mcp_mi->Position().Vect())
+            //         || geoBot.isInside(mcp_mi->EndPosition().Vect())
+            //         ? kHasMichelInside
+            //         : kHasMichelOutside
+            //     );
+            //     miTrueEnergy = (mcp_mi->E() - mcp_mi->Mass()) * 1e3;
+            //     PtrTrk pt_mi = ana::mcp2trk(mcp_mi, vpt_ev, clockData, fmp_trk2hit);
+            //     miTrackLength = pt_mi ? pt_mi->Length() : util::kBogusF;
+            //     // PtrShw ps_mi = ana::mcp2shw(mcp_mi, vps_ev, clockData, fmp_shw2hit);
+            //     // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
+
+            //     for (size_t i=0; i<vph_mi.size(); i++) {
+            //         PtrHit const& ph_mi = vph_mi[i];
+            //         float energyFrac = energyFracs_mi[i];
+            //         if (ph_mi->View() != geo::kW) continue;
+            //         miHits.push_back(GetHit(ph_mi));
+            //         miHitEnergyFrac.push_back(energyFrac);
+            //     }
+            //     miHitEnergy = std::accumulate(miHits.adc.begin(), miHits.adc.end(), 0.F);
+            // }
+        }
 
         trTree->Fill();
         evTrackIndices.push_back(trIndex);
@@ -542,11 +575,18 @@ void ana::Crossers::resetMuon() {
     trGhostTrack = false;
     trHitdQds.clear();
 
-    // truPdg = 0;
-    // truEndProcess = "";
-    // truStartPoint = ana::Point{};
-    // truEndPoint = ana::Point{};
-    // truEndEnergy = util::kBogusF;
+    truPdg = 0;
+    truEndProcess = "";
+    truStartPoint = ana::Point{};
+    truEndPoint = ana::Point{};
+    truEndEnergy = util::kBogusF;
+
+    truCathodePoint = ana::Point{};
+    truCathodeCrossing = false;
+    truAnodePoint = ana::Point{};
+    truAnodeCrossing = false;
+
+
     // truStartHit = ana::Hit{};
     // truEndHit = ana::Hit{};
     // truReg = ana::LinearRegression{};
