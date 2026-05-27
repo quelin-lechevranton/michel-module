@@ -82,31 +82,32 @@ private:
 
     // Track information: recob::Hit
     ana::Hits               muHits;
-    std::vector<float>      muHitX;
+    std::vector<float>      muHitCathodeX;
+    std::vector<float>      muHitAnodeX;
     std::vector<float>      muHitY;
     ana::Hit                muStartHit; 
-    float                   muStartHitX;
+    float                   muStartHitCathodeX;
     float                   muStartHitY;
-    bool                    muStartInX;
+    bool                    muStartInCathodeX;
     bool                    muStartInY;
     bool                    muStartInZ;
     bool                    muStartInT;
-    bool                    muStartInXYZT;    
+    bool                    muStartInYZT;    
     ana::Hit                muEndHit;
-    float                   muEndHitX; 
+    float                   muEndHitCathodeX; 
     float                   muEndHitY;
-    bool                    muEndInX;
+    bool                    muEndInCathodeX;
     bool                    muEndInY;
     bool                    muEndInZ;
     bool                    muEndInT;
-    bool                    muEndInXYZT;
+    bool                    muEndInYZT;
     // bool                    muRegError;
     // ana::LinearRegression   muTopReg;
     // ana::LinearRegression   muBotReg;
-    float                   muEndAngle;
+    // float                   muEndAngle;
     bool                    muCathodeCrossing;
-    bool                    muCathodeMisaligned;
-    // bool                    muAnodeCrossing;
+    float                   muCathodeMisalignment;
+    bool                    muAnodeCrossing;
     std::vector<float>      muHitdQds;
     ana::Hits               muSphereHits;
     float                   muSphereEnergy;
@@ -252,27 +253,28 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // Hit
     // muTree->Branch("RegError",                  &muRegError);
     muTree->Branch("CathodeCrossing",           &muCathodeCrossing);
-    muTree->Branch("CathodeMisaligned",         &muCathodeMisaligned);
-    // muTree->Branch("AnodeCrossing",             &muAnodeCrossing);
+    muTree->Branch("CathodeMisalignment",       &muCathodeMisalignment);
+    muTree->Branch("AnodeCrossing",             &muAnodeCrossing);
     SetBranches(muTree, "Start",                &muStartHit);
-    muTree->Branch("StartHitX",                 &muStartHitX);
+    muTree->Branch("StartHitCathodeX",          &muStartHitCathodeX);
     muTree->Branch("StartHitY",                 &muStartHitY);
-    muTree->Branch("StartInX",                  &muStartInX);
+    muTree->Branch("StartInCathodeX",           &muStartInCathodeX);
     muTree->Branch("StartInY",                  &muStartInY);
     muTree->Branch("StartInZ",                  &muStartInZ);
     muTree->Branch("StartInT",                  &muStartInT);
-    muTree->Branch("StartInXYZT",               &muStartInXYZT);
+    muTree->Branch("StartInYZT",                &muStartInYZT);
     SetBranches(muTree, "End",                  &muEndHit);
-    muTree->Branch("EndHitX",                   &muEndHitX);
+    muTree->Branch("EndHitCathodeX",            &muEndHitCathodeX);
     muTree->Branch("EndHitY",                   &muEndHitY);
-    muTree->Branch("EndInX",                    &muEndInX);
+    muTree->Branch("EndInCathodeX",             &muEndInCathodeX);
     muTree->Branch("EndInY",                    &muEndInY);
     muTree->Branch("EndInZ",                    &muEndInZ);
     muTree->Branch("EndInT",                    &muEndInT);
-    muTree->Branch("EndInXYZT",                 &muEndInXYZT);
-    muTree->Branch("EndAngle",                  &muEndAngle);
+    muTree->Branch("EndInYZT",                  &muEndInYZT);
+    // muTree->Branch("EndAngle",                  &muEndAngle);
     SetBranches(muTree, "",                     &muHits);
-    muTree->Branch("HitX",                      &muHitX);
+    muTree->Branch("HitCathodeX",               &muHitCathodeX);
+    muTree->Branch("HitAnodeX",                 &muHitAnodeX);
     muTree->Branch("HitY",                      &muHitY);
     // SetBranches(muTree, "Top",                  &muTopReg);
     // SetBranches(muTree, "Bot",                  &muBotReg);
@@ -449,7 +451,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         Side_t first_side = GetSide(vph_mu.front());
         VecPtrHit::iterator cathode_it = std::find_if(
-            vph_mu.begin(), vph_mu.end(), [&](PtrHit const& ph) {
+            vph_mu.begin()+1, vph_mu.end(), [&](PtrHit const& ph) {
                 return GetSide(ph) != first_side;
             }
         );
@@ -525,49 +527,48 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump cathode crossing boolean: defined as track with 4+ hits on both sides of the cathode
         muCathodeCrossing = is_cc;
-        muCathodeMisaligned = is_cc && abs(cc_first->PeakTime()-cc_second->PeakTime())*fTick2cm < 3 * geoCathodeGap;
+        muCathodeMisalignment = is_cc ? abs(cc_first->PeakTime()-cc_second->PeakTime())*fTick2cm : util::kBogusF;
 
         LOG(muCathodeCrossing);
         if (!inKeepAll && !muCathodeCrossing) continue;
 
-        // switch (geoDet) {
-        // case kPDVD: /* ASSUMS DOWNWARD MUON */
-        //     muAnodeCrossing = muStartHit.section < 4
-        //         && geoTop.z.isInside(muStartHit.space, inFiducialLength)
-        //         && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
-        //     break;
-        // case kPDHD:
-        //     muAnodeCrossing =
-        //         geoTop.z.isInside(muStartHit.space, inFiducialLength)
-        //         && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
-        //     break;
-        // }
-        // LOG(muCathodeCrossing || muAnodeCrossing);
-        // if (!inKeepAll && (!muAnodeCrossing && !muCathodeCrossing)) continue;
+        switch (geoDet) {
+        case kPDVD: /* ASSUMS DOWNWARD MUON */
+            muAnodeCrossing = GetSide(muStartHit.section) == kTop
+                && geoTop.y.isInside(muStartHitY, inFiducialLength)
+                && geoTop.z.isInside(muStartHit.space, inFiducialLength)
+                && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
+            break;
+        case kPDHD:
+            muAnodeCrossing =
+                geoTop.y.isInside(muStartHitY, inFiducialLength)
+                && geoTop.z.isInside(muStartHit.space, inFiducialLength)
+                && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
+            break;
+        }
+        LOG(muCathodeCrossing || muAnodeCrossing);
+        if (!inKeepAll && (!muAnodeCrossing && !muCathodeCrossing)) continue;
 
 
-        // dump hit X positions for cathode crossing tracks
-        muStartInX=false;
-        muEndInX=false;
+        // dump hit X positions for cathode/anode crossing tracks
         if (muCathodeCrossing) {
             Side_t start_side = GetSide(muStartHit.tpc);
             Side_t end_side = GetSide(muEndHit.tpc);
             PtrHit const& cc_bot = start_side == kBot ? cc_first : cc_second;
             PtrHit const& cc_top = start_side == kTop ? cc_first : cc_second;
 
-            muStartHitX = GetX(muStartHit, cc_bot, cc_top, geoCathodeGap);
-            muStartInX = start_side == kBot
-                ? geoBot.x.isInside(muStartHitX, inFiducialLength)
-                : geoTop.x.isInside(muStartHitX, inFiducialLength);
+            muStartHitCathodeX = GetCathodeX(muStartHit, cc_bot, cc_top, geoCathodeGap);
+            muStartInCathodeX = start_side == kBot
+                ? geoBot.x.isInside(muStartHitCathodeX, inFiducialLength)
+                : geoTop.x.isInside(muStartHitCathodeX, inFiducialLength);
 
-            muEndHitX = GetX(muEndHit, cc_bot, cc_top, geoCathodeGap);
-            muEndInX = end_side == kBot
-                ? geoBot.x.isInside(muEndHitX, inFiducialLength)
-                : geoTop.x.isInside(muEndHitX, inFiducialLength);
+            muEndHitCathodeX = GetCathodeX(muEndHit, cc_bot, cc_top, geoCathodeGap);
+            muEndInCathodeX = end_side == kBot
+                ? geoBot.x.isInside(muEndHitCathodeX, inFiducialLength)
+                : geoTop.x.isInside(muEndHitCathodeX, inFiducialLength);
 
             for (PtrHit const& ph_mu : vph_mu) {
-                if (ph_mu->View() != geo::kW) continue;
-                muHitX.push_back(GetX(ph_mu, cc_bot, cc_top, geoCathodeGap));
+                muHitCathodeX.push_back(GetCathodeX(ph_mu, cc_bot, cc_top, geoCathodeGap));
             }
 
             // if (mcp) {
@@ -592,12 +593,17 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             //     }
             // }
         }
+        if (muAnodeCrossing) {
+            for (PtrHit const& ph_mu : vph_mu) {
+                muHitAnodeX.push_back(GetAnodeX(ph_mu, vph_mu.front(), geoBot.x.min, geoTop.x.max));
+            }
+        }
 
-        muStartInXYZT = muStartInX && muStartInY && muStartInZ && muStartInT;
-        muEndInXYZT = muEndInX && muEndInY && muEndInZ && muEndInT;
-        LOG(muStartInXYZT);
-        LOG(muEndInXYZT);
-        if (!inKeepAll && !muEndInXYZT) continue;
+        muStartInYZT = muStartInY && muStartInZ && muStartInT;
+        muEndInYZT = muEndInY && muEndInZ && muEndInT;
+        LOG(muStartInYZT);
+        LOG(muEndInYZT);
+        if (!inKeepAll && !muEndInYZT) continue;
 
         // dump hits
         for (PtrHit const& ph_mu : vph_mu) {
@@ -623,11 +629,12 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // muEndAngle = sh_mu.regs
         //     .at(GetSide(muEndHit.section))
         //     .theta(muEndHit.space > muStartHit.space ? 1 : -1);
-        muEndAngle = 0;
+        
+        
+        // muEndAngle = ??
         // integrate charges around muon endpoint
         muSphereEnergy = 0;
         muSphereEnergyTP = 0;
-        muSphereHasLongTrack = false;
         // muSphereMaxShowerEnergy = 0;
         for (PtrHit const& ph_ev : vph_ev_endsec) {
             float dist = GetDistance(ph_ev, vph_mu.back());
@@ -653,9 +660,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muSphereEnergy += ph_ev->ROISummedADC();
             muSphereHits.push_back(hit);
 
-            float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
-            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            muSphereHitMuonAngle.push_back(da);
+            // float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
+            // da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            // muSphereHitMuonAngle.push_back(da);
 
             if (std::find_if(
                 vph_mi.begin(), vph_mi.end(),
@@ -670,9 +677,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muBary = muBaryHits.barycenter(fTick2cm);
             ana::Vec2 end_bary = muBary - muEndHit.vec(fTick2cm);
             muBaryAngle = end_bary.angle();
-            float da = muBaryAngle - muEndAngle;
-            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            muBaryMuonAngle = da;
+            // float da = muBaryAngle - muEndAngle;
+            // da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            // muBaryMuonAngle = da;
 
             // if (inCone) {
             //     // float angle = end_bary.angle();
@@ -920,7 +927,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                     miHits.push_back(GetHit(ph_mi));
                     miHitEnergyFrac.push_back(energyFrac);
                 }
-                miHitEnergy = miHits.energy();
+                miHitEnergy = std::accumulate(miHits.adc.begin(), miHits.adc.end(), 0.F);
             }
 
             // ana::SortedHits sh_mcp = GetSortedHits(vph_mcp_mu, mcp->EndX() > mcp->Vx() ? 1 : -1);
@@ -1006,30 +1013,31 @@ void ana::MichelAnalysis::resetEvent() {
 }
 void ana::MichelAnalysis::resetMuon() {
     muHits.clear();
-    muHitX.clear();
+    muHitCathodeX.clear();
+    muHitAnodeX.clear();
     muHitY.clear();
     muStartHit = ana::Hit{};
-    muStartHitX = util::kBogusF;
+    muStartHitCathodeX = util::kBogusF;
     muStartHitY = util::kBogusF;
-    muStartInX = false;
+    muStartInCathodeX = false;
     muStartInY = false;
     muStartInZ = false;
     muStartInT = false;
-    muStartInXYZT = false;
+    muStartInYZT = false;
     muEndHit = ana::Hit{};
-    muEndHitX = util::kBogusF;
+    muEndHitCathodeX = util::kBogusF;
     muEndHitY = util::kBogusF;
-    muEndInX = false;
+    muEndInCathodeX = false;
     muEndInY = false;
     muEndInZ = false;
     muEndInT = false;
-    muEndInXYZT = false;
+    muEndInYZT = false;
     // muTopReg = ana::LinearRegression{};
     // muBotReg = ana::LinearRegression{};
-    muEndAngle = util::kBogusF;
+    // muEndAngle = util::kBogusF;
     muCathodeCrossing = false;
-    muCathodeMisaligned = false;
-    // muAnodeCrossing = false;
+    muCathodeMisalignment = util::kBogusF;
+    muAnodeCrossing = false;
     muHitdQds.clear();
     muSphereHits.clear();
     muSphereEnergy = util::kBogusF;
