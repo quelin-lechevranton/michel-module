@@ -530,7 +530,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muCathodeMisalignment = is_cc ? abs(cc_first->PeakTime()-cc_second->PeakTime())*fTick2cm : util::kBogusF;
 
         LOG(muCathodeCrossing);
-        if (!inKeepAll && !muCathodeCrossing) continue;
+        // if (!inKeepAll && !muCathodeCrossing) continue;
 
         switch (geoDet) {
         case kPDVD: /* ASSUMS DOWNWARD MUON */
@@ -540,14 +540,15 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
             break;
         case kPDHD:
+        case kPDSP:
             muAnodeCrossing =
                 geoTop.y.isInside(muStartHitY, inFiducialLength)
                 && geoTop.z.isInside(muStartHit.space, inFiducialLength)
                 && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
             break;
         }
-        LOG(muCathodeCrossing || muAnodeCrossing);
-        if (!inKeepAll && (!muAnodeCrossing && !muCathodeCrossing)) continue;
+        LOG(muAnodeCrossing);
+        if (!inKeepAll && !(muAnodeCrossing || muCathodeCrossing)) continue;
 
 
         // dump hit X positions for cathode/anode crossing tracks

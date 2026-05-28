@@ -269,7 +269,7 @@ void ana::Crossers::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
-        std::cout << "MiAna: " "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
+        std::cout << "Crossers: " "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrHit vph_ev;
@@ -277,7 +277,7 @@ void ana::Crossers::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) {
-        std::cout << "MiAna: " "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
+        std::cout << "Crossers: " "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrTrk vpt_ev;
@@ -499,19 +499,41 @@ void ana::Crossers::analyze(art::Event const& e) {
 
 
             // truCathodeCrossing 
-            for (size_t i=0; i<mcp->NumberTrajectoryPoints(); i++) {
+            int before_anode=-1, before_cathode=-1;
+            TVector3 prev_pt = mcp->Position().Vect();
+            for (size_t i=1; i<mcp->NumberTrajectoryPoints(); i++) {
                 TVector3 const& pt = mcp->Position(i).Vect();
 
-                if (abs(pt.X()) < 10) {
-                    truCathodePoint = ana::Point(pt);
-                    truCathodeCrossing = geoTop.y.isInside(pt.Y(), 5.F)
-                        && geoTop.z.isInside(pt.Z(), 5.F);
+                if (before_cathode != -1 && before_anode != -1) break;
+
+                if (before_cathode == -1 && prev_pt.X() * pt.X() < 0) {
+                    before_cathode = i-1;
                 }
-                if (abs(pt.X()-geoTop.x.max) < 10) {
-                    truAnodePoint = ana::Point(pt);
-                    truAnodeCrossing = geoTop.y.isInside(pt.Y(), 5.F)
-                        && geoTop.z.isInside(pt.Z(), 5.F);
+
+                if (before_anode != -1) continue;
+
+                switch (geoDet) {
+                case kPDVD:
+                    if (prev_pt.X() > geoTop.x.max && geoTop.x.max > pt.X())
+                        before_anode = i-1;
+                    break;
+                case kPDHD: 
+                    std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
+                    break;
+                case kPDSP: 
+                    std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
+                    break;
                 }
+            }
+            if (before_cathode != -1) {
+                truCathodePoint = ana::Point(mcp->Position(before_cathode).Vect());
+                truCathodeCrossing = geoTop.y.isInside(truCathodePoint.y, 5.F)
+                    && geoTop.z.isInside(truCathodePoint.z, 5.F);
+            }
+            if (before_anode != -1) {
+                truAnodePoint = ana::Point(mcp->Position(before_anode).Vect());
+                truAnodeCrossing = geoTop.y.isInside(truAnodePoint.y, 5.F)
+                    && geoTop.z.isInside(truAnodePoint.z, 5.F);
             }
 
 
