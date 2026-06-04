@@ -104,7 +104,7 @@ private:
     // bool                    muRegError;
     // ana::LinearRegression   muTopReg;
     // ana::LinearRegression   muBotReg;
-    // float                   muEndAngle;
+    float                   muEndAngle;
     bool                    muCathodeCrossing;
     float                   muCathodeMisalignment;
     bool                    muAnodeCrossing;
@@ -271,7 +271,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     muTree->Branch("EndInZ",                    &muEndInZ);
     muTree->Branch("EndInT",                    &muEndInT);
     muTree->Branch("EndInYZT",                  &muEndInYZT);
-    // muTree->Branch("EndAngle",                  &muEndAngle);
+    muTree->Branch("EndAngle",                  &muEndAngle);
     SetBranches(muTree, "",                     &muHits);
     muTree->Branch("HitCathodeX",               &muHitCathodeX);
     muTree->Branch("HitAnodeX",                 &muHitAnodeX);
@@ -632,7 +632,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         //     .theta(muEndHit.space > muStartHit.space ? 1 : -1);
         
         
-        // muEndAngle = ??
+        recob::Track::Vector_t end_dir = pt_ev->EndDirection();
+        muEndAngle = atan2(end_dir.x(), end_dir.z());
         // integrate charges around muon endpoint
         muSphereEnergy = 0;
         muSphereEnergyTP = 0;
@@ -678,9 +679,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muBary = muBaryHits.barycenter(fTick2cm);
             ana::Vec2 end_bary = muBary - muEndHit.vec(fTick2cm);
             muBaryAngle = end_bary.angle();
-            // float da = muBaryAngle - muEndAngle;
-            // da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            // muBaryMuonAngle = da;
+            float da = muBaryAngle - muEndAngle;
+            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            muBaryMuonAngle = da;
 
             // if (inCone) {
             //     // float angle = end_bary.angle();
@@ -1035,7 +1036,7 @@ void ana::MichelAnalysis::resetMuon() {
     muEndInYZT = false;
     // muTopReg = ana::LinearRegression{};
     // muBotReg = ana::LinearRegression{};
-    // muEndAngle = util::kBogusF;
+    muEndAngle = util::kBogusF;
     muCathodeCrossing = false;
     muCathodeMisalignment = util::kBogusF;
     muAnodeCrossing = false;
