@@ -354,6 +354,14 @@ namespace ana {
             tick.clear();
             adc.clear();
         }
+        void reserve(size_t capacity) {
+            tpc.reserve(capacity);
+            section.reserve(capacity);
+            space.reserve(capacity);
+            channel.reserve(capacity);
+            tick.reserve(capacity);
+            adc.reserve(capacity);
+        }
         unsigned size() const { return N; }
         bool empty() const { return !N; }
         float energy() const { return std::accumulate(adc.begin(), adc.end(), 0.F); }
