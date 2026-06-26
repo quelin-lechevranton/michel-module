@@ -76,6 +76,7 @@ private:
     float                   trLength;
     ana::Point              trStartPoint;
     ana::Point              trEndPoint;
+    ana::Points             trPoints;
 
     // Track information: recob::Hit
     ana::Hits               trHits;
@@ -96,9 +97,11 @@ private:
     
     // Truth information: Muon
     int                     truPdg;
+    float                   truEnergy;
     std::string             truEndProcess;
     ana::Point              truStartPoint;
     ana::Point              truEndPoint;
+    ana::Points             truPoints;
     float                   truEndEnergy;
 
     ana::Point              truCathodePoint;
@@ -221,26 +224,29 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("Length",        &trLength);
     SetBranches(trTree, "Start",    &trStartPoint);
     SetBranches(trTree, "End",      &trEndPoint);
+    SetBranches(trTree, "",         &trPoints);
 
     // Hit
-    trTree->Branch("CathodeCrossing",           &trCathodeCrossing);
-    trTree->Branch("CathodeAlignment",          &trCathodeAlignment);
-    trTree->Branch("AnodeCrossing",             &trAnodeCrossing);
-    SetBranches(trTree, "Start",    &trStartReg);
-    SetBranches(trTree, "Ghost",    &trGhostReg);
-    trTree->Branch("GhostTrack",                &trGhostTrack);
-    // trTree->Branch("EndAngle",                  &trEndAngle);
-    SetBranches(trTree, "",                     &trHits);
-    trTree->Branch("HitAX",                     &trHitAX);
-    trTree->Branch("HitCX",                     &trHitCX);
-    trTree->Branch("HitY",                      &trHitY);
-    trTree->Branch("HitdQds",                   &trHitdQds);
+    trTree->Branch("CathodeCrossing",       &trCathodeCrossing);
+    trTree->Branch("CathodeAlignment",      &trCathodeAlignment);
+    trTree->Branch("AnodeCrossing",         &trAnodeCrossing);
+    SetBranches(trTree, "Start",            &trStartReg);
+    SetBranches(trTree, "Ghost",            &trGhostReg);
+    trTree->Branch("GhostTrack",            &trGhostTrack);
+    // trTree->Branch("EndAngle",              &trEndAngle);
+    SetBranches(trTree, "",                 &trHits);
+    trTree->Branch("HitAX",                 &trHitAX);
+    trTree->Branch("HitCX",                 &trHitCX);
+    trTree->Branch("HitY",                  &trHitY);
+    trTree->Branch("HitdQds",               &trHitdQds);
 
     // Truth
     trTree->Branch("TruePdg",               &truPdg);
+    trTree->Branch("TrueEnergy",            &truEnergy);
     trTree->Branch("TrueEndProcess",        &truEndProcess);
     SetBranches(trTree, "TrueStart",        &truStartPoint);
     SetBranches(trTree, "TrueEnd",          &truEndPoint);
+    SetBranches(trTree, "True",             &truPoints);
     trTree->Branch("TrueEndEnergy",         &truEndEnergy);
 
     SetBranches(trTree, "TrueCathode",      &truCathodePoint);
@@ -369,7 +375,7 @@ void ana::Crossers::analyze(art::Event const& e) {
                 return GetSide(ph) != first_side;
             }
         );
-        if (is_cc) { ASSERT(cathode_it != vph_mu.end()) }
+        // if (is_cc) { ASSERT(cathode_it != vph_mu.end()) }
         PtrHit const cc_first = is_cc ? *(cathode_it-1) : PtrHit{};
         PtrHit const cc_second = is_cc ? *cathode_it : PtrHit{};
 
@@ -422,6 +428,10 @@ void ana::Crossers::analyze(art::Event const& e) {
                 ? pt_ev->LocationAtPoint(hit_track_idx).Y()
                 : util::kBogusF
             );
+        }
+
+        for (size_t index=pt_ev->NextValidPoint(0); index!=recob::TrackTrajectory::InvalidIndex; index=pt_ev->NextValidPoint(index)) {
+            trPoints.push_back(pt_ev->LocationAtPoint(index));
         }
 
         if (trCathodeCrossing) {
@@ -492,6 +502,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         LOG(mcp);
         if (mcp) {
             truPdg = mcp->PdgCode();
+            truEnergy = mcp->E();
             truEndProcess = mcp->EndProcess();
             truStartPoint = ana::Point(mcp->Position().Vect());
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
@@ -503,6 +514,7 @@ void ana::Crossers::analyze(art::Event const& e) {
             TVector3 prev_pt = mcp->Position().Vect();
             for (size_t i=1; i<mcp->NumberTrajectoryPoints(); i++) {
                 TVector3 const& pt = mcp->Position(i).Vect();
+                truPoints.push_back(ana::Point(pt));
 
                 if (before_cathode != -1 && before_anode != -1) break;
 
@@ -518,7 +530,7 @@ void ana::Crossers::analyze(art::Event const& e) {
                         before_anode = i-1;
                     break;
                 case kPDHD: 
-                    std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
+                    std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDHD" "\033[0m" << std::endl;
                     break;
                 case kPDSP: 
                     std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
@@ -535,8 +547,6 @@ void ana::Crossers::analyze(art::Event const& e) {
                 truAnodeCrossing = geoTop.y.isInside(truAnodePoint.y, 5.F)
                     && geoTop.z.isInside(truAnodePoint.z, 5.F);
             }
-
-
 
             // LOG(mcp_mi);
             // if (mcp_mi) {
@@ -590,7 +600,7 @@ void ana::Crossers::resetMuon() {
     trHitY.clear();
     // trEndAngle = util::kBogusF;
     trCathodeCrossing = false;
-    trCathodeAlignment = -1.F;
+    trCathodeAlignment = util::kBogusF;
     trAnodeCrossing = false;
     trStartReg.clear();
     trGhostReg.clear();
@@ -598,6 +608,7 @@ void ana::Crossers::resetMuon() {
     trHitdQds.clear();
 
     truPdg = 0;
+    truEnergy = util::kBogusF;
     truEndProcess = "";
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
@@ -607,7 +618,6 @@ void ana::Crossers::resetMuon() {
     truCathodeCrossing = false;
     truAnodePoint = ana::Point{};
     truAnodeCrossing = false;
-
 
     // truStartHit = ana::Hit{};
     // truEndHit = ana::Hit{};

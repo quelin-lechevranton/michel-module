@@ -415,7 +415,7 @@ namespace ana {
         Point operator-=(Point const& p) { x -= p.x; y -= p.y; z -= p.z; return *this; }
         Point operator*(float f) const { return Point{f*x, f*y, f*z}; }
 
-        operator bool() const { return !(x==0 && y==0 && z==0); }
+        operator bool() const { return !(x==util::kBogusF && y==util::kBogusF && z==util::kBogusF); }
 
         friend std::ostream& operator<<(std::ostream& os, const Point& p) {
             return os << "(" << p.x << ", " << p.y << ", " << p.z << ")";
