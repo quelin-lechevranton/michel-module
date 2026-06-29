@@ -216,7 +216,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
 
     PtrTrk const& muonTrack = ana::mcp2trk(&muon, vpt_ev, clockData, fmp_trk2hit);
     _muHasTrack = muonTrack.isNonnull();
-    geo::Point_t decayPoint = geo::Point_t(muon.EndPosition());
+    // geo::Point_t decayPoint = geo::Point_t(muon.EndPosition().Vect());
     VecPtrHit muonHits = ana::mcp2hits(&muon, vph_ev, clockData, false);
 
     PtrTrk const& michelTrack = ana::mcp2trk(michel, vpt_ev, clockData, fmp_trk2hit);
@@ -227,7 +227,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHasShower = michelShower.isNonnull();
     _miShowerLength = _miHasShower ? michelShower->Length() : util::kBogusF;
 
-    geo::Vector_t michelDir = geo::Vector_t(michel->EndMomentum()).Unit();
+    geo::Vector_t michelDir = geo::Vector_t(michel->EndMomentum().Vect()).Unit();
     ana::Vec2 michelVec2(michelDir.Z(), michelDir.X());
     float michelVec2Angle = michelVec2.angle();
 
