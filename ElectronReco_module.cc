@@ -79,6 +79,7 @@ private:
   std::vector<float> _miHitEnergyFrac;
   std::vector<float> _miHitDistance;
   std::vector<float> _miHitAngle;
+  std::vector<bool> _miHitIsPrime;
   std::vector<bool> _miHitFromMichelTrack;
   std::vector<bool> _miHitFromMichelShower;
   std::vector<bool> _miHitFromMuonTrack;
@@ -140,28 +141,29 @@ ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
 
   _tree = asFile->make<TTree>("michel","");
 
-  _tree->Branch("muEnergy",   &_muEnergy);
-  _tree->Branch("muTheta",   &_muTheta);
-  _tree->Branch("muPhi",   &_muPhi);
-  _tree->Branch("muEndEnergy",   &_muEndEnergy);
-  _tree->Branch("muEndTheta",   &_muEndTheta);
-  _tree->Branch("muEndPhi",   &_muEndPhi);
-  _tree->Branch("miEnergy",   &_miEnergy);
-  SetBranches(_tree, "muEnd",   &_muEndHit);
+  _tree->Branch("muEnergy",              &_muEnergy);
+  _tree->Branch("muTheta",               &_muTheta);
+  _tree->Branch("muPhi",                 &_muPhi);
+  _tree->Branch("muEndEnergy",           &_muEndEnergy);
+  _tree->Branch("muEndTheta",            &_muEndTheta);
+  _tree->Branch("muEndPhi",              &_muEndPhi);
+  _tree->Branch("miEnergy",              &_miEnergy);
+  SetBranches(_tree, "muEnd",            &_muEndHit);
 
-  _tree->Branch("muHasTrack",   &_muHasTrack);
-  _tree->Branch("miHasTrack",   (int*)&_miHasTrack);
-  _tree->Branch("miHasShower",   &_miHasShower);
-  _tree->Branch("miTrackLength",   &_miTrackLength);
-  _tree->Branch("miShowerLength",   &_miShowerLength);
+  _tree->Branch("muHasTrack",            &_muHasTrack);
+  _tree->Branch("miHasTrack",            (int*)&_miHasTrack);
+  _tree->Branch("miHasShower",           &_miHasShower);
+  _tree->Branch("miTrackLength",         &_miTrackLength);
+  _tree->Branch("miShowerLength",        &_miShowerLength);
 
-  SetBranches(_tree, "mi",    &_miHits);
-  _tree->Branch("miHitEnergyFrac",   &_miHitEnergyFrac);
-  _tree->Branch("miHitDistance",   &_miHitDistance);
-  _tree->Branch("miHitAngle",   &_miHitAngle);
-  _tree->Branch("miHitFromMichelTrack",   &_miHitFromMichelTrack);
-  _tree->Branch("miHitFromMichelShower",   &_miHitFromMichelShower);
-  _tree->Branch("miHitFromMuonTrack",   &_miHitFromMuonTrack);
+  SetBranches(_tree, "mi",               &_miHits);
+  _tree->Branch("miHitEnergyFrac",       &_miHitEnergyFrac);
+  _tree->Branch("miHitDistance",         &_miHitDistance);
+  _tree->Branch("miHitAngle",            &_miHitAngle);
+  _tree->Branch("miHitIsPrime",          &_miHitIsPrime);
+  _tree->Branch("miHitFromMichelTrack",  &_miHitFromMichelTrack);
+  _tree->Branch("miHitFromMichelShower", &_miHitFromMichelShower);
+  _tree->Branch("miHitFromMuonTrack",    &_miHitFromMuonTrack);
 }
 
 void ana::ElectronReco::analyze(art::Event const& e) {
@@ -258,6 +260,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
 
     _miHitEnergyFrac.clear();
     VecPtrHit eveHits = ana::mcp2hits(michel, vph_ev, clockData, true, &_miHitEnergyFrac);
+    VecPtrHit primeHits = ana::mcp2hits(michel, vph_ev, clockData, false);
 
     PtrHit const& endHit = *std::max_element(
       muonHits.begin(), muonHits.end(), 
@@ -277,6 +280,8 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHitDistance.reserve(eveHits.size());
     _miHitAngle.clear();
     _miHitAngle.reserve(eveHits.size());
+    _miHitIsPrime.clear();
+    _miHitIsPrime.reserve(eveHits.size());
     _miHitFromMichelTrack.clear();
     _miHitFromMichelTrack.reserve(eveHits.size());
     _miHitFromMichelShower.clear();
@@ -288,6 +293,10 @@ void ana::ElectronReco::analyze(art::Event const& e) {
       ana::Hit hit = GetHit(hitPtr);
       _miHits.push_back(hit);
 
+      _miHitIsPrime.push_back(std::find_if(
+        primeHits.begin(), primeHits.end(), 
+        [key=hitPtr.key()](PtrHit const& hit1){ return hit1.key()==key; }
+      ) != primeHits.end());
       _miHitDistance.push_back(GetDistance(hit, _muEndHit));
 
       ana::Vec2 decay2hit(hit.space - _muEndHit.space, (hit.tick - _muEndHit.tick) * fTick2cm);
