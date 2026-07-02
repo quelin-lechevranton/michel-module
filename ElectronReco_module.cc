@@ -64,6 +64,7 @@ private:
   float _muEndTheta;
   float _muEndPhi;
   float _miEnergy;
+  ana::Hit _muEndHit;
 
   bool _muHasTrack;
   bool _miHasTrack;
@@ -143,6 +144,7 @@ ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
   _tree->Branch("muEndTheta",   &_muEndTheta);
   _tree->Branch("muEndPhi",   &_muEndPhi);
   _tree->Branch("miEnergy",   &_miEnergy);
+  SetBranches(_tree, "muEnd",   &_muEndHit);
 
   _tree->Branch("muHasTrack",   &_muHasTrack);
   _tree->Branch("miHasTrack",   &_miHasTrack);
@@ -210,13 +212,23 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _muPhi = muonDir.Phi();
 
     TVector3 const& muEndVect = muon.EndMomentum().Vect();
-    geo::Vector_t muonEndDir(muEndVect.Y(), muEndVect.Z(), muEndVect.X());
+
+    geo::Vector_t muonEndDir;
+    switch (geoDet) {
+      case kPDVD:
+        muonEndDir.SetCoordinates(muEndVect.Y(), muEndVect.Z(), muEndVect.X());
+        break;
+      case kPDHD:
+      case kPDSP:
+        muonEndDir.SetCoordinates(muEndVect.Z(), muEndVect.X(), muEndVect.Y());
+        break;
+    }
     _muEndTheta = muonEndDir.Theta();
     _muEndPhi = muonEndDir.Phi();
 
     PtrTrk const& muonTrack = ana::mcp2trk(&muon, vpt_ev, clockData, fmp_trk2hit);
     _muHasTrack = muonTrack.isNonnull();
-    // geo::Point_t decayPoint = geo::Point_t(muon.EndPosition().Vect());
+    // geo::Point_t endPoint = geo::Point_t(muon.EndPosition().Vect());
     VecPtrHit muonHits = ana::mcp2hits(&muon, vph_ev, clockData, false);
 
     PtrTrk const& michelTrack = ana::mcp2trk(michel, vpt_ev, clockData, fmp_trk2hit);
@@ -234,17 +246,17 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHitsEnergyFrac.clear();
     VecPtrHit eveHits = ana::mcp2hits(michel, vph_ev, clockData, true, &_miHitsEnergyFrac);
 
-    PtrHit const& decayHit = *std::max_element(
+    PtrHit const& endHit = *std::max_element(
       muonHits.begin(), muonHits.end(), 
-      [](PtrHit const& hit1, PtrHit const& hit2) {
-        if (hit1->WireID().TPC>=8 && hit2->WireID().TPC>=8)
+      [&](PtrHit const& hit1, PtrHit const& hit2) {
+        if (GetSide(hit1) == kTop && GetSide(hit2) == kTop)
           return hit1->PeakTime() < hit2->PeakTime();
-        if (hit1->WireID().TPC<8 && hit2->WireID().TPC<8)
+        if (GetSide(hit1) == kBot && GetSide(hit2) == kBot)
           return hit1->PeakTime() > hit2->PeakTime();
-        return hit1->WireID().TPC>=8;
+        return GetSide(hit1) == kTop;
       }
     );
-    ana::Hit ana_decayHit = GetHit(decayHit);
+    _muEndHit = GetHit(endHit);
 
     _miHits.reserve(eveHits.size());
     _miHitsDistance.clear();
@@ -258,22 +270,22 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHitsFromMuonTrack.clear();
     _miHitsFromMuonTrack.reserve(eveHits.size());
 
-    for (PtrHit const& hit : eveHits) {
-      ana::Hit ana_hit = GetHit(hit);
-      _miHits.push_back(ana_hit);
+    for (PtrHit const& hitPtr : eveHits) {
+      ana::Hit hit = GetHit(hitPtr);
+      _miHits.push_back(hit);
 
-      _miHitsDistance.push_back(GetDistance(ana_hit, ana_decayHit));
+      _miHitsDistance.push_back(GetDistance(hit, _muEndHit));
 
-      ana::Vec2 decay2hit(ana_hit.space - ana_decayHit.space, (ana_hit.tick - ana_decayHit.tick) * fTick2cm);
+      ana::Vec2 decay2hit(hit.space - _muEndHit.space, (hit.tick - _muEndHit.tick) * fTick2cm);
       float angle = decay2hit.angle() - michelVec2Angle;
       angle = abs(angle) > M_PI ? angle - (angle>0 ? 1 : -1) * 2*M_PI : angle;
       _miHitsAngle.push_back(angle);
 
-      PtrTrk const& hitTrack = fop_hit2trk.at(hit.key());
+      PtrTrk const& hitTrack = fop_hit2trk.at(hitPtr.key());
       _miHitsFromMichelTrack.push_back(michelTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == michelTrack.key());
       _miHitsFromMuonTrack.push_back(muonTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == muonTrack.key());
 
-      PtrShw const& hitShower = fop_hit2shw.at(hit.key());
+      PtrShw const& hitShower = fop_hit2shw.at(hitPtr.key());
       _miHitsFromMichelShower.push_back(michelShower.isNonnull() && hitShower.isNonnull() && hitShower.key() == michelShower.key());
     }
 
