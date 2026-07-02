@@ -262,14 +262,15 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     VecPtrHit eveHits = ana::mcp2hits(michel, vph_ev, clockData, true, &_miHitEnergyFrac);
     VecPtrHit primeHits = ana::mcp2hits(michel, vph_ev, clockData, false);
 
+    int increasingX = muVect.X() > 0 ? +1 : -1;
     PtrHit const& endHit = *std::max_element(
       muonHits.begin(), muonHits.end(), 
       [&](PtrHit const& hit1, PtrHit const& hit2) {
         if (GetSide(hit1) == kTop && GetSide(hit2) == kTop)
-          return hit1->PeakTime() < hit2->PeakTime();
+          return increasingX * (hit1->PeakTime() - hit2->PeakTime()) > 0;
         if (GetSide(hit1) == kBot && GetSide(hit2) == kBot)
-          return hit1->PeakTime() > hit2->PeakTime();
-        return GetSide(hit1) == kTop;
+          return increasingX * (hit1->PeakTime() - hit2->PeakTime()) < 0;
+        return GetSide(hit1) == (increasingX>0 ? kBot : kTop);
       }
     );
     _muEndHit = GetHit(endHit);
