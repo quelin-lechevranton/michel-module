@@ -67,18 +67,21 @@ private:
   ana::Hit _muEndHit;
 
   bool _muHasTrack;
-  bool _miHasTrack;
+  enum EnumMichelHasTrack: int { 
+    kIsMuonTrack = -1, kNoTrack = 0, kHasTrack = 1
+  };
+  EnumMichelHasTrack _miHasTrack;
   bool _miHasShower;
   float _miTrackLength;
   float _miShowerLength;
 
   ana::Hits _miHits;
-  std::vector<float> _miHitsEnergyFrac;
-  std::vector<float> _miHitsDistance;
-  std::vector<float> _miHitsAngle;
-  std::vector<bool> _miHitsFromMichelTrack;
-  std::vector<bool> _miHitsFromMichelShower;
-  std::vector<bool> _miHitsFromMuonTrack;
+  std::vector<float> _miHitEnergyFrac;
+  std::vector<float> _miHitDistance;
+  std::vector<float> _miHitAngle;
+  std::vector<bool> _miHitFromMichelTrack;
+  std::vector<bool> _miHitFromMichelShower;
+  std::vector<bool> _miHitFromMuonTrack;
 };
 
 ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
@@ -147,18 +150,18 @@ ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
   SetBranches(_tree, "muEnd",   &_muEndHit);
 
   _tree->Branch("muHasTrack",   &_muHasTrack);
-  _tree->Branch("miHasTrack",   &_miHasTrack);
+  _tree->Branch("miHasTrack",   (int*)&_miHasTrack);
   _tree->Branch("miHasShower",   &_miHasShower);
   _tree->Branch("miTrackLength",   &_miTrackLength);
   _tree->Branch("miShowerLength",   &_miShowerLength);
 
   SetBranches(_tree, "mi",    &_miHits);
-  _tree->Branch("miHitsEnergyFrac",   &_miHitsEnergyFrac);
-  _tree->Branch("miHitsDistance",   &_miHitsDistance);
-  _tree->Branch("miHitsAngle",   &_miHitsAngle);
-  _tree->Branch("miHitsFromMichelTrack",   &_miHitsFromMichelTrack);
-  _tree->Branch("miHitsFromMichelShower",   &_miHitsFromMichelShower);
-  _tree->Branch("miHitsFromMuonTrack",   &_miHitsFromMuonTrack);
+  _tree->Branch("miHitEnergyFrac",   &_miHitEnergyFrac);
+  _tree->Branch("miHitDistance",   &_miHitDistance);
+  _tree->Branch("miHitAngle",   &_miHitAngle);
+  _tree->Branch("miHitFromMichelTrack",   &_miHitFromMichelTrack);
+  _tree->Branch("miHitFromMichelShower",   &_miHitFromMichelShower);
+  _tree->Branch("miHitFromMuonTrack",   &_miHitFromMuonTrack);
 }
 
 void ana::ElectronReco::analyze(art::Event const& e) {
@@ -242,7 +245,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     // geo::Point_t endPoint = geo::Point_t(muon.EndPosition().Vect());
 
     PtrTrk const& michelTrack = ana::mcp2trk(michel, vpt_ev, clockData, fmp_trk2hit);
-    _miHasTrack = michelTrack.isNonnull();
+    _miHasTrack = michelTrack.isNull() ? kNoTrack : (_muHasTrack && muonTrack.key()==michelTrack.key() ? kIsMuonTrack : kHasTrack);
     _miTrackLength = _miHasTrack ? michelTrack->Length() : util::kBogusF;
 
     PtrShw const& michelShower = ana::mcp2shw(michel, vps_ev, clockData, fmp_shw2hit);
@@ -253,8 +256,8 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     ana::Vec2 michelVec2(michelDir.Z(), michelDir.X());
     float michelVec2Angle = michelVec2.angle();
 
-    _miHitsEnergyFrac.clear();
-    VecPtrHit eveHits = ana::mcp2hits(michel, vph_ev, clockData, true, &_miHitsEnergyFrac);
+    _miHitEnergyFrac.clear();
+    VecPtrHit eveHits = ana::mcp2hits(michel, vph_ev, clockData, true, &_miHitEnergyFrac);
 
     PtrHit const& endHit = *std::max_element(
       muonHits.begin(), muonHits.end(), 
@@ -270,34 +273,34 @@ void ana::ElectronReco::analyze(art::Event const& e) {
 
     _miHits.clear();
     _miHits.reserve(eveHits.size());
-    _miHitsDistance.clear();
-    _miHitsDistance.reserve(eveHits.size());
-    _miHitsAngle.clear();
-    _miHitsAngle.reserve(eveHits.size());
-    _miHitsFromMichelTrack.clear();
-    _miHitsFromMichelTrack.reserve(eveHits.size());
-    _miHitsFromMichelShower.clear();
-    _miHitsFromMichelShower.reserve(eveHits.size());
-    _miHitsFromMuonTrack.clear();
-    _miHitsFromMuonTrack.reserve(eveHits.size());
+    _miHitDistance.clear();
+    _miHitDistance.reserve(eveHits.size());
+    _miHitAngle.clear();
+    _miHitAngle.reserve(eveHits.size());
+    _miHitFromMichelTrack.clear();
+    _miHitFromMichelTrack.reserve(eveHits.size());
+    _miHitFromMichelShower.clear();
+    _miHitFromMichelShower.reserve(eveHits.size());
+    _miHitFromMuonTrack.clear();
+    _miHitFromMuonTrack.reserve(eveHits.size());
 
     for (PtrHit const& hitPtr : eveHits) {
       ana::Hit hit = GetHit(hitPtr);
       _miHits.push_back(hit);
 
-      _miHitsDistance.push_back(GetDistance(hit, _muEndHit));
+      _miHitDistance.push_back(GetDistance(hit, _muEndHit));
 
       ana::Vec2 decay2hit(hit.space - _muEndHit.space, (hit.tick - _muEndHit.tick) * fTick2cm);
       float angle = decay2hit.angle() - michelVec2Angle;
       angle = abs(angle) > M_PI ? angle - (angle>0 ? 1 : -1) * 2*M_PI : angle;
-      _miHitsAngle.push_back(angle);
+      _miHitAngle.push_back(angle);
 
       PtrTrk const& hitTrack = fop_hit2trk.at(hitPtr.key());
-      _miHitsFromMichelTrack.push_back(michelTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == michelTrack.key());
-      _miHitsFromMuonTrack.push_back(muonTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == muonTrack.key());
+      _miHitFromMichelTrack.push_back(michelTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == michelTrack.key());
+      _miHitFromMuonTrack.push_back(muonTrack.isNonnull() && hitTrack.isNonnull() && hitTrack.key() == muonTrack.key());
 
       PtrShw const& hitShower = fop_hit2shw.at(hitPtr.key());
-      _miHitsFromMichelShower.push_back(michelShower.isNonnull() && hitShower.isNonnull() && hitShower.key() == michelShower.key());
+      _miHitFromMichelShower.push_back(michelShower.isNonnull() && hitShower.isNonnull() && hitShower.key() == michelShower.key());
     }
 
     _tree->Fill();
