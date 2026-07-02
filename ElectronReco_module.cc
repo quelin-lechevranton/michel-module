@@ -254,7 +254,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHasShower = michelShower.isNonnull();
     _miShowerLength = _miHasShower ? michelShower->Length() : util::kBogusF;
 
-    geo::Vector_t michelDir = geo::Vector_t(michel->EndMomentum().Vect()).Unit();
+    geo::Vector_t michelDir = geo::Vector_t(michel->Momentum().Vect()).Unit();
     ana::Vec2 michelVec2(michelDir.Z(), michelDir.X());
     float michelVec2Angle = michelVec2.angle();
 
