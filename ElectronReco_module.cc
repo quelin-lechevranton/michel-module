@@ -268,6 +268,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     );
     _muEndHit = GetHit(endHit);
 
+    _miHits.clear();
     _miHits.reserve(eveHits.size());
     _miHitsDistance.clear();
     _miHitsDistance.reserve(eveHits.size());
