@@ -202,17 +202,28 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     simb::MCParticle const* michel = GetMichelMCP(&muon);
     if (!michel) continue;
 
+    VecPtrHit muonHits = ana::mcp2hits(&muon, vph_ev, clockData, false);
+    if (muonHits.empty()) continue;
+
     _muEnergy = (muon.E() - muon.Mass()) * 1e3;
     _muEndEnergy = (muon.EndE() - muon.Mass()) * 1e3;
     _miEnergy = (michel->E() - michel->Mass()) * 1e3;
 
     TVector3 const& muVect = muon.Momentum().Vect();
-    geo::Vector_t muonDir(muVect.Y(), muVect.Z(), muVect.X());
+    geo::Vector_t muonDir;
+    switch (geoDet) {
+      case kPDVD:
+        muonDir.SetCoordinates(muVect.Y(), muVect.Z(), muVect.X());
+        break;
+      case kPDHD:
+      case kPDSP:
+        muonDir.SetCoordinates(muVect.Z(), muVect.X(), muVect.Y());
+        break;
+    }
     _muTheta = muonDir.Theta();
     _muPhi = muonDir.Phi();
 
     TVector3 const& muEndVect = muon.EndMomentum().Vect();
-
     geo::Vector_t muonEndDir;
     switch (geoDet) {
       case kPDVD:
@@ -229,7 +240,6 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     PtrTrk const& muonTrack = ana::mcp2trk(&muon, vpt_ev, clockData, fmp_trk2hit);
     _muHasTrack = muonTrack.isNonnull();
     // geo::Point_t endPoint = geo::Point_t(muon.EndPosition().Vect());
-    VecPtrHit muonHits = ana::mcp2hits(&muon, vph_ev, clockData, false);
 
     PtrTrk const& michelTrack = ana::mcp2trk(michel, vpt_ev, clockData, fmp_trk2hit);
     _miHasTrack = michelTrack.isNonnull();
