@@ -58,13 +58,17 @@ private:
 
   // Output Variables
   float _muEnergy;
+  ana::Point _muDir;
   float _muTheta;
   float _muPhi;
   float _muEndEnergy;
+  ana::Point _muEndDir;
   float _muEndTheta;
   float _muEndPhi;
   float _miEnergy;
+  ana::Point _miDir;
   ana::Hit _muEndHit;
+  ana::Point _muEndPoint;
 
   bool _muHasTrack;
   enum EnumMichelHasTrack: int { 
@@ -142,16 +146,20 @@ ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
   _tree = asFile->make<TTree>("michel","");
 
   _tree->Branch("muEnergy",              &_muEnergy);
+  SetBranches(_tree, "muDir",            &_muDir);
   _tree->Branch("muTheta",               &_muTheta);
   _tree->Branch("muPhi",                 &_muPhi);
   _tree->Branch("muEndEnergy",           &_muEndEnergy);
+  SetBranches(_tree, "muEndDir",         &_muEndDir);
   _tree->Branch("muEndTheta",            &_muEndTheta);
   _tree->Branch("muEndPhi",              &_muEndPhi);
   _tree->Branch("miEnergy",              &_miEnergy);
+  SetBranches(_tree, "miDir",            &_miDir);
   SetBranches(_tree, "muEnd",            &_muEndHit);
+  SetBranches(_tree, "muEnd",            &_muEndPoint);
 
   _tree->Branch("muHasTrack",            &_muHasTrack);
-  _tree->Branch("miHasTrack",            (int*)&_miHasTrack);
+  _tree->Branch("miHasTrack",      (int*)&_miHasTrack);
   _tree->Branch("miHasShower",           &_miHasShower);
   _tree->Branch("miTrackLength",         &_miTrackLength);
   _tree->Branch("miShowerLength",        &_miShowerLength);
@@ -225,9 +233,11 @@ void ana::ElectronReco::analyze(art::Event const& e) {
         muonDir.SetCoordinates(muVect.Z(), muVect.X(), muVect.Y());
         break;
     }
+    _muDir = ana::Point(muVect.Unit());
     _muTheta = muonDir.Theta();
     _muPhi = muonDir.Phi();
 
+    _muEndPoint = ana::Point(muon.EndPosition().Vect());
     TVector3 const& muEndVect = muon.EndMomentum().Vect();
     geo::Vector_t muonEndDir;
     switch (geoDet) {
@@ -239,6 +249,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
         muonEndDir.SetCoordinates(muEndVect.Z(), muEndVect.X(), muEndVect.Y());
         break;
     }
+    _muEndDir = ana::Point(muEndVect.Unit());
     _muEndTheta = muonEndDir.Theta();
     _muEndPhi = muonEndDir.Phi();
 
@@ -247,6 +258,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     // geo::Point_t endPoint = geo::Point_t(muon.EndPosition().Vect());
 
     PtrTrk const& michelTrack = ana::mcp2trk(michel, vpt_ev, clockData, fmp_trk2hit);
+
     _miHasTrack = michelTrack.isNull() ? kNoTrack : (_muHasTrack && muonTrack.key()==michelTrack.key() ? kIsMuonTrack : kHasTrack);
     _miTrackLength = _miHasTrack ? michelTrack->Length() : util::kBogusF;
 
@@ -254,8 +266,8 @@ void ana::ElectronReco::analyze(art::Event const& e) {
     _miHasShower = michelShower.isNonnull();
     _miShowerLength = _miHasShower ? michelShower->Length() : util::kBogusF;
 
-    geo::Vector_t michelDir = geo::Vector_t(michel->Momentum().Vect()).Unit();
-    ana::Vec2 michelVec2(michelDir.Z(), michelDir.X());
+    _miDir = ana::Point(michel->Momentum().Vect().Unit());
+    ana::Vec2 michelVec2(_miDir.z, _miDir.x);
     float michelVec2Angle = michelVec2.angle();
 
     _miHitEnergyFrac.clear();
