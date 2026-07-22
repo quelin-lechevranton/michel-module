@@ -1,0 +1,52 @@
+#include "services_dune.fcl"
+#include "services_dunefd_horizdrift_1x2x6.fcl"
+
+process_name: RunSNElectron
+
+services: {
+    TFileService: { fileName: "fdhd_SNElectron.root" }
+    TimeTracker: {}
+    RandomNumberGenerator: {}
+    WireReadout:                @local::dune_wire_readout
+    DetectorPropertiesService:  @local::dunefd_detproperties
+    FileCatalogMetadata:        @local::art_file_catalog_mc
+                                @table::dunefd_reco_services
+    LArPropertiesService:       @local::dunefd_properties
+}
+
+source: {
+    module_type: RootInput
+    maxEvents: -1
+}
+
+physics: {
+    analyzers: {
+        checks: {
+            module_type:    "SNElectron"
+            Products:       [
+                # process, label, instance, type
+                ["MARLEYGen",  "marley",          "",             "simb::MCTruth"],
+                ["SupernovaG4","largeant",        "",             "simb::MCParticle"],
+                ["detsim",     "tpcrawdecoder",   "gauss",        "recob::Wire"],
+                ["Reco2",      "trajcluster",     "",             "recob::Hit"],
+                # ["Reco2",      "linecluster",     "",             "recob::Hit"],
+                ["Reco2",      "trajcluster",     "",             "recob::Cluster"],
+                # ["Reco2",      "linecluster",     "",             "recob::Cluster"],
+                # ["Reco2",      "pandora",         "",             "recob::Cluster"],
+                ["Reco2",      "trajcluster",     "",             "recob::EndPoint2D"],
+                # ["Reco2",      "linecluster",     "",             "recob::EndPoint2D"],
+                ["Reco2",      "pmtracktc",       "",             "recob::Track"],
+                # ["Reco2",      "pandoraTrack",    "",             "recob::Track"],
+                # ["Reco2",      "pandoraShower",   "",             "recob::Track"],
+                # ["Reco2",      "pandoraShower",   "",             "recob::Shower"],
+                ["Reco2",      "trajcluster",     "",             "recob::Shower"],
+                # ["Reco2",      "pandora",         "",             "recob::PFParticle"],
+                ["Reco2",      "trajcluster",     "",             "recob::PFParticle"],
+                # ["Reco2",      "pmtracktc",       "",             "recob::PFParticle"],
+            ]
+            Log: false
+        }
+    }
+    ana: [ checks ]
+    end_paths: [ ana ]
+}
