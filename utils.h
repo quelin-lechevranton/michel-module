@@ -808,7 +808,11 @@ ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
         geoDet = kPDHD;
     else if (asGeo->DetectorName() == "protodunev7")
         geoDet = kPDSP;
-    else {
+    else if (asGeo->DetectorName() == "dune10kt_v6_1x2x6") {
+        geoDet = kPDHD;
+        std::cout << "MiAna: " "\033[1;91m" "geometry: "
+            << asGeo->DetectorName() << " treated as PDHD" << "\033[0m" << std::endl;
+    } else {
         std::cout << "MiAna: " "\033[1;91m" "unknown geometry: "
             << asGeo->DetectorName() << "\033[0m" << std::endl;
         exit(1);
