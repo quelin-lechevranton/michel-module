@@ -73,8 +73,8 @@ namespace ana {
        BOT       TOP
     */
 
-    enum Det_t: int { kPDVD, kPDHD, kPDSP };
-    std::vector<std::string> const det_name = { "PDVD", "PDHD", "PDSP" };
+    enum Det_t: int { kPDVD, kPDHD, kPDSP, kFDHD };
+    std::vector<std::string> const det_name = { "PDVD", "PDHD", "PDSP", "FDHD" };
     enum Side_t: int { kBot=0, kTop=1, kInvalidSide=-1 };
     using Sec_t = int;
     static constexpr Sec_t kInvalidSec = -1;
@@ -82,7 +82,8 @@ namespace ana {
     std::vector<unsigned> const n_sec = {
         8, // PDVD
         2, // PDHD
-        2  // PDSP
+        2, // PDSP
+        4  // FDHD
     };
     std::vector<std::map<geo::TPCID::TPCID_t, Sec_t>> const tpc2sec = {
         { // PDVD
@@ -107,6 +108,14 @@ namespace ana {
             {10, 0}, {6, 1}, {2, 1},
             {11, kInvalidSide}, {7, kInvalidSec}, {3, kInvalidSec},
             { geo::TPCID::InvalidID, kInvalidSec }
+        }, { // FDHD
+            {0, 2},  {1, 3},  {2, 0},  {3, 1},
+            {4, 2},  {5, 3},  {6, 0},  {7, 1},
+            {8, 2},  {9, 3},  {10, 0}, {11, 1},
+            {12, 2}, {13, 3}, {14, 0}, {15, 1},
+            {16, 2}, {17, 3}, {18, 0}, {19, 1},
+            {20, 2}, {21, 3}, {22, 0}, {23, 1},
+            { geo::TPCID::InvalidID, kInvalidSec }
         }
     };
     std::vector<std::map<Sec_t, std::vector<geo::TPCID::TPCID_t>>> const sec2tpcs = {
@@ -128,6 +137,12 @@ namespace ana {
             {0, {1, 5, 9} },
             {1, {2, 6, 10} },
             {kInvalidSec, { geo::TPCID::InvalidID } }
+        }, { // FDHD
+            {0, {2, 6, 10, 14, 18, 22} },
+            {1, {3, 7, 11, 15, 19, 23} },
+            {2, {0, 4, 8, 12, 16, 20} },
+            {3, {1, 5, 9, 13, 17, 21} },
+            {kInvalidSec, { geo::TPCID::InvalidID } }
         }
     };
     std::vector<std::map<geo::TPCID::TPCID_t, Side_t>> const tpc2side = {
@@ -146,6 +161,14 @@ namespace ana {
             { 4, kInvalidSide }, { 5, kBot }, { 6, kTop }, { 7, kInvalidSide },
             { 8, kInvalidSide }, { 9, kBot }, { 10, kTop }, { 11, kInvalidSide },
             { geo::TPCID::InvalidID, kInvalidSide }
+        }, { // FDHD
+            { 0, kBot }, { 2, kBot }, { 1, kTop }, { 3, kTop },
+            { 4, kBot }, { 6, kBot }, { 5, kTop }, { 7, kTop },
+            { 8, kBot }, { 10, kBot }, { 9, kTop }, { 11, kTop },
+            { 12, kBot }, { 14, kBot }, { 13, kTop }, { 15, kTop },
+            { 16, kBot }, { 18, kBot }, { 17, kTop }, { 19, kTop },
+            { 20, kBot }, { 22, kBot }, { 21, kTop }, { 23, kTop },
+            { geo::TPCID::InvalidID, kInvalidSide }
         }
     };
     std::vector<std::map<Side_t, std::vector<Sec_t>>> const side2secs = {
@@ -158,18 +181,24 @@ namespace ana {
         }, { // PDSP
             { kBot, {0} }, { kTop, {1} },
             { kInvalidSide, {} }
+        }, { // FDHD
+            { kBot, {0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22} }, { kTop, {1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23} },
+            { kInvalidSide, {} }
         }
     };
     std::vector<std::map<Sec_t, Side_t>> const sec2side = {
         { // PDVD
             {0, kTop}, {1, kTop}, {2, kTop}, {3, kTop},
             {4, kBot}, {5, kBot}, {6, kBot}, {7, kBot},
-            {kInvalidSec, kInvalidSide }
+            { kInvalidSec, kInvalidSide }
         }, { // PDHD
             {0, kBot}, {1, kTop},
             { kInvalidSec, kInvalidSide }
         }, { // PDSP 
             {0, kBot}, {1, kTop},
+            { kInvalidSec, kInvalidSide }
+        }, { // FDHD
+            {0, kBot}, {2, kBot}, {1, kTop}, {3, kTop},
             { kInvalidSec, kInvalidSide }
         }
     };
@@ -809,9 +838,7 @@ ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
     else if (asGeo->DetectorName() == "protodunev7")
         geoDet = kPDSP;
     else if (asGeo->DetectorName() == "dune10kt_v6_1x2x6") {
-        geoDet = kPDHD;
-        std::cout << "MiAna: " "\033[1;91m" "geometry: "
-            << asGeo->DetectorName() << " treated as PDHD" << "\033[0m" << std::endl;
+        geoDet = kFDHD;
     } else {
         std::cout << "MiAna: " "\033[1;91m" "unknown geometry: "
             << asGeo->DetectorName() << "\033[0m" << std::endl;
