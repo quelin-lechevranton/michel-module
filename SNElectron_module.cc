@@ -64,6 +64,7 @@ private:
 
   ana::Hits _allHits;
   int _pdg;
+  float _energy;
   ana::Point _startPoint;
   ana::Point _endPoint;
 };
@@ -143,6 +144,7 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
   _part_tree->Branch("IndexInEvent",&_evPartNumber);
   _part_tree->Branch("Index",       &_partIndex);
   _part_tree->Branch("pdg",         &_pdg);
+  _part_tree->Branch("energy",      &_energy);
   SetBranches(_part_tree, "start",  &_startPoint);
   SetBranches(_part_tree, "end",    &_endPoint);
 }
@@ -193,9 +195,10 @@ void ana::SNElectron::analyze(art::Event const& e) {
   int np=0;
   for (simb::MCParticle const& part : *vh_mcp) {
 
-    std::cout << "#" << ++np << ": " << part.PdgCode() << "   ";
+    // std::cout << "#" << ++np << ": " << part.PdgCode() << "   ";
 
     _pdg = part.PdgCode();
+    _energy = part.E();
     _startPoint = part.Position().Vect();
     _endPoint = part.EndPosition().Vect();
 
