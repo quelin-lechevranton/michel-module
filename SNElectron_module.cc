@@ -188,10 +188,12 @@ void ana::SNElectron::analyze(art::Event const& e) {
       if (p_hit->View() == geo::kW)
           _allHits.push_back(GetHit(p_hit));
 
-  std::cout << vh_mcp->size() << " particles" << std::endl;
+  // std::cout << vh_mcp->size() << " particles" << std::endl;
+  if (vh_mcp->empty()) return;
+  int np=0;
   for (simb::MCParticle const& part : *vh_mcp) {
 
-    std::cout << "#1: " << part.PdgCode() << "   ";
+    std::cout << "#" << ++np << ": " << part.PdgCode() << "   ";
 
     _pdg = part.PdgCode();
     _startPoint = part.Position().Vect();
@@ -202,10 +204,10 @@ void ana::SNElectron::analyze(art::Event const& e) {
     _partIndex++;
     _evPartNumber++;
   }
-  std::cout << std::endl;
+  // std::cout << std::endl;
 
   _evt_tree->Fill();
-  _partIndex++;
+  _evIndex++;
 }
 
 void ana::SNElectron::beginJob() {}
