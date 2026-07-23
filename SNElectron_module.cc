@@ -62,10 +62,10 @@ private:
   std::vector<unsigned>   _evPartIndices;
   unsigned                _partIndex=0;
 
-  std::vector<int> _pdg;
   ana::Hits _allHits;
-  ana::Points _startPoints;
-  ana::Points _endPoints;
+  int _pdg;
+  ana::Point _startPoint;
+  ana::Point _endPoint;
 };
 
 ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
@@ -129,15 +129,13 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
     << "  Top Bounds: " << geoTop << std::endl
     << "  Bot Bounds: " << geoBot << std::endl
   ;
-  std::cout << "SNElecModule: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
-  ;
 
   _evt_tree = asFile->make<TTree>("event", "");
 
   _evt_tree->Branch("Index",       &_evIndex);
   _evt_tree->Branch("PartNumber",  &_evPartNumber);
   _evt_tree->Branch("PartIndices", &_evPartIndices);
-  SetBranches(_part_tree, "all",   &_allHits);
+  SetBranches(_evt_tree, "",   &_allHits);
 
   _part_tree = asFile->make<TTree>("particle","");
 
@@ -145,8 +143,8 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
   _part_tree->Branch("IndexInEvent",&_evPartNumber);
   _part_tree->Branch("Index",       &_partIndex);
   _part_tree->Branch("pdg",         &_pdg);
-  SetBranches(_part_tree, "start",  &_startPoints);
-  SetBranches(_part_tree, "end",    &_endPoints);
+  SetBranches(_part_tree, "start",  &_startPoint);
+  SetBranches(_part_tree, "end",    &_endPoint);
 }
 
 void ana::SNElectron::analyze(art::Event const& e) {
@@ -195,13 +193,9 @@ void ana::SNElectron::analyze(art::Event const& e) {
 
     std::cout << "#1: " << part.PdgCode() << "   ";
 
-    _pdg.clear();
-    _startPoints.clear();
-    _endPoints.clear();
-
-    _pdg.push_back(part.PdgCode());
-    _startPoints.push_back(part.Position().Vect());
-    _endPoints.push_back(part.EndPosition().Vect());
+    _pdg = part.PdgCode();
+    _startPoint = part.Position().Vect();
+    _endPoint = part.EndPosition().Vect();
 
     _part_tree->Fill();
     _evPartIndices.push_back(_partIndex);
