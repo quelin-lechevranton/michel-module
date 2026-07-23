@@ -85,12 +85,12 @@ namespace ana {
     FDHD: (beam direction ?) (vertical: Y up)
     ┌──────────┬──────────┐ Y
     │ side0    │ side1    │ ^
-    │ sec0     │ sec1     │ │
+    │ sec1     │ sec0     │ │
     │ tpc2-22  │ tpc3-23  │ │
     │          │          │ │
     ├──────────┼──────────┤ │
     │ side0    │ side1    │ │
-    │ sec2     │ sec3     │ │
+    │ sec3     │ sec2     │ │
     │ tpc0-20  │ tpc1-21  │ │
     │          │          │ │
     └──────────┴──────────┘
@@ -135,12 +135,12 @@ namespace ana {
             {11, kInvalidSide}, {7, kInvalidSec}, {3, kInvalidSec},
             { geo::TPCID::InvalidID, kInvalidSec }
         }, { // FDHD
-            {0, 2},  {1, 3},  {2, 0},  {3, 1},
-            {4, 2},  {5, 3},  {6, 0},  {7, 1},
-            {8, 2},  {9, 3},  {10, 0}, {11, 1},
-            {12, 2}, {13, 3}, {14, 0}, {15, 1},
-            {16, 2}, {17, 3}, {18, 0}, {19, 1},
-            {20, 2}, {21, 3}, {22, 0}, {23, 1},
+            {0,  3},  {1, 2},  {2, 1},  {3, 0},
+            {4,  3},  {5, 2},  {6, 1},  {7, 0},
+            {8,  3},  {9, 2}, {10, 1}, {11, 0},
+            {12, 3}, {13, 2}, {14, 1}, {15, 0},
+            {16, 3}, {17, 2}, {18, 1}, {19, 0},
+            {20, 3}, {21, 2}, {22, 1}, {23, 0},
             { geo::TPCID::InvalidID, kInvalidSec }
         }
     };
@@ -164,10 +164,10 @@ namespace ana {
             {1, {2, 6, 10} },
             {kInvalidSec, { geo::TPCID::InvalidID } }
         }, { // FDHD
-            {0, {2, 6, 10, 14, 18, 22} },
-            {1, {3, 7, 11, 15, 19, 23} },
-            {2, {0, 4, 8, 12, 16, 20} },
-            {3, {1, 5, 9, 13, 17, 21} },
+            {0, {3, 7, 11, 15, 19, 23} },
+            {1, {2, 6, 10, 14, 18, 22} },
+            {2, {1, 5, 9, 13, 17, 21} },
+            {3, {0, 4, 8, 12, 16, 20} },
             {kInvalidSec, { geo::TPCID::InvalidID } }
         }
     };
@@ -208,7 +208,7 @@ namespace ana {
             { kBot, {0} }, { kTop, {1} },
             { kInvalidSide, {} }
         }, { // FDHD
-            { kBot, {0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22} }, { kTop, {1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23} },
+            { kBot, {1, 3} }, { kTop, {0, 2} },
             { kInvalidSide, {} }
         }
     };
@@ -224,7 +224,7 @@ namespace ana {
             {0, kBot}, {1, kTop},
             { kInvalidSec, kInvalidSide }
         }, { // FDHD
-            {0, kBot}, {2, kBot}, {1, kTop}, {3, kTop},
+            {1, kBot}, {3, kBot}, {0, kTop}, {2, kTop},
             { kInvalidSec, kInvalidSide }
         }
     };
