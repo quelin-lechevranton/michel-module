@@ -102,18 +102,28 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
         asGeo->TPC(geo::TPCID{0, 10}).Max()
       };
       break;
-    default: break;
+    case kFDHD:
+      geoBot = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 0}).Min(),
+        asGeo->TPC(geo::TPCID{0, 22}).Max()
+      };
+      geoTop = ana::Bounds3D<float>{
+        asGeo->TPC(geo::TPCID{0, 1}).Min(),
+        asGeo->TPC(geo::TPCID{0, 23}).Max()
+      };
+    default:
+      std::cout << "SNElecModule: " << "\033[1;93m" << "geometry not handled: " << ana::det_name[geoDet] << "\033[0m" << std::endl;
   }
   geoCathodeGap = geoTop.x.min - geoBot.x.max;
 
-  std::cout << "SNElec: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+  std::cout << "SNElecModule: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
     << "  Detector Geometry: " << asGeo->DetectorName()
     << "  (" << ana::det_name[geoDet] << ")" << std::endl
     << "  Tick Window: " << wireWindow << std::endl
     << "  Top Bounds: " << geoTop << std::endl
     << "  Bot Bounds: " << geoBot << std::endl
   ;
-  std::cout << "SNElec: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+  std::cout << "SNElecModule: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
   ;
 
   _tree = asFile->make<TTree>("tree","");
@@ -130,20 +140,20 @@ void ana::SNElectron::analyze(art::Event const& e) {
   fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
 
   auto const& vh_mcp = e.getHandle<std::vector<simb::MCParticle>>(tag_mcp);
-  if (!vh_mcp.isValid()) { std::cout<<"SNElec: No valid simb::MCParticle handle"<<std::endl; return; }
+  if (!vh_mcp.isValid()) { std::cout<<"SNElecModule: No valid simb::MCParticle handle"<<std::endl; return; }
 
   auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
-  if (!vh_hit.isValid()) { std::cout<<"SNElec: No valid recob::Hit handle"<<std::endl; return; }
+  if (!vh_hit.isValid()) { std::cout<<"SNElecModule: No valid recob::Hit handle"<<std::endl; return; }
   VecPtrHit vph_ev;
   art::fill_ptr_vector(vph_ev, vh_hit);
 
   auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
-  if (!vh_trk.isValid()) { std::cout<<"SNElec: No valid recob::Track handle"<<std::endl; return; }
+  if (!vh_trk.isValid()) { std::cout<<"SNElecModule: No valid recob::Track handle"<<std::endl; return; }
   VecPtrTrk vpt_ev;
   art::fill_ptr_vector(vpt_ev, vh_trk);
 
   auto const & vh_shw = e.getHandle<std::vector<recob::Shower>>(tag_shw);
-  if (!vh_shw.isValid()) { std::cout<<"SNElec: No valid recob::Shower handle"<<std::endl; return; }
+  if (!vh_shw.isValid()) { std::cout<<"SNElecModule: No valid recob::Shower handle"<<std::endl; return; }
   VecPtrShw vps_ev;
   art::fill_ptr_vector(vps_ev, vh_shw);
 

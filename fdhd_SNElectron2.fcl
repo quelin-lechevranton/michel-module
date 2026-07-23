@@ -1,17 +1,13 @@
-#include "services_dune.fcl"
-#include "services_dunefd_horizdrift_1x2x6.fcl"
+#include "services_refactored_pdune.fcl"
+#include "simulationservices_dune.fcl"
+#include "standard_reco_dune10kt.fcl"
 
 process_name: RunSNElectron
 
 services: {
     TFileService: { fileName: "fdhd_SNElectron.root" }
-    TimeTracker: {}
-    RandomNumberGenerator: {}
-    WireReadout:                @local::dune_wire_readout
-    DetectorPropertiesService:  @local::dunefd_detproperties
-    FileCatalogMetadata:        @local::art_file_catalog_mc
-                                @table::dunefd_reco_services
-    LArPropertiesService:       @local::dunefd_properties
+    @table::services
+    @table::dunefd_1x2x6_reco_services
 }
 
 source: {

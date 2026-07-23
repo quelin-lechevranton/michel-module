@@ -205,7 +205,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
                 asGeo->TPC(geo::TPCID{0, 10}).Max()
             };
             break;
-        default: break;
+        default: 
+            std::cout << "MiAna: " << "\033[1;93m" << "geometry not handled: " << ana::det_name[geoDet] << "\033[0m" << std::endl;
     }
     geoCathodeGap = geoTop.x.min - geoBot.x.max;
 
@@ -251,45 +252,45 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "End",      &muEndPoint);
 
     // Hit
-    // muTree->Branch("RegError",                  &muRegError);
-    muTree->Branch("CathodeCrossing",           &muCathodeCrossing);
-    muTree->Branch("CathodeMisalignment",       &muCathodeMisalignment);
-    muTree->Branch("AnodeCrossing",             &muAnodeCrossing);
-    SetBranches(muTree, "Start",                &muStartHit);
-    muTree->Branch("StartHitCathodeX",          &muStartHitCathodeX);
-    muTree->Branch("StartHitY",                 &muStartHitY);
-    muTree->Branch("StartInCathodeX",           &muStartInCathodeX);
-    muTree->Branch("StartInY",                  &muStartInY);
-    muTree->Branch("StartInZ",                  &muStartInZ);
-    muTree->Branch("StartInT",                  &muStartInT);
-    muTree->Branch("StartInYZT",                &muStartInYZT);
-    SetBranches(muTree, "End",                  &muEndHit);
-    muTree->Branch("EndHitCathodeX",            &muEndHitCathodeX);
-    muTree->Branch("EndHitY",                   &muEndHitY);
-    muTree->Branch("EndInCathodeX",             &muEndInCathodeX);
-    muTree->Branch("EndInY",                    &muEndInY);
-    muTree->Branch("EndInZ",                    &muEndInZ);
-    muTree->Branch("EndInT",                    &muEndInT);
-    muTree->Branch("EndInYZT",                  &muEndInYZT);
-    muTree->Branch("EndAngle",                  &muEndAngle);
-    SetBranches(muTree, "",                     &muHits);
-    muTree->Branch("HitCathodeX",               &muHitCathodeX);
-    muTree->Branch("HitAnodeX",                 &muHitAnodeX);
-    muTree->Branch("HitY",                      &muHitY);
-    // SetBranches(muTree, "Top",                  &muTopReg);
-    // SetBranches(muTree, "Bot",                  &muBotReg);
-    muTree->Branch("HitdQds",                   &muHitdQds);
-    SetBranches(muTree, "Sphere",               &muSphereHits);
-    muTree->Branch("SphereHitMuonAngle",        &muSphereHitMuonAngle);
-    muTree->Branch("SphereEnergy",              &muSphereEnergy); // ADC
-    muTree->Branch("SphereEnergyTP",            &muSphereEnergyTP); // ADC
-    muTree->Branch("SphereHasLongTrack",        &muSphereHasLongTrack);
-    // muTree->Branch("SphereMaxShowerEnergy",     &muSphereMaxShowerEnergy);
+    // muTree->Branch("RegError",              &muRegError);
+    muTree->Branch("CathodeCrossing",       &muCathodeCrossing);
+    muTree->Branch("CathodeMisalignment",   &muCathodeMisalignment);
+    muTree->Branch("AnodeCrossing",         &muAnodeCrossing);
+    SetBranches(muTree, "Start",            &muStartHit);
+    muTree->Branch("StartHitCathodeX",      &muStartHitCathodeX);
+    muTree->Branch("StartHitY",             &muStartHitY);
+    muTree->Branch("StartInCathodeX",       &muStartInCathodeX);
+    muTree->Branch("StartInY",              &muStartInY);
+    muTree->Branch("StartInZ",              &muStartInZ);
+    muTree->Branch("StartInT",              &muStartInT);
+    muTree->Branch("StartInYZT",            &muStartInYZT);
+    SetBranches(muTree, "End",              &muEndHit);
+    muTree->Branch("EndHitCathodeX",        &muEndHitCathodeX);
+    muTree->Branch("EndHitY",               &muEndHitY);
+    muTree->Branch("EndInCathodeX",         &muEndInCathodeX);
+    muTree->Branch("EndInY",                &muEndInY);
+    muTree->Branch("EndInZ",                &muEndInZ);
+    muTree->Branch("EndInT",                &muEndInT);
+    muTree->Branch("EndInYZT",              &muEndInYZT);
+    muTree->Branch("EndAngle",              &muEndAngle);
+    SetBranches(muTree, "",                 &muHits);
+    muTree->Branch("HitCathodeX",           &muHitCathodeX);
+    muTree->Branch("HitAnodeX",             &muHitAnodeX);
+    muTree->Branch("HitY",                  &muHitY);
+    // SetBranches(muTree, "Top",              &muTopReg);
+    // SetBranches(muTree, "Bot",              &muBotReg);
+    muTree->Branch("HitdQds",               &muHitdQds);
+    SetBranches(muTree, "Sphere",           &muSphereHits);
+    muTree->Branch("SphereHitMuonAngle",    &muSphereHitMuonAngle);
+    muTree->Branch("SphereEnergy",          &muSphereEnergy); // ADC
+    muTree->Branch("SphereEnergyTP",        &muSphereEnergyTP); // ADC
+    muTree->Branch("SphereHasLongTrack",    &muSphereHasLongTrack);
+    // muTree->Branch("SphereMaxShowerEnergy", &muSphereMaxShowerEnergy);
 
-    SetBranches(muTree, "Bary",                 &muBaryHits);
-    SetBranches(muTree, "Bary",                 &muBary);
-    muTree->Branch("BaryAngle",                 &muBaryAngle);
-    muTree->Branch("BaryMuonAngle",             &muBaryMuonAngle);
+    SetBranches(muTree, "Bary",             &muBaryHits);
+    SetBranches(muTree, "Bary",             &muBary);
+    muTree->Branch("BaryAngle",             &muBaryAngle);
+    muTree->Branch("BaryMuonAngle",         &muBaryMuonAngle);
 
     // Truth
     muTree->Branch("TruePdg",               &truPdg);

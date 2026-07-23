@@ -49,16 +49,16 @@ using VecPtrShw = std::vector<art::Ptr<recob::Shower>>;
 namespace ana {
     /*
     PDVD: (beam direction along Z, inside side1) (vertical: X up)
-    ┌─────────┬─────────┬─────────┬─────────┐  X
-    │ side1   │ side1   │ side1   │ side1   │  ^
-    │ sec0    │ sec1    │ sec2    │ sec3    │  │  TOP
-    │ tpc8,10 │ tpc9,11 │ tpc12,14│ tpc13,15│  │
-    │         │         │         │         │  │
-    ├─────────┼─────────┼─────────┼─────────┤  │
-    │ side0   │ side0   │ side0   │ side0   │  │
-    │ sec4    │ sec5    │ sec6    │ sec7    │  │  BOT
-    │ tpc0,2  │ tpc1,3  │ tpc4,6  │ tpc5,7  │  │ 
-    │         │         │         │         │  │
+    ┌─────────┬─────────┬─────────┬─────────┐ X
+    │ side1   │ side1   │ side1   │ side1   │ ^
+    │ sec0    │ sec1    │ sec2    │ sec3    │ │  TOP
+    │ tpc8,10 │ tpc9,11 │ tpc12,14│ tpc13,15│ │
+    │         │         │         │         │ │
+    ├─────────┼─────────┼─────────┼─────────┤ │
+    │ side0   │ side0   │ side0   │ side0   │ │
+    │ sec4    │ sec5    │ sec6    │ sec7    │ │  BOT
+    │ tpc0,2  │ tpc1,3  │ tpc4,6  │ tpc5,7  │ │ 
+    │         │         │         │         │ │
     └─────────┴─────────┴─────────┴─────────┘
      ─────────────────────────────────────> Y
 
@@ -71,6 +71,32 @@ namespace ana {
     └─────────┴─────────┘  
      ─────────────────> X
        BOT       TOP
+
+    PDSP: (beam direction ?) (vertical: Y up)
+    ┌──────────┬──────────┐ Y
+    │ side0    │ side1    │ ^
+    │ sec0     │ sec1     │ │
+    │ tpc1,5,9 │ tpc2,6,10│ │
+    │          │          │ │
+    └──────────┴──────────┘  
+     ───────────────────> X
+        BOT        TOP
+
+    FDHD: (beam direction ?) (vertical: Y up)
+    ┌──────────┬──────────┐ Y
+    │ side0    │ side1    │ ^
+    │ sec0     │ sec1     │ │
+    │ tpc2-22  │ tpc3-23  │ │
+    │          │          │ │
+    ├──────────┼──────────┤ │
+    │ side0    │ side1    │ │
+    │ sec2     │ sec3     │ │
+    │ tpc0-20  │ tpc1-21  │ │
+    │          │          │ │
+    └──────────┴──────────┘
+     ───────────────────> X
+        BOT        TOP
+
     */
 
     enum Det_t: int { kPDVD, kPDHD, kPDSP, kFDHD };

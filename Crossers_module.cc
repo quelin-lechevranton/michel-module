@@ -183,17 +183,18 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
                 asGeo->TPC(geo::TPCID{0, 10}).Max()
             };
             break;
-        default: break;
+        default:
+            std::cout << "CrossersModule: " << "\033[1;93m" << "geometry not handled: " << ana::det_name[geoDet] << "\033[0m" << std::endl;
     }
     geoCathodeGap = geoTop.x.min - geoBot.x.max;
 
-    std::cout << "Crossers: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+    std::cout << "CrossersModule: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
         << "  Detector Geometry: " << asGeo->DetectorName()
         << "  (" << ana::det_name[geoDet] << ")" << std::endl
         << "  Tick Window: " << wireWindow << std::endl
         << "  Top Bounds: " << geoTop << std::endl
         << "  Bot Bounds: " << geoBot << std::endl;
-    std::cout << "Crossers: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+    std::cout << "CrossersModule: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
         << "  Track Length Cut: " << inTrackLengthCut << " cm" << std::endl
         << "  Fiducial Length: " << inFiducialLength << " cm" << std::endl
         << "  Smoothing Length: " << inRegN << " points" << std::endl;
@@ -275,7 +276,7 @@ void ana::Crossers::analyze(art::Event const& e) {
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
-        std::cout << "Crossers: " "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
+        std::cout << "CrossersModule: " "\033[1;91m" "No valid recob::Hit handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrHit vph_ev;
@@ -283,7 +284,7 @@ void ana::Crossers::analyze(art::Event const& e) {
 
     auto const & vh_trk = e.getHandle<std::vector<recob::Track>>(tag_trk);
     if (!vh_trk.isValid()) {
-        std::cout << "Crossers: " "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
+        std::cout << "CrossersModule: " "\033[1;91m" "No valid recob::Track handle" "\033[0m" << std::endl;
         return;
     }
     VecPtrTrk vpt_ev;
@@ -414,6 +415,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         case kPDSP:
             trAnodeCrossing = false;
             break;
+        default:
         }
         LOG(trAnodeCrossing);
 
@@ -535,6 +537,7 @@ void ana::Crossers::analyze(art::Event const& e) {
                 case kPDSP: 
                     std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
                     break;
+                default:
                 }
             }
             if (before_cathode != -1) {

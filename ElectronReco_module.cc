@@ -129,18 +129,19 @@ ana::ElectronReco::ElectronReco(fhicl::ParameterSet const& p)
         asGeo->TPC(geo::TPCID{0, 10}).Max()
       };
       break;
-    default: break;
+    default:
+      std::cout << "ElectronRecoModule: " << "\033[1;93m" << "geometry not handled: " << ana::det_name[geoDet] << "\033[0m" << std::endl;
   }
   geoCathodeGap = geoTop.x.min - geoBot.x.max;
 
-  std::cout << "MiAna: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
+  std::cout << "ElectronRecoModule: " "\033[1;93m" "Detector Properties:" "\033[0m" << std::endl
     << "  Detector Geometry: " << asGeo->DetectorName()
     << "  (" << ana::det_name[geoDet] << ")" << std::endl
     << "  Tick Window: " << wireWindow << std::endl
     << "  Top Bounds: " << geoTop << std::endl
     << "  Bot Bounds: " << geoBot << std::endl
   ;
-  std::cout << "MiAna: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
+  std::cout << "ElectronRecoModule: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
   ;
 
   _tree = asFile->make<TTree>("michel","");
@@ -232,6 +233,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
       case kPDSP:
         muonDir.SetCoordinates(muVect.Z(), muVect.X(), muVect.Y());
         break;
+      default:
     }
     _muDir = ana::Point(muVect.Unit());
     _muTheta = muonDir.Theta();
@@ -248,6 +250,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
       case kPDSP:
         muonEndDir.SetCoordinates(muEndVect.Z(), muEndVect.X(), muEndVect.Y());
         break;
+      default:
     }
     _muEndDir = ana::Point(muEndVect.Unit());
     _muEndTheta = muonEndDir.Theta();
