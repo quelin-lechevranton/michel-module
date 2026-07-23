@@ -415,7 +415,7 @@ void ana::Crossers::analyze(art::Event const& e) {
         case kPDSP:
             trAnodeCrossing = false;
             break;
-        default:
+        default: break;
         }
         LOG(trAnodeCrossing);
 
@@ -537,7 +537,7 @@ void ana::Crossers::analyze(art::Event const& e) {
                 case kPDSP: 
                     std::cout << "\033[1;91m" "truCathodeCrossing not implemented for PDSP" "\033[0m" << std::endl;
                     break;
-                default:
+                default: break;
                 }
             }
             if (before_cathode != -1) {

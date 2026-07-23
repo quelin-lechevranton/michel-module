@@ -547,6 +547,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 && geoTop.z.isInside(muStartHit.space, inFiducialLength)
                 && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
             break;
+        default: break;
         }
         LOG(muAnodeCrossing);
         if (!inKeepAll && !(muAnodeCrossing || muCathodeCrossing)) continue;

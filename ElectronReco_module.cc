@@ -233,7 +233,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
       case kPDSP:
         muonDir.SetCoordinates(muVect.Z(), muVect.X(), muVect.Y());
         break;
-      default:
+      default: break;
     }
     _muDir = ana::Point(muVect.Unit());
     _muTheta = muonDir.Theta();
@@ -250,7 +250,7 @@ void ana::ElectronReco::analyze(art::Event const& e) {
       case kPDSP:
         muonEndDir.SetCoordinates(muEndVect.Z(), muEndVect.X(), muEndVect.Y());
         break;
-      default:
+      default: break;
     }
     _muEndDir = ana::Point(muEndVect.Unit());
     _muEndTheta = muonEndDir.Theta();
