@@ -54,7 +54,13 @@ private:
   // Input Parameters
   bool        inLog;
 
-  TTree       *_tree;
+  TTree       *_evt_tree;
+  TTree       *_part_tree;
+
+  unsigned                _evIndex=0;
+  unsigned                _evPartNumber;
+  std::vector<unsigned>   _evPartIndices;
+  unsigned                _partIndex=0;
 
   std::vector<int> _pdg;
   ana::Hits _allHits;
@@ -126,12 +132,21 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
   std::cout << "SNElecModule: " "\033[1;93m" "Analysis Parameters:" "\033[0m" << std::endl
   ;
 
-  _tree = asFile->make<TTree>("tree","");
+  _evt_tree = asFile->make<TTree>("event", "");
 
-  SetBranches(_tree, "all",   &_allHits);
-  _tree->Branch("pdg",        &_pdg);
-  SetBranches(_tree, "start", &_startPoints);
-  SetBranches(_tree, "end",   &_endPoints);
+  _evt_tree->Branch("Index",       &_evIndex);
+  _evt_tree->Branch("PartNumber",  &_evPartNumber);
+  _evt_tree->Branch("PartIndices", &_evPartIndices);
+  SetBranches(_part_tree, "all",   &_allHits);
+
+  _part_tree = asFile->make<TTree>("particle","");
+
+  _part_tree->Branch("EventIndex",  &_evIndex);
+  _part_tree->Branch("IndexInEvent",&_evPartNumber);
+  _part_tree->Branch("Index",       &_partIndex);
+  _part_tree->Branch("pdg",         &_pdg);
+  SetBranches(_part_tree, "start",  &_startPoints);
+  SetBranches(_part_tree, "end",    &_endPoints);
 }
 
 void ana::SNElectron::analyze(art::Event const& e) {
@@ -167,6 +182,10 @@ void ana::SNElectron::analyze(art::Event const& e) {
   // evSubRun = e.subRun();
   // evEvent = e.event();
   // evIsData = e.isRealData();
+
+  _evPartNumber=0;
+  _evPartIndices.clear();
+  _allHits.clear();
   for (PtrHit p_hit : vph_ev)
       if (p_hit->View() == geo::kW)
           _allHits.push_back(GetHit(p_hit));
@@ -176,11 +195,23 @@ void ana::SNElectron::analyze(art::Event const& e) {
 
     std::cout << "#1: " << part.PdgCode() << "   ";
 
+    _pdg.clear();
+    _startPoints.clear();
+    _endPoints.clear();
+
     _pdg.push_back(part.PdgCode());
     _startPoints.push_back(part.Position().Vect());
     _endPoints.push_back(part.EndPosition().Vect());
+
+    _part_tree->Fill();
+    _evPartIndices.push_back(_partIndex);
+    _partIndex++;
+    _evPartNumber++;
   }
   std::cout << std::endl;
+
+  _evt_tree->Fill();
+  _partIndex++;
 }
 
 void ana::SNElectron::beginJob() {}
