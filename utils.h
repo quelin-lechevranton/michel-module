@@ -769,10 +769,10 @@ namespace ana {
         Det_t geoDet;
         float fTick2cm;
 
-        art::InputTag   tag_mcp, tag_sed, tag_wir,
-                        tag_hit, tag_clu, tag_trk,
-                        tag_shw, tag_spt, tag_pfp,
-                        tag_cal;
+        art::InputTag   tag_mct, tag_mcp, tag_sed, 
+                        tag_wir, tag_hit, tag_clu, 
+                        tag_trk, tag_shw, tag_spt, 
+                        tag_pfp, tag_cal;
 
         // VecPtrHit vph_ev;
         // VecPtrTrk vpt_ev;
@@ -845,7 +845,8 @@ ana::MichelModule::MichelModule(fhicl::ParameterSet const& p) :
 
         art::InputTag tag(label,instance);
 
-        if      (type == "simb::MCParticle")        tag_mcp = tag;
+        if      (type == "simb::MCTruth")           tag_mct = tag;
+        else if (type == "simb::MCParticle")        tag_mcp = tag;
         else if (type == "sim::SimEnergyDeposit")   tag_sed = tag;
         else if (type == "recob::Wire")             tag_wir = tag;
         else if (type == "recob::Hit")              tag_hit = tag;

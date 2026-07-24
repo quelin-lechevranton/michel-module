@@ -54,19 +54,19 @@ private:
   // Input Parameters
   bool        inLog;
 
-  TTree       *_evt_tree;
-  TTree       *_part_tree;
+  TTree       *_evTree;
+  TTree       *_partTree;
 
   unsigned                _evIndex=0;
   unsigned                _evPartNumber;
   std::vector<unsigned>   _evPartIndices;
+  ana::Hits               _evHits;
   unsigned                _partIndex=0;
 
-  ana::Hits _allHits;
-  int _pdg;
-  float _energy;
-  ana::Point _startPoint;
-  ana::Point _endPoint;
+  int                     _pdg;
+  float                   _energy;
+  ana::Point              _startPoint;
+  ana::Point              _endPoint;
 };
 
 ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
@@ -131,28 +131,31 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
     << "  Bot Bounds: " << geoBot << std::endl
   ;
 
-  _evt_tree = asFile->make<TTree>("event", "");
+  _evTree = asFile->make<TTree>("event", "");
 
-  _evt_tree->Branch("Index",       &_evIndex);
-  _evt_tree->Branch("PartNumber",  &_evPartNumber);
-  _evt_tree->Branch("PartIndices", &_evPartIndices);
-  SetBranches(_evt_tree, "",   &_allHits);
+  _evTree->Branch("Index",       &_evIndex);
+  _evTree->Branch("PartNumber",  &_evPartNumber);
+  _evTree->Branch("PartIndices", &_evPartIndices);
+  SetBranches(_evTree, "",       &_evHits);
 
-  _part_tree = asFile->make<TTree>("particle","");
+  _partTree = asFile->make<TTree>("particle","");
 
-  _part_tree->Branch("EventIndex",  &_evIndex);
-  _part_tree->Branch("IndexInEvent",&_evPartNumber);
-  _part_tree->Branch("Index",       &_partIndex);
-  _part_tree->Branch("pdg",         &_pdg);
-  _part_tree->Branch("energy",      &_energy);
-  SetBranches(_part_tree, "start",  &_startPoint);
-  SetBranches(_part_tree, "end",    &_endPoint);
+  _partTree->Branch("EventIndex",  &_evIndex);
+  _partTree->Branch("IndexInEvent",&_evPartNumber);
+  _partTree->Branch("Index",       &_partIndex);
+  _partTree->Branch("pdg",         &_pdg);
+  _partTree->Branch("energy",      &_energy);
+  SetBranches(_partTree, "start",  &_startPoint);
+  SetBranches(_partTree, "end",    &_endPoint);
 }
 
 void ana::SNElectron::analyze(art::Event const& e) {
   auto const clockData = asDetClocks->DataFor(e);
   auto const detProp = asDetProp->DataFor(e,clockData);
   fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+
+  auto const& vh_mct = e.getHandle<std::vector<simb::MCTruth>>(tag_mct);
+  if (!vh_mct.isValid()) { std::cout<<"SNElecModule: No valid simb::MCTruth handle"<<std::endl; return; }
 
   auto const& vh_mcp = e.getHandle<std::vector<simb::MCParticle>>(tag_mcp);
   if (!vh_mcp.isValid()) { std::cout<<"SNElecModule: No valid simb::MCParticle handle"<<std::endl; return; }
@@ -177,6 +180,21 @@ void ana::SNElectron::analyze(art::Event const& e) {
   art::FindManyP<recob::Hit> fmp_shw2hit(vh_shw, e, tag_shw);
   art::FindOneP<recob::Shower> fop_hit2shw(vh_hit, e, tag_shw);
 
+
+  std::cout << "mct (" << vh_mct->size() << "): {" << std::endl;
+  for (auto const& t : *vh_mct) {
+    std::cout << "\t";
+    for (int i=0; i<t.NParticles(); i++) 
+      std::cout << t.GetParticle(i) << ", ";
+    std::cout << std::endl;
+  }
+  std::cout << "}" << std::endl;
+
+  std::cout << "mcp (" << vh_mcp->size() << "): { ";
+  for (auto const& p : *vh_mcp) std::cout << p.PdgCode() << ", ";
+  std::cout << "}" << std::endl;
+
+
   // dump event information
   // evRun = e.run();
   // evSubRun = e.subRun();
@@ -185,31 +203,31 @@ void ana::SNElectron::analyze(art::Event const& e) {
 
   _evPartNumber=0;
   _evPartIndices.clear();
-  _allHits.clear();
+  _evHits.clear();
   for (PtrHit p_hit : vph_ev)
-      if (p_hit->View() == geo::kW)
-          _allHits.push_back(GetHit(p_hit));
+    if (p_hit->View() == geo::kW)
+      _evHits.push_back(GetHit(p_hit));
 
   // std::cout << vh_mcp->size() << " particles" << std::endl;
   if (vh_mcp->empty()) return;
-  int np=0;
+  // int np=0;
   for (simb::MCParticle const& part : *vh_mcp) {
 
     // std::cout << "#" << ++np << ": " << part.PdgCode() << "   ";
 
     _pdg = part.PdgCode();
-    _energy = part.E();
+    _energy = (part.E() - part.Mass()) * 1e3;
     _startPoint = part.Position().Vect();
     _endPoint = part.EndPosition().Vect();
 
-    _part_tree->Fill();
+    _partTree->Fill();
     _evPartIndices.push_back(_partIndex);
     _partIndex++;
     _evPartNumber++;
   }
   // std::cout << std::endl;
 
-  _evt_tree->Fill();
+  _evTree->Fill();
   _evIndex++;
 }
 
