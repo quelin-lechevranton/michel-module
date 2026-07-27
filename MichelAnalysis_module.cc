@@ -79,6 +79,7 @@ private:
     float                   muLength;
     ana::Point              muStartPoint;
     ana::Point              muEndPoint;
+    ana::Points             muPoints;
 
     // Track information: recob::Hit
     ana::Hits               muHits;
@@ -95,8 +96,10 @@ private:
     bool                    muStartInYZT;    
     ana::Hit                muEndHit;
     float                   muEndHitCathodeX; 
+    float                   muEndHitAnodeX;
     float                   muEndHitY;
     bool                    muEndInCathodeX;
+    bool                    muEndInAnodeX;
     bool                    muEndInY;
     bool                    muEndInZ;
     bool                    muEndInT;
@@ -250,6 +253,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     muTree->Branch("Length",        &muLength);
     SetBranches(muTree, "Start",    &muStartPoint);
     SetBranches(muTree, "End",      &muEndPoint);
+    SetBranches(muTree, "",         &muPoints);
 
     // Hit
     // muTree->Branch("RegError",              &muRegError);
@@ -266,8 +270,10 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     muTree->Branch("StartInYZT",            &muStartInYZT);
     SetBranches(muTree, "End",              &muEndHit);
     muTree->Branch("EndHitCathodeX",        &muEndHitCathodeX);
+    muTree->Branch("EndHitAnodeX",          &muEndHitAnodeX);
     muTree->Branch("EndHitY",               &muEndHitY);
     muTree->Branch("EndInCathodeX",         &muEndInCathodeX);
+    muTree->Branch("EndInAnodeX",           &muEndHitAnodeX);
     muTree->Branch("EndInY",                &muEndInY);
     muTree->Branch("EndInZ",                &muEndInZ);
     muTree->Branch("EndInT",                &muEndInT);
@@ -392,6 +398,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         geo::Point_t End = track_is_up ? pt_ev->End() : pt_ev->Start();
         muStartPoint = ana::Point(Start);
         muEndPoint = ana::Point(End);
+
+        for (size_t i=pt_ev->FirstValidPoint(); i!=pt_ev->LastValidPoint(); i=pt_ev->NextValidPoint(i))
+            muPoints.push_back(pt_ev->LocationAtPoint(i));
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
         // don't specify X direction (Start.X()>End.X()? is not reliable)
@@ -597,6 +606,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // }
         }
         if (muAnodeCrossing) {
+            Side_t start_side = GetSide(muStartHit.tpc);
+
+            muEndHitAnodeX = GetAnodeX(muEndHit, vph_mu.front(), geoBot.x.min, geoTop.x.max);
+            muEndInAnodeX = start_side == kBot
+                ? geoBot.x.isInside(muEndHitAnodeX, inFiducialLength)
+                : geoTop.x.isInside(muEndHitAnodeX, inFiducialLength);
+
             for (PtrHit const& ph_mu : vph_mu) {
                 muHitAnodeX.push_back(GetAnodeX(ph_mu, vph_mu.front(), geoBot.x.min, geoTop.x.max));
             }
@@ -635,7 +651,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         
         
         recob::Track::Vector_t end_dir = pt_ev->EndDirection();
-        muEndAngle = atan2(end_dir.x(), end_dir.z());
+        muEndAngle = ana::Vec2(end_dir.z(), end_dir.x()).angle();
         // integrate charges around muon endpoint
         muSphereEnergy = 0;
         muSphereEnergyTP = 0;
@@ -664,9 +680,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muSphereEnergy += ph_ev->ROISummedADC();
             muSphereHits.push_back(hit);
 
-            // float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
-            // da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
-            // muSphereHitMuonAngle.push_back(da);
+            float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
+            da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
+            muSphereHitMuonAngle.push_back(da);
 
             if (std::find_if(
                 vph_mi.begin(), vph_mi.end(),
@@ -681,6 +697,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             muBary = muBaryHits.barycenter(fTick2cm);
             ana::Vec2 end_bary = muBary - muEndHit.vec(fTick2cm);
             muBaryAngle = end_bary.angle();
+            
             float da = muBaryAngle - muEndAngle;
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             muBaryMuonAngle = da;
@@ -1017,6 +1034,7 @@ void ana::MichelAnalysis::resetEvent() {
 }
 void ana::MichelAnalysis::resetMuon() {
     muHits.clear();
+    muPoints.clear();
     muHitCathodeX.clear();
     muHitAnodeX.clear();
     muHitY.clear();
@@ -1030,8 +1048,10 @@ void ana::MichelAnalysis::resetMuon() {
     muStartInYZT = false;
     muEndHit = ana::Hit{};
     muEndHitCathodeX = util::kBogusF;
+    muEndHitAnodeX = util::kBogusF;
     muEndHitY = util::kBogusF;
     muEndInCathodeX = false;
+    muEndInAnodeX = false;
     muEndInY = false;
     muEndInZ = false;
     muEndInT = false;
