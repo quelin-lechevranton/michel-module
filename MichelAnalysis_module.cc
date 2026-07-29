@@ -80,6 +80,7 @@ private:
     ana::Point              muStartPoint;
     ana::Point              muEndPoint;
     ana::Points             muPoints;
+    float                   muCosY;
 
     // Track information: recob::Hit
     ana::Hits               muHits;
@@ -131,6 +132,7 @@ private:
     ana::Point              truStartPoint;
     ana::Point              truEndPoint;
     float                   truEndEnergy;
+    bool                    truEndInXYZ;
     // ana::Hit                truStartHit;
     // ana::Hit                truEndHit;
     // ana::LinearRegression   truReg;
@@ -254,6 +256,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "Start",    &muStartPoint);
     SetBranches(muTree, "End",      &muEndPoint);
     SetBranches(muTree, "",         &muPoints);
+    muTree->Branch("CosY",          &muCosY);
 
     // Hit
     // muTree->Branch("RegError",              &muRegError);
@@ -304,6 +307,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "TrueStart",        &truStartPoint);
     SetBranches(muTree, "TrueEnd",          &truEndPoint);
     muTree->Branch("TrueEndEnergy",         &truEndEnergy);
+    muTree->Branch("TrueEndInXYZ",          &truEndInXYZ);
     // SetBranches(muTree, "TrueStart",        &truStartHit);
     // SetBranches(muTree, "TrueEnd",          &truEndHit);
     // SetBranches(muTree, "True",             &truReg);
@@ -399,8 +403,13 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muStartPoint = ana::Point(Start);
         muEndPoint = ana::Point(End);
 
-        for (size_t i=pt_ev->FirstValidPoint(); i!=pt_ev->LastValidPoint(); i=pt_ev->NextValidPoint(i))
+        for (size_t i=pt_ev->FirstValidPoint(); i!=pt_ev->LastValidPoint(); i++) {
+            if (!pt_ev->HasValidPoint(i)) continue;
             muPoints.push_back(pt_ev->LocationAtPoint(i));
+        }
+
+        geo::Vector_t start_to_end = (track_is_up ? +1 : -1) * (pt_ev->End() - pt_ev->Start());
+        muCosY = start_to_end.Dot(geo::Point_t(0, 1, 0)) / start_to_end.R();
 
         // sort hits and retrieve some info: mainly if it crosses the cathode
         // don't specify X direction (Start.X()>End.X()? is not reliable)
@@ -923,6 +932,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             truStartPoint = ana::Point(mcp->Position().Vect());
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
+            truEndInXYZ = geoBot.isInside(truEndPoint, inFiducialLength) 
+                || geoTop.isInside(truEndPoint, inFiducialLength);
 
             LOG(mcp_mi);
             if (mcp_mi) {
@@ -1080,6 +1091,7 @@ void ana::MichelAnalysis::resetMuon() {
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
     truEndEnergy = util::kBogusF;
+    truEndInXYZ = false;
     // truStartHit = ana::Hit{};
     // truEndHit = ana::Hit{};
     // truReg = ana::LinearRegression{};

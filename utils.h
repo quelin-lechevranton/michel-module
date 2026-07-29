@@ -297,6 +297,9 @@ namespace ana {
             x{T(min.x()), T(max.x())}, y{T(min.y()), T(max.y())}, z{T(min.z()), T(max.z())} {}
         // Bounds3D(geo::BoxBoundedGeo const& bb) :
         //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
+        bool isInside(ana::Point const& p, float r=0) const {
+            return x.isInside(p.x, r) && y.isInside(p.y, r) && z.isInside(p.z, r);
+        }
         bool isInside(geo::Point_t const& p, float r=0) const {
             return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
         }
