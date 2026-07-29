@@ -91,12 +91,12 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
       break;
     case kPDHD:
       geoBot = ana::Bounds3D<float>{
-          asGeo->TPC(geo::TPCID{0, 1}).Min(),
-          asGeo->TPC(geo::TPCID{0, 5}).Max()
+        asGeo->TPC(geo::TPCID{0, 1}).Min(),
+        asGeo->TPC(geo::TPCID{0, 5}).Max()
       };
       geoTop = ana::Bounds3D<float>{
-          asGeo->TPC(geo::TPCID{0, 2}).Min(),
-          asGeo->TPC(geo::TPCID{0, 6}).Max()
+        asGeo->TPC(geo::TPCID{0, 2}).Min(),
+        asGeo->TPC(geo::TPCID{0, 6}).Max()
       };
       break;
     case kPDSP:
@@ -118,8 +118,9 @@ ana::SNElectron::SNElectron(fhicl::ParameterSet const& p)
         asGeo->TPC(geo::TPCID{0, 1}).Min(),
         asGeo->TPC(geo::TPCID{0, 23}).Max()
       };
+      break;
     default:
-      std::cout << "SNElecModule: " << "\033[1;93m" << "geometry not handled: " << ana::det_name[geoDet] << "\033[0m" << std::endl;
+      std::cout << "SNElecModule: " << "\033[1;91m" << "geometry not handled (" << ana::det_name[geoDet] << ")" << "\033[0m" << std::endl;
   }
   geoCathodeGap = geoTop.x.min - geoBot.x.max;
 

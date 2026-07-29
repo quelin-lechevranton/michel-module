@@ -229,14 +229,14 @@ void ana::MichelProd::produce(art::Event& e)
     bool end_in_z = geoBot.z.isInside(end_hit.space, inFiducialLength) || geoTop.z.isInside(end_hit.space, inFiducialLength);
     bool end_in_t = wireWindow.isInside(end_hit.tick, inFiducialLength / fTick2cm);
 
-    Side_t end_side = GetSide(end_hit.tpc);
+    // Side_t end_side = GetSide(end_hit.tpc);
     float end_x = util::kBogusF;
     bool end_in_x = false;
     if (sh_mu.is_cc()) {
-      end_x = end_side == kBot
+      end_x = end_hit.side == kBot
         ? -(geoCathodeGap/2) - (sh_mu.cc_second()->PeakTime() - end_hit.tick) * fTick2cm
         : +(geoCathodeGap/2) + (sh_mu.cc_first()->PeakTime() - end_hit.tick) * fTick2cm;
-      end_in_x = (end_side==kBot ? geoBot : geoTop).x.isInside(end_x, inFiducialLength);
+      end_in_x = (end_hit.side==kBot ? geoBot : geoTop).x.isInside(end_x, inFiducialLength);
     }
     ASSERT(end_in_x && end_in_y && end_in_z && end_in_t)
 
@@ -280,7 +280,7 @@ void ana::MichelProd::produce(art::Event& e)
     ASSERT(bary_hits.size() >= inMinBaryHits)
     ana::Vec2 end_to_bary = bary_hits.barycenter(fTick2cm) - end_hit.vec(fTick2cm);
     float mu_angle = sh_mu.regs
-      .at(GetSide(end_hit.section))
+      .at(end_hit.side)
       .theta(end_hit.space > start_hit.space ? 1 : -1);
     float da = end_to_bary.angle() - mu_angle;
     da = abs(da) > M_PI ? da - (da>0 ? 1 : -1)*2*M_PI : da;
@@ -290,7 +290,7 @@ void ana::MichelProd::produce(art::Event& e)
     if (inLog) std::cout << "\t\033[93;1m" "michel" "\033[0m" << std::endl;
 
     for (PtrHit const& ph_ev: vph_ev_endsec) {
-      if (GetDistance(ph_ev, end_side, end_y, end_hit.space, end_hit.tick) > inMichelRadius) continue;
+      if (GetDistance(ph_ev, (Side_t)end_hit.side, end_y, end_hit.space, end_hit.tick) > inMichelRadius) continue;
 
       PtrTrk pt_hit = fop_hit2trk.at(ph_ev.key());
       if (pt_hit && pt_hit->Length() > inTrackLengthCut) continue;

@@ -276,50 +276,6 @@ namespace ana {
         }
     };
 
-    template<typename T>
-    struct Bounds {
-        T min, max;
-        Bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
-        Bounds(T m, T M) : min(m), max(M) {}
-        bool isInside(T x, float r=0) const { 
-            return min+r <= x && x <= max-r;
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const Bounds& b) {
-            return os << "[" << b.min << ", " << b.max << "]";
-        }
-    };
-    template<typename T>
-    struct Bounds3D {
-        Bounds<T> x, y, z;
-        Bounds3D() : x(), y(), z() {}
-        Bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
-            x{T(min.x()), T(max.x())}, y{T(min.y()), T(max.y())}, z{T(min.z()), T(max.z())} {}
-        // Bounds3D(geo::BoxBoundedGeo const& bb) :
-        //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
-        bool isInside(ana::Point const& p, float r=0) const {
-            return x.isInside(p.x, r) && y.isInside(p.y, r) && z.isInside(p.z, r);
-        }
-        bool isInside(geo::Point_t const& p, float r=0) const {
-            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
-        }
-        bool isInside(TVector3 const& p, float r=0) const {
-            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
-        }
-        bool isInsideYZ(geo::Point_t const& p, float r=0) const {
-            return y.isInside(p.y(), r) && z.isInside(p.z(), r);
-        }
-        geo::Point_t min() const {
-            return geo::Point_t{x.min, y.min, z.min};
-        }
-        geo::Point_t max() const {
-            return geo::Point_t{x.max, y.max, z.max};
-        }
-
-        friend std::ostream& operator<<(std::ostream& os, const Bounds3D& b) {
-            return os << b.min() << " -> " << b.max();
-        }
-    };
 
     // axis of equation ay*Y - az*Z = 0
     struct Axis {
@@ -349,6 +305,7 @@ namespace ana {
         // int view;
         unsigned tpc;
         int section;
+        int side;
         float space;
         unsigned channel;
         float tick;
@@ -357,12 +314,13 @@ namespace ana {
             // view(geo::kUnknown),
             tpc(geo::TPCID::InvalidID), 
             section(kInvalidSec), 
+            side(kInvalidSide),
             space(util::kBogusF), 
             channel(raw::InvalidChannelID), 
             tick(util::kBogusF), 
             adc(util::kBogusF) {}
-        Hit(/*int v,*/ unsigned T, int S, float s, unsigned c, float t, float a) :
-            /*view(v),*/ tpc(T), section(S), space(s), channel(c), tick(t), adc(a) {}
+        Hit(/*int v,*/ unsigned T, int sec, int sid, float s, unsigned c, float t, float a) :
+            /*view(v),*/ tpc(T), section(sec), side(sid), space(s), channel(c), tick(t), adc(a) {}
 
         Vec2 vec(float tick2cm=1) const { return Vec2{space, tick * tick2cm}; }
         // double operator-(Hit const& h) const {
@@ -376,6 +334,7 @@ namespace ana {
             // t->Branch(Form("%sHitView", pre), &view);
             t->Branch(Form("%sHitTPC", pre), &tpc);
             t->Branch(Form("%sHitSection", pre), &section);
+            t->Branch(Form("%sHitSide", pre), &side);
             t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
@@ -387,16 +346,18 @@ namespace ana {
         // std::vector<int> view;
         std::vector<unsigned> tpc;
         std::vector<int> section;
+        std::vector<int> side;
         std::vector<float> space;
         std::vector<unsigned> channel;
         std::vector<float> tick;
         std::vector<float> adc;
-        Hits() : N(0), /*view(),*/ tpc(), section(), space(), channel(), tick(), adc() {}
+        Hits() : N(0), /*view(),*/ tpc(), section(), side(), space(), channel(), tick(), adc() {}
         void push_back(Hit const& hit) {
             N++;
             // view.push_back(hit.view);
             tpc.push_back(hit.tpc);
             section.push_back(hit.section);
+            side.push_back(hit.side);
             space.push_back(hit.space);
             channel.push_back(hit.channel);
             tick.push_back(hit.tick);
@@ -407,6 +368,7 @@ namespace ana {
             // view.clear();
             tpc.clear();
             section.clear();
+            side.clear();
             space.clear();
             channel.clear();
             tick.clear();
@@ -415,6 +377,7 @@ namespace ana {
         void reserve(size_t capacity) {
             tpc.reserve(capacity);
             section.reserve(capacity);
+            side.reserve(capacity);
             space.reserve(capacity);
             channel.reserve(capacity);
             tick.reserve(capacity);
@@ -438,13 +401,14 @@ namespace ana {
             t->Branch(Form("%sNHit", pre), &N);
             t->Branch(Form("%sHitTPC", pre), &tpc);
             t->Branch(Form("%sHitSection", pre), &section);
+            t->Branch(Form("%sHitSide", pre), &side);
             t->Branch(Form("%sHitSpace", pre), &space);
             t->Branch(Form("%sHitChannel", pre), &channel);
             t->Branch(Form("%sHitTick", pre), &tick);
             t->Branch(Form("%sHitADC", pre), &adc);
         }
 
-        Hit at(unsigned i) const { return Hit{tpc[i], section[i], space[i], channel[i], tick[i], adc[i]}; }
+        Hit at(unsigned i) const { return Hit{tpc[i], section[i], side[i], space[i], channel[i], tick[i], adc[i]}; }
         struct iterator {
             const Hits* hits;
             unsigned i;
@@ -537,6 +501,51 @@ namespace ana {
         };
         iterator begin() const { return iterator(this); }
         iterator end() const { return iterator(this, N); }
+    };
+
+    template<typename T>
+    struct Bounds {
+        T min, max;
+        Bounds() : min(std::numeric_limits<T>::max()), max(std::numeric_limits<T>::lowest()) {}
+        Bounds(T m, T M) : min(m), max(M) {}
+        bool isInside(T x, float r=0) const { 
+            return min+r <= x && x <= max-r;
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const Bounds& b) {
+            return os << "[" << b.min << ", " << b.max << "]";
+        }
+    };
+    template<typename T>
+    struct Bounds3D {
+        Bounds<T> x, y, z;
+        Bounds3D() : x(), y(), z() {}
+        Bounds3D(geo::Point_t const& min, geo::Point_t const& max) :
+            x{T(min.x()), T(max.x())}, y{T(min.y()), T(max.y())}, z{T(min.z()), T(max.z())} {}
+        // Bounds3D(geo::BoxBoundedGeo const& bb) :
+        //     x{bb.MinX(), bb.MaxX()}, y{bb.MinY(), bb.MaxY()}, z{bb.MinZ(), bb.MaxZ()} {}
+        bool isInside(Point const& p, float r=0) const {
+            return x.isInside(p.x, r) && y.isInside(p.y, r) && z.isInside(p.z, r);
+        }
+        bool isInside(geo::Point_t const& p, float r=0) const {
+            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        bool isInside(TVector3 const& p, float r=0) const {
+            return x.isInside(p.x(), r) && y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        bool isInsideYZ(geo::Point_t const& p, float r=0) const {
+            return y.isInside(p.y(), r) && z.isInside(p.z(), r);
+        }
+        geo::Point_t min() const {
+            return geo::Point_t{x.min, y.min, z.min};
+        }
+        geo::Point_t max() const {
+            return geo::Point_t{x.max, y.max, z.max};
+        }
+
+        friend std::ostream& operator<<(std::ostream& os, const Bounds3D& b) {
+            return os << b.min() << " -> " << b.max();
+        }
     };
 
     template<typename AnaStruct>
@@ -795,7 +804,7 @@ namespace ana {
         Side_t GetSide(Sec_t sec) const { return sec2side.at(geoDet).at(sec); }
         Side_t GetSide(geo::TPCID::TPCID_t tpc) const { return tpc2side.at(geoDet).at(tpc); }
         Side_t GetSide(PtrHit const& ph) const { return GetSide(ph->WireID().TPC); }
-        Side_t GetSide(ana::Hit const& h) const { return GetSide(h.tpc); }
+        // Side_t GetSide(ana::Hit const& h) const { return GetSide(h.tpc); }
 
         bool IsUpright(recob::Track const& T);
         std::string GetParticleName(int pdg);
@@ -945,6 +954,7 @@ ana::Hit ana::MichelModule::GetHit(PtrHit const& ph) const {
     return {
         wid.TPC,
         GetSec(wid.TPC),
+        GetSide(wid.TPC),
         float(GetSpace(wid)),
         ph->Channel(),
         ph->PeakTime(),
@@ -959,7 +969,8 @@ double ana::MichelModule::GetDistance(PtrHit const& ph1, PtrHit const& ph2, bool
     return GetDistance(GetHit(ph1), GetHit(ph2), allow_different_side);
 }
 double ana::MichelModule::GetDistance(ana::Hit const& h1, ana::Hit const& h2, bool allow_different_side=false) const {
-    if (!allow_different_side && GetSide((Sec_t)h1.section) != GetSide((Sec_t)h2.section))
+    // if (!allow_different_side && GetSide((Sec_t)h1.section) != GetSide((Sec_t)h2.section))
+    if (!allow_different_side && h1.side != h2.side)
         return std::numeric_limits<double>::max();
     return sqrt(pow(h2.space - h1.space, 2) + pow((h2.tick - h1.tick) * fTick2cm, 2));
 }
@@ -976,7 +987,8 @@ float ana::MichelModule::GetCathodeX(PtrHit const& ph, PtrHit const& cc_bot, Ptr
         : +(cathode_gap/2) + (cc_top->PeakTime() - ph->PeakTime()) * fTick2cm;
 }
 float ana::MichelModule::GetCathodeX(ana::Hit const& hit, PtrHit const& cc_bot, PtrHit const& cc_top, float cathode_gap) const {
-    return GetSide((geo::TPCID::TPCID_t)hit.tpc) == kBot
+    // return GetSide((geo::TPCID::TPCID_t)hit.tpc) == kBot
+    return hit.side == kBot
         ? -(cathode_gap/2) - (cc_bot->PeakTime() - hit.tick) * fTick2cm
         : +(cathode_gap/2) + (cc_top->PeakTime() - hit.tick) * fTick2cm;
 }
@@ -990,9 +1002,11 @@ float ana::MichelModule::GetAnodeX(PtrHit const& ph, PtrHit const& start_hit, fl
         : util::kBogusF;
 }
 float ana::MichelModule::GetAnodeX(ana::Hit const& hit, PtrHit const& start_hit, float xmin, float xmax) const {
-    Side_t side = GetSide((geo::TPCID::TPCID_t)hit.tpc);
-    return side == GetSide(start_hit)
-        ? ( side == kTop
+    // Side_t side = GetSide((geo::TPCID::TPCID_t)hit.tpc);
+    // return side == GetSide(start_hit)
+    return hit.side == GetSide(start_hit)
+        // ? ( side == kTop
+        ? ( hit.side == kTop
             ? xmax - (hit.tick - start_hit->PeakTime()) * fTick2cm
             : xmin + (hit.tick - start_hit->PeakTime()) * fTick2cm
         )

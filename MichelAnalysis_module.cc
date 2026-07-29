@@ -553,7 +553,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         switch (geoDet) {
         case kPDVD: /* ASSUMS DOWNWARD MUON */
-            muAnodeCrossing = GetSide(muStartHit.section) == kTop
+            // muAnodeCrossing = GetSide(muStartHit.section) == kTop
+            muAnodeCrossing = muStartHit.side == kTop
                 && geoTop.y.isInside(muStartHitY, inFiducialLength)
                 && geoTop.z.isInside(muStartHit.space, inFiducialLength)
                 && wireWindow.isInside(muStartHit.tick, inFiducialLength/fTick2cm);
@@ -573,18 +574,18 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump hit X positions for cathode/anode crossing tracks
         if (muCathodeCrossing) {
-            Side_t start_side = GetSide(muStartHit.tpc);
-            Side_t end_side = GetSide(muEndHit.tpc);
-            PtrHit const& cc_bot = start_side == kBot ? cc_first : cc_second;
-            PtrHit const& cc_top = start_side == kTop ? cc_first : cc_second;
+            // Side_t start_side = GetSide(muStartHit.tpc);
+            // Side_t end_side = GetSide(muEndHit.tpc);
+            PtrHit const& cc_bot = muStartHit.side == kBot ? cc_first : cc_second;
+            PtrHit const& cc_top = muEndHit.side == kTop ? cc_first : cc_second;
 
             muStartHitCathodeX = GetCathodeX(muStartHit, cc_bot, cc_top, geoCathodeGap);
-            muStartInCathodeX = start_side == kBot
+            muStartInCathodeX = muStartHit.side == kBot
                 ? geoBot.x.isInside(muStartHitCathodeX, inFiducialLength)
                 : geoTop.x.isInside(muStartHitCathodeX, inFiducialLength);
 
             muEndHitCathodeX = GetCathodeX(muEndHit, cc_bot, cc_top, geoCathodeGap);
-            muEndInCathodeX = end_side == kBot
+            muEndInCathodeX = muEndHit.side == kBot
                 ? geoBot.x.isInside(muEndHitCathodeX, inFiducialLength)
                 : geoTop.x.isInside(muEndHitCathodeX, inFiducialLength);
 
@@ -615,10 +616,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // }
         }
         if (muAnodeCrossing) {
-            Side_t start_side = GetSide(muStartHit.tpc);
+            // Side_t start_side = GetSide(muStartHit.tpc);
 
             muEndHitAnodeX = GetAnodeX(muEndHit, vph_mu.front(), geoBot.x.min, geoTop.x.max);
-            muEndInAnodeX = start_side == kBot
+            // muEndInAnodeX = start_side == kBot
+            muEndInAnodeX = muStartHit.side == kBot
                 ? geoBot.x.isInside(muEndHitAnodeX, inFiducialLength)
                 : geoTop.x.isInside(muEndHitAnodeX, inFiducialLength);
 
