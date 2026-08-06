@@ -74,24 +74,29 @@ private:
     // Track information: recob::Track
     unsigned                trIndex=0;
     float                   trLength;
+    bool                    trHasT0;
+    double                  trT0Time;
+    unsigned                trT0TriggerType;
+    int                     trT0TriggerBits;
+    double                  trT0TriggerConf;
     ana::Point              trStartPoint;
     ana::Point              trEndPoint;
     ana::Points             trPoints;
 
     // Track information: recob::Hit
     ana::Hits               trHits;
-    std::vector<float>      trHitAX;
-    std::vector<float>      trHitCX;
+    std::vector<float>      trHitAnodeX;
+    std::vector<float>      trHitCathodeX;
     std::vector<float>      trHitY;
     // float                   trEndAngle;
     bool                    trCathodeCrossing;
     float                   trCathodeAlignment;
     bool                    trAnodeCrossing;
 
-    ana::LinearRegression   trStartReg;
-    ana::LinearRegression   trGhostReg;
+    // ana::LinearRegression   trStartReg;
+    // ana::LinearRegression   trGhostReg;
 
-    bool                    trGhostTrack;
+    // bool                    trGhostTrack;
 
     std::vector<float>      trHitdQds;
     
@@ -223,6 +228,14 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
 
     // Track
     trTree->Branch("Length",        &trLength);
+    trTree->Branch("HasT0",         &trHasT0);
+    trTree->Branch("T0Time",        &trT0Time);
+    trTree->Branch("T0TriggerType", &trT0TriggerType);
+    trTree->Branch("T0TriggerBits", &trT0TriggerBits);
+    trTree->Branch("T0TriggerConf", &trT0TriggerConf);
+    trTree->Branch("T0Time",        &trT0Time);
+    trTree->Branch("T0Time",        &trT0Time);
+    trTree->Branch("T0Time",        &trT0Time);
     SetBranches(trTree, "Start",    &trStartPoint);
     SetBranches(trTree, "End",      &trEndPoint);
     SetBranches(trTree, "",         &trPoints);
@@ -231,13 +244,13 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("CathodeCrossing",       &trCathodeCrossing);
     trTree->Branch("CathodeAlignment",      &trCathodeAlignment);
     trTree->Branch("AnodeCrossing",         &trAnodeCrossing);
-    SetBranches(trTree, "Start",            &trStartReg);
-    SetBranches(trTree, "Ghost",            &trGhostReg);
-    trTree->Branch("GhostTrack",            &trGhostTrack);
+    // SetBranches(trTree, "Start",            &trStartReg);
+    // SetBranches(trTree, "Ghost",            &trGhostReg);
+    // trTree->Branch("GhostTrack",            &trGhostTrack);
     // trTree->Branch("EndAngle",              &trEndAngle);
     SetBranches(trTree, "",                 &trHits);
-    trTree->Branch("HitAX",                 &trHitAX);
-    trTree->Branch("HitCX",                 &trHitCX);
+    trTree->Branch("HitAnodeX",             &trHitAnodeX);
+    trTree->Branch("HitCathodeX",           &trHitCathodeX);
     trTree->Branch("HitY",                  &trHitY);
     trTree->Branch("HitdQds",               &trHitdQds);
 
@@ -290,8 +303,19 @@ void ana::Crossers::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
+    auto const & vh_pfp = e.getHandle<std::vector<recob::Track>>(tag_pfp);
+    if (!vh_pfp.isValid()) {
+        std::cout << "CrossersModule: " "\033[1;91m" "No valid recob::PFParticle handle" "\033[0m" << std::endl;
+        return;
+    }
+    VecPtrTrk vpp_ev;
+    art::fill_ptr_vector(vpp_ev, vh_pfp);
+
     art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
+
+    art::FindOneP<recob::PFParticle> fop_trk2pfp(vh_trk, e, tag_trk);
+    art::FindOneP<anab::T0> fop_pfp2t0(vh_pfp, e, tag_pfp);
 
     resetEvent();
 
@@ -309,10 +333,12 @@ void ana::Crossers::analyze(art::Event const& e) {
         if (inLog) std::cout << "e" << evIndex << "t" << pt_ev->ID() << "\r" << std::flush;
         resetMuon();
 
+        auto const& pp_ev = fop_trk2pfp.at(pt_ev.key());
+        ASSERT(pp_ev.isNonnull())
+
         // get hits and metadata associated to the track
         VecPtrHit vph_mu_all = fmp_trk2hit.at(pt_ev.key());
         std::vector<recob::TrackHitMeta const*> const& vhm_mu = fmp_trk2hit.data(pt_ev.key());
-        // std::map<size_t, unsigned> map_hitkey2metaidx;
         std::map<size_t, size_t> map_hitkey2trkidx;
         ASSERT(!vph_mu_all.empty())
         ASSERT(vph_mu_all.size() == vhm_mu.size())
@@ -334,12 +360,21 @@ void ana::Crossers::analyze(art::Event const& e) {
         trStartPoint = ana::Point(Start);
         trEndPoint = ana::Point(End);
 
-
         if (inLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evTrackNumber << " (" << trIndex << ")" "\033[0m" << std::endl;
 
         // dump basic track information
         trLength = pt_ev->Length();
-        ASSERT(trLength > inTrackLengthCut)
+        // ASSERT(trLength > inTrackLengthCut)
+
+        auto pt0 = fop_pfp2t0.at(pp_ev.key());
+        trHasT0 = pt0.isNonnull();
+        if (trHasT0) {
+            trT0TriggerType = pt0->TriggerType();
+            trT0TriggerBits = pt0->TriggerBits();
+            trT0TriggerConf = pt0->TriggerConfidence();
+        }
+
+
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
             return map_hitkey2trkidx.at(ph1.key()) < map_hitkey2trkidx.at(ph2.key());
@@ -407,13 +442,11 @@ void ana::Crossers::analyze(art::Event const& e) {
                 && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
             break;
         case kPDHD:
+        case kPDSP:
             trAnodeCrossing =
                 geoTop.y.isInside(start_y, inFiducialLength)
                 && geoTop.z.isInside(start_z, inFiducialLength)
                 && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
-            break;
-        case kPDSP:
-            trAnodeCrossing = false;
             break;
         default: break;
         }
@@ -441,53 +474,40 @@ void ana::Crossers::analyze(art::Event const& e) {
             PtrHit const& cc_bot = start_side == kBot ? cc_first : cc_second;
             PtrHit const& cc_top = start_side == kTop ? cc_first : cc_second;
 
-            for (PtrHit const& ph_mu : vph_mu) {
-                trHitCX.push_back(GetSide(ph_mu) == kBot
-                    ? -(geoCathodeGap/2) - (cc_bot->PeakTime() - ph_mu->PeakTime()) * fTick2cm
-                    : +(geoCathodeGap/2) + (cc_top->PeakTime() - ph_mu->PeakTime()) * fTick2cm
-                );
-            }
+            for (PtrHit const& ph_mu : vph_mu)
+                trHitCathodeX.push_back(GetCathodeX(ph_mu, cc_bot, cc_top, geoCathodeGap));
         }
         if (trAnodeCrossing) {
-            Side_t start_side = GetSide(vph_mu.front());
-
-            for (PtrHit const& ph_mu : vph_mu) {
-                if (GetSide(ph_mu) == start_side)
-                    trHitAX.push_back(GetSide(ph_mu) == kTop
-                        ? geoTop.x.max - (ph_mu->PeakTime() - start_t) * fTick2cm
-                        : geoBot.x.min + (ph_mu->PeakTime() - start_t) * fTick2cm
-                    );
-                else
-                    trHitAX.push_back(util::kBogusF);
-            }
+            for (PtrHit const& ph_mu : vph_mu)
+                trHitAnodeX.push_back(GetAnodeX(ph_mu, vph_mu.front(), geoBot.x.min, geoTop.x.max));
         }
 
         // Search for ghost track
-        int n = 0;
-        for (PtrHit const& ph_mu : vph_mu) {
-            if (n++ == 20) break;
-            trStartReg.add( GetSpace(ph_mu), ph_mu->PeakTime()*fTick2cm );
-        }
-        trStartReg.compute();
+        // int n = 0;
+        // for (PtrHit const& ph_mu : vph_mu) {
+        //     if (n++ == 20) break;
+        //     trStartReg.add( GetSpace(ph_mu), ph_mu->PeakTime()*fTick2cm );
+        // }
+        // trStartReg.compute();
 
-        int induction_hits = 0;
-        for (PtrHit const& ph_ev : vph_ev) {
-            PtrTrk const& pt = fop_hit2trk.at(ph_ev.key());
-            if (pt.isNonnull() && pt->Length() > inTrackLengthCut) continue;
+        // int induction_hits = 0;
+        // for (PtrHit const& ph_ev : vph_ev) {
+        //     PtrTrk const& pt = fop_hit2trk.at(ph_ev.key());
+        //     if (pt.isNonnull() && pt->Length() > inTrackLengthCut) continue;
 
-            if (ph_ev->View() != geo::kW) {
-                if (GetDistance(ph_ev, (Side_t)-1, start_y, start_z, start_t, true) < 20)
-                    induction_hits++;
-                continue;
-            }
-            if (GetDistance(ph_ev, vph_mu.front()) > 20) continue;
-            trGhostReg.add( GetSpace(ph_ev), ph_ev->PeakTime()*fTick2cm );
-        }
-        trGhostReg.compute();
+        //     if (ph_ev->View() != geo::kW) {
+        //         if (GetDistance(ph_ev, (Side_t)-1, start_y, start_z, start_t, true) < 20)
+        //             induction_hits++;
+        //         continue;
+        //     }
+        //     if (GetDistance(ph_ev, vph_mu.front()) > 20) continue;
+        //     trGhostReg.add( GetSpace(ph_ev), ph_ev->PeakTime()*fTick2cm );
+        // }
+        // trGhostReg.compute();
 
-        trGhostTrack = trGhostReg.r2 > 0.8 
-            && abs( (trGhostReg.m - trStartReg.m) / trStartReg.m ) < 10 
-            && (trGhostReg.n - induction_hits) > 0;
+        // trGhostTrack = trGhostReg.r2 > 0.8 
+        //     && abs( (trGhostReg.m - trStartReg.m) / trStartReg.m ) < 10 
+        //     && (trGhostReg.n - induction_hits) > 0;
 
 
         // Truth Information
@@ -509,7 +529,6 @@ void ana::Crossers::analyze(art::Event const& e) {
             truStartPoint = ana::Point(mcp->Position().Vect());
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
-
 
             // truCathodeCrossing 
             int before_anode=-1, before_cathode=-1;
@@ -597,17 +616,22 @@ void ana::Crossers::resetEvent() {
     evHits.clear();
 }
 void ana::Crossers::resetMuon() {
+    trT0Time = util::kBogusF;
+    trT0TriggerType = 999;
+    trT0TriggerBits = 0;
+    trT0TriggerConf = util::kBogusF;
+
     trHits.clear();
-    trHitAX.clear();
-    trHitCX.clear();
+    trHitAnodeX.clear();
+    trHitCathodeX.clear();
     trHitY.clear();
     // trEndAngle = util::kBogusF;
     trCathodeCrossing = false;
     trCathodeAlignment = util::kBogusF;
     trAnodeCrossing = false;
-    trStartReg.clear();
-    trGhostReg.clear();
-    trGhostTrack = false;
+    // trStartReg.clear();
+    // trGhostReg.clear();
+    // trGhostTrack = false;
     trHitdQds.clear();
 
     truPdg = 0;
