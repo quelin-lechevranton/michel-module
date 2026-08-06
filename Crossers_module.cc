@@ -303,13 +303,13 @@ void ana::Crossers::analyze(art::Event const& e) {
     VecPtrTrk vpt_ev;
     art::fill_ptr_vector(vpt_ev, vh_trk);
 
-    auto const & vh_pfp = e.getHandle<std::vector<recob::Track>>(tag_pfp);
+    auto const & vh_pfp = e.getHandle<std::vector<recob::PFParticle>>(tag_pfp);
     if (!vh_pfp.isValid()) {
         std::cout << "CrossersModule: " "\033[1;91m" "No valid recob::PFParticle handle" "\033[0m" << std::endl;
         return;
     }
-    VecPtrTrk vpp_ev;
-    art::fill_ptr_vector(vpp_ev, vh_pfp);
+    // std::vector<art::Ptr<recob::PFParticle>> vpp_ev;
+    // art::fill_ptr_vector(vpp_ev, vh_pfp);
 
     art::FindManyP<recob::Hit, recob::TrackHitMeta> fmp_trk2hit(vh_trk, e, tag_trk);
     art::FindOneP<recob::Track> fop_hit2trk(vh_hit, e, tag_trk);
@@ -373,8 +373,6 @@ void ana::Crossers::analyze(art::Event const& e) {
             trT0TriggerBits = pt0->TriggerBits();
             trT0TriggerConf = pt0->TriggerConfidence();
         }
-
-
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
             return map_hitkey2trkidx.at(ph1.key()) < map_hitkey2trkidx.at(ph2.key());
@@ -465,8 +463,9 @@ void ana::Crossers::analyze(art::Event const& e) {
             );
         }
 
-        for (size_t index=pt_ev->NextValidPoint(0); index!=recob::TrackTrajectory::InvalidIndex; index=pt_ev->NextValidPoint(index)) {
-            trPoints.push_back(pt_ev->LocationAtPoint(index));
+        for (size_t i=pt_ev->FirstValidPoint(); i!=pt_ev->LastValidPoint(); i++) {
+            if (!pt_ev->HasValidPoint(i)) continue;
+            trPoints.push_back(pt_ev->LocationAtPoint(i));
         }
 
         if (trCathodeCrossing) {
