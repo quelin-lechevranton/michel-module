@@ -92,6 +92,7 @@ private:
     bool                    trCathodeCrossing;
     float                   trCathodeAlignment;
     bool                    trAnodeCrossing;
+    bool                    trFakeAnodeCrossing;
 
     // ana::LinearRegression   trStartReg;
     // ana::LinearRegression   trGhostReg;
@@ -244,6 +245,7 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("CathodeCrossing",       &trCathodeCrossing);
     trTree->Branch("CathodeAlignment",      &trCathodeAlignment);
     trTree->Branch("AnodeCrossing",         &trAnodeCrossing);
+    trTree->Branch("FakeAnodeCrossing",     &trFakeAnodeCrossing);
     // SetBranches(trTree, "Start",            &trStartReg);
     // SetBranches(trTree, "Ghost",            &trGhostReg);
     // trTree->Branch("GhostTrack",            &trGhostTrack);
@@ -438,6 +440,11 @@ void ana::Crossers::analyze(art::Event const& e) {
                 && geoTop.y.isInside(start_y, inFiducialLength)
                 && geoTop.z.isInside(start_z, inFiducialLength)
                 && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
+
+            trFakeAnodeCrossing = GetSide(vph_mu.front()) == kTop
+                && geoTop.y.isInside(start_y, inFiducialLength)
+                && geoTop.z.isInside(start_z, inFiducialLength)
+                && (start_t < inFiducialLength/fTick2cm || start_t > wireWindow.max - inFiducialLength/fTick2cm;
             break;
         case kPDHD:
         case kPDSP:
@@ -445,10 +452,16 @@ void ana::Crossers::analyze(art::Event const& e) {
                 geoTop.y.isInside(start_y, inFiducialLength)
                 && geoTop.z.isInside(start_z, inFiducialLength)
                 && wireWindow.isInside(start_t, inFiducialLength/fTick2cm);
+
+            trFakeAnodeCrossing =
+                geoTop.y.isInside(start_y, inFiducialLength)
+                && geoTop.z.isInside(start_z, inFiducialLength)
+                && (start_t < inFiducialLength/fTick2cm || start_t > wireWindow.max - inFiducialLength/fTick2cm;
             break;
         default: break;
         }
         LOG(trAnodeCrossing);
+        LOG(trFakeAnodeCrossing);
 
 
         // dump hits
@@ -620,6 +633,7 @@ void ana::Crossers::resetMuon() {
     trT0TriggerBits = 0;
     trT0TriggerConf = util::kBogusF;
 
+    trPoints.clear();
     trHits.clear();
     trHitAnodeX.clear();
     trHitCathodeX.clear();
@@ -628,6 +642,7 @@ void ana::Crossers::resetMuon() {
     trCathodeCrossing = false;
     trCathodeAlignment = util::kBogusF;
     trAnodeCrossing = false;
+    trFakeAnodeCrossing = false;
     // trStartReg.clear();
     // trGhostReg.clear();
     // trGhostTrack = false;
