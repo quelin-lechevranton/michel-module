@@ -76,9 +76,9 @@ private:
     float                   trLength;
     bool                    trHasT0;
     double                  trT0Time;
-    unsigned                trT0TriggerType;
-    int                     trT0TriggerBits;
-    double                  trT0TriggerConf;
+    // unsigned                trT0TriggerType;
+    // int                     trT0TriggerBits;
+    // double                  trT0TriggerConf;
     ana::Point              trStartPoint;
     ana::Point              trEndPoint;
     ana::Points             trPoints;
@@ -231,9 +231,9 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("Length",        &trLength);
     trTree->Branch("HasT0",         &trHasT0);
     trTree->Branch("T0Time",        &trT0Time);
-    trTree->Branch("T0TriggerType", &trT0TriggerType);
-    trTree->Branch("T0TriggerBits", &trT0TriggerBits);
-    trTree->Branch("T0TriggerConf", &trT0TriggerConf);
+    // trTree->Branch("T0TriggerType", &trT0TriggerType);
+    // trTree->Branch("T0TriggerBits", &trT0TriggerBits);
+    // trTree->Branch("T0TriggerConf", &trT0TriggerConf);
     trTree->Branch("T0Time",        &trT0Time);
     trTree->Branch("T0Time",        &trT0Time);
     trTree->Branch("T0Time",        &trT0Time);
@@ -370,17 +370,17 @@ void ana::Crossers::analyze(art::Event const& e) {
 
         auto pt0 = fop_pfp2t0.at(pp_ev.key());
         trHasT0 = pt0.isNonnull();
-        if (trHasT0) {
-            trT0TriggerType = pt0->TriggerType();
+        /* if (trHasT0) {
+            trT0TriggerType = pt0->TriggerType(); // always 3 (unknown type)
             trT0TriggerBits = pt0->TriggerBits();
-            trT0TriggerConf = pt0->TriggerConfidence();
-            if (inLog) std::cout << "\t" "T0 Trigger: " << (
-                trT0TriggerType == 0 ? "Muon Counters" :
-                trT0TriggerType == 1 ? "Photon Detectors" :
-                trT0TriggerType == 2 ? "Monte Carlo Truth" :
-                "Unknown"
-            ) << " (" << trT0TriggerType << ")" << std::endl;
-        }
+            trT0TriggerConf = pt0->TriggerConfidence(); // always -999 (bogus)
+            // if (inLog) std::cout << "\t" "T0 Trigger: " << (
+            //     trT0TriggerType == 0 ? "Muon Counters" :
+            //     trT0TriggerType == 1 ? "Photon Detectors" :
+            //     trT0TriggerType == 2 ? "Monte Carlo Truth" :
+            //     "Unknown"
+            // ) << " (" << trT0TriggerType << ")" << std::endl;
+        } */
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
             return map_hitkey2trkidx.at(ph1.key()) < map_hitkey2trkidx.at(ph2.key());
@@ -635,9 +635,9 @@ void ana::Crossers::resetEvent() {
 }
 void ana::Crossers::resetMuon() {
     trT0Time = util::kBogusF;
-    trT0TriggerType = 999;
-    trT0TriggerBits = 0;
-    trT0TriggerConf = util::kBogusF;
+    // trT0TriggerType = 999;
+    // trT0TriggerBits = 0;
+    // trT0TriggerConf = util::kBogusF;
 
     trPoints.clear();
     trHits.clear();
@@ -656,6 +656,7 @@ void ana::Crossers::resetMuon() {
 
     truPdg = 0;
     truEnergy = util::kBogusF;
+    truPoints.clear();
     truEndProcess = "";
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
