@@ -374,12 +374,12 @@ void ana::Crossers::analyze(art::Event const& e) {
             trT0TriggerType = pt0->TriggerType();
             trT0TriggerBits = pt0->TriggerBits();
             trT0TriggerConf = pt0->TriggerConfidence();
-            if (inLog) std::cout << "\t" "T0 Trigger:" << (
+            if (inLog) std::cout << "\t" "T0 Trigger: " << (
                 trT0TriggerType == 0 ? "Muon Counters" :
                 trT0TriggerType == 1 ? "Photon Detectors" :
                 trT0TriggerType == 2 ? "Monte Carlo Truth" :
                 "Unknown"
-            ) << std::endl;
+            ) << " (" << trT0TriggerType << ")" << std::endl;
         }
 
         std::sort(vph_mu.begin(), vph_mu.end(), [&map_hitkey2trkidx](PtrHit const& ph1, PtrHit const& ph2) {
