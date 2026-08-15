@@ -408,7 +408,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         }
 
         geo::Vector_t start_to_end = (track_is_up ? +1 : -1) * (pt_ev->End() - pt_ev->Start());
-        muCosY = start_to_end.Dot(geo::Point_t(0, 1, 0)) / start_to_end.R();
+        muCosY = abs(start_to_end.Dot(geo::Point_t(0, 1, 0)) / start_to_end.R());
 
         if (inLog) std::cout << "\t" "\033[1;93m" "e" << evIndex << "m" << evMuonNumber << " (" << muIndex << ")" "\033[0m" << std::endl;
 
@@ -425,8 +425,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
         // dump basic track information
         muLength = pt_ev->Length();
-        // muChi2 = pt_ev->Chi2();
-        // muChi2PerNdof = pt_ev->Chi2PerNdof();
+        // muChi2 = pt_ev->Chi2(); // always undefined
+        // muChi2PerNdof = pt_ev->Chi2PerNdof(); // always undefined
 
         LOG(muLength >= inTrackLengthCut);
         if (!inKeepAll && muLength < inTrackLengthCut) continue;
