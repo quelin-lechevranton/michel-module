@@ -107,6 +107,8 @@ private:
     std::string             truEndProcess;
     ana::Point              truStartPoint;
     ana::Point              truEndPoint;
+    ana::Point              truStartMomentum;
+    ana::Point              truEndMomentum;
     ana::Points             truPoints;
     float                   truEndEnergy;
 
@@ -262,6 +264,8 @@ ana::Crossers::Crossers(fhicl::ParameterSet const& p)
     trTree->Branch("TrueEndProcess",        &truEndProcess);
     SetBranches(trTree, "TrueStart",        &truStartPoint);
     SetBranches(trTree, "TrueEnd",          &truEndPoint);
+    SetBranches(trTree, "TrueStartMomentum",&truStartMomentum);
+    SetBranches(trTree, "TrueEndMomentum",  &truEndMomentum);
     SetBranches(trTree, "True",             &truPoints);
     trTree->Branch("TrueEndEnergy",         &truEndEnergy);
 
@@ -546,6 +550,8 @@ void ana::Crossers::analyze(art::Event const& e) {
             truEndProcess = mcp->EndProcess();
             truStartPoint = ana::Point(mcp->Position().Vect());
             truEndPoint = ana::Point(mcp->EndPosition().Vect());
+            truStartMomentum = ana::Point(mcp->Momentum().Vect());
+            truEndMomentum = ana::Point(mcp->EndMomentum().Vect());
             truEndEnergy = (mcp->EndE() - mcp->Mass()) * 1e3; // MeV
 
             // truCathodeCrossing 
@@ -556,11 +562,9 @@ void ana::Crossers::analyze(art::Event const& e) {
                 truPoints.push_back(ana::Point(pt));
 
                 if (before_cathode != -1 && before_anode != -1) break;
-
                 if (before_cathode == -1 && prev_pt.X() * pt.X() < 0) {
                     before_cathode = i-1;
                 }
-
                 if (before_anode != -1) continue;
 
                 switch (geoDet) {
@@ -660,6 +664,8 @@ void ana::Crossers::resetMuon() {
     truEndProcess = "";
     truStartPoint = ana::Point{};
     truEndPoint = ana::Point{};
+    truStartMomentum = ana::Point{};
+    truEndMomentum = ana::Point{};
     truEndEnergy = util::kBogusF;
 
     truCathodePoint = ana::Point{};
