@@ -115,9 +115,10 @@ private:
     std::vector<float>      muHitdQds;
     ana::Hits               muSphereHits;
     float                   muSphereEnergy;
-    float                   muSphereEnergyTP;
+    // float                   muSphereEnergyTP;
     std::vector<float>      muSphereHitMuonAngle;
     // float                   muSphereMaxShowerEnergy;
+    std::vector<bool>       muSphereHitFromMichel;
 
     // Track information: reconstructed Michel electron
     ana::Vec2   muBary;
@@ -293,9 +294,10 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "Sphere",           &muSphereHits);
     muTree->Branch("SphereHitMuonAngle",    &muSphereHitMuonAngle);
     muTree->Branch("SphereEnergy",          &muSphereEnergy); // ADC
-    muTree->Branch("SphereEnergyTP",        &muSphereEnergyTP); // ADC
+    // muTree->Branch("SphereEnergyTP",        &muSphereEnergyTP); // ADC
     muTree->Branch("SphereHasLongTrack",    &muSphereHasLongTrack);
     // muTree->Branch("SphereMaxShowerEnergy", &muSphereMaxShowerEnergy);
+    muTree->Branch("SphereHitFromMichel",   &muSphereHitFromMichel);
 
     SetBranches(muTree, "Bary",             &muBaryHits);
     SetBranches(muTree, "Bary",             &muBary);
@@ -593,7 +595,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         muEndAngle = ana::Vec2(end_dir.z(), end_dir.x()).angle();
         // integrate charges around muon endpoint
         muSphereEnergy = 0;
-        muSphereEnergyTP = 0;
+        // muSphereEnergyTP = 0;
         // muSphereMaxShowerEnergy = 0;
         for (PtrHit const& ph_ev : vph_ev_endsec) {
             float dist = GetDistance(ph_ev, vph_mu.back());
@@ -623,11 +625,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             muSphereHitMuonAngle.push_back(da);
 
-            if (std::find_if(
+            muSphereHitFromMichel.push_back(std::find_if(
                 vph_mi.begin(), vph_mi.end(),
                 [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-            ) != vph_mi.end())
-                muSphereEnergyTP = ph_ev->ROISummedADC();
+            ) != vph_mi.end());
+                // muSphereEnergyTP = ph_ev->ROISummedADC();
         }
 
         // Cone
@@ -943,9 +945,10 @@ void ana::MichelAnalysis::resetMuon() {
     muHitdQds.clear();
     muSphereHits.clear();
     muSphereEnergy = util::kBogusF;
-    muSphereEnergyTP = util::kBogusF;
+    // muSphereEnergyTP = util::kBogusF;
     muSphereHitMuonAngle.clear();
     // muSphereMaxShowerEnergy = util::kBogusF;
+    muSphereHitFromMichel.clear();
 
     muBary = ana::Vec2{0,0};
     muBaryHits.clear();
