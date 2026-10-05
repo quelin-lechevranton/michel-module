@@ -118,7 +118,10 @@ private:
     // float                   muSphereEnergyTP;
     std::vector<float>      muSphereHitMuonAngle;
     // float                   muSphereMaxShowerEnergy;
-    std::vector<bool>       muSphereHitFromMichel;
+    // std::vector<bool>       muSphereHitFromMichel;
+    // std::vector<bool>       muSphereHitFromMuon;
+    std::vector<float>       muSphereHitMichelFrac;
+    std::vector<float>       muSphereHitMuonFrac;
 
     // Track information: reconstructed Michel electron
     ana::Vec2   muBary;
@@ -297,7 +300,10 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     // muTree->Branch("SphereEnergyTP",        &muSphereEnergyTP); // ADC
     muTree->Branch("SphereHasLongTrack",    &muSphereHasLongTrack);
     // muTree->Branch("SphereMaxShowerEnergy", &muSphereMaxShowerEnergy);
-    muTree->Branch("SphereHitFromMichel",   &muSphereHitFromMichel);
+    // muTree->Branch("SphereHitFromMichel",   &muSphereHitFromMichel);
+    // muTree->Branch("SphereHitFromMuon",     &muSphereHitFromMuon);
+    muTree->Branch("SphereHitMichelFrac",   &muSphereHitMichelFrac);
+    muTree->Branch("SphereHitMuonFrac",     &muSphereHitMuonFrac);
 
     SetBranches(muTree, "Bary",             &muBaryHits);
     SetBranches(muTree, "Bary",             &muBary);
@@ -418,10 +424,10 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         simb::MCParticle const* mcp = ana::trk2mcp(pt_ev, clockData, fmp_trk2hit);
         simb::MCParticle const* mcp_mi = nullptr;
         VecPtrHit vph_mcp_mu, vph_mi;
-        std::vector<float> energyFracs_mi;
+        std::vector<float> energyFracs_mi, energyFracs_mu;
         if (mcp) {
             mcp_mi = GetMichelMCP(mcp);
-            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false);
+            vph_mcp_mu = ana::mcp2hits(mcp, vph_ev, clockData, false, &energyFracs_mu);
             vph_mi = ana::mcp2hits(mcp_mi, vph_ev, clockData, true, &energyFracs_mi);
         }
 
@@ -625,11 +631,32 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
             muSphereHitMuonAngle.push_back(da);
 
-            muSphereHitFromMichel.push_back(std::find_if(
+            // muSphereHitFromMichel.push_back(std::find_if(
+            //     vph_mi.begin(), vph_mi.end(),
+            //     [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+            // ) != vph_mi.end());
+            // muSphereEnergyTP = ph_ev->ROISummedADC();
+            // muSphereHitFromMuon.push_back(std::find_if(
+            //     vph_mcp_mu.begin(), vph_mcp_mu.end(),
+            //     [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+            // ) != vph_mcp_mu.end());
+
+            size_t index_mi = std::distance(vph_mi.begin(), std::find_if(
                 vph_mi.begin(), vph_mi.end(),
                 [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
-            ) != vph_mi.end());
-                // muSphereEnergyTP = ph_ev->ROISummedADC();
+            ));
+            muSphereHitMichelFrac.push_back(index_mi != vph_mi.size()
+                ? energyFracs_mi[index_mi]
+                : 0.F
+            );
+            size_t index_mu = std::distance(vph_mcp_mu.begin(), std::find_if(
+                vph_mcp_mu.begin(), vph_mcp_mu.end(),
+                [&ph_ev](PtrHit const& h) -> bool { return h.key() == ph_ev.key(); }
+            ));
+            muSphereHitMuonFrac.push_back(index_mu != vph_mcp_mu.size()
+                ? energyFracs_mu[index_mu]
+                : 0.F
+            );
         }
 
         // Cone
@@ -948,7 +975,10 @@ void ana::MichelAnalysis::resetMuon() {
     // muSphereEnergyTP = util::kBogusF;
     muSphereHitMuonAngle.clear();
     // muSphereMaxShowerEnergy = util::kBogusF;
-    muSphereHitFromMichel.clear();
+    // muSphereHitFromMichel.clear();
+    // muSphereHitFromMuon.clear();
+    muSphereHitMichelFrac.clear();
+    muSphereHitMuonFrac.clear();
 
     muBary = ana::Vec2{0,0};
     muBaryHits.clear();
