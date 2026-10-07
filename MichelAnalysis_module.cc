@@ -131,6 +131,7 @@ private:
     bool        muSphereHasLongTrack;
 
     // Truth information: Muon
+    int                     truTrackID;
     int                     truPdg;
     std::string             truEndProcess;
     ana::Point              truStartPoint;
@@ -311,6 +312,7 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     muTree->Branch("BaryMuonAngle",         &muBaryMuonAngle);
 
     // Truth
+    muTree->Branch("TrueTrackID",           &truTrackID);
     muTree->Branch("TruePdg",               &truPdg);
     muTree->Branch("TrueEndProcess",        &truEndProcess);
     SetBranches(muTree, "TrueStart",        &truStartPoint);
@@ -886,6 +888,7 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // Truth Information
         LOG(mcp);
         if (mcp) {
+            truTrackID = mcp->TrackId();
             truPdg = mcp->PdgCode();
             truEndProcess = mcp->EndProcess();
             truStartPoint = ana::Point(mcp->Position().Vect());
@@ -986,6 +989,7 @@ void ana::MichelAnalysis::resetMuon() {
     muBaryMuonAngle = util::kBogusF;
     muSphereHasLongTrack = false;
 
+    truTrackID = 0;
     truPdg = 0;
     truEndProcess = "";
     truStartPoint = ana::Point{};
