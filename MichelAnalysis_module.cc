@@ -130,6 +130,9 @@ private:
     float       muBaryMuonAngle;
     bool        muSphereHasLongTrack;
 
+    ana::Points muHitTruePoints;
+    ana::Points muSphereHitTruePoints;
+
     // Truth information: Muon
     int                     truTrackID;
     int                     truPdg;
@@ -310,6 +313,9 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     SetBranches(muTree, "Bary",             &muBary);
     muTree->Branch("BaryAngle",             &muBaryAngle);
     muTree->Branch("BaryMuonAngle",         &muBaryMuonAngle);
+
+    SetBranches(muTree, "HitTrue",          &muHitTruePoints);
+    SetBranches(muTree, "SphereHitTrue",    &muSphereHitTruePoints);
 
     // Truth
     muTree->Branch("TrueTrackID",           &truTrackID);
@@ -589,6 +595,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ? pt_ev->LocationAtPoint(hit_track_idx).Y()
                 : util::kBogusF
             );
+            std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_mu);
+            muHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
         }
 
         // get hits from the section of the last hit
@@ -628,6 +636,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             ana::Hit hit = GetHit(ph_ev);
             muSphereEnergy += ph_ev->ROISummedADC();
             muSphereHits.push_back(hit);
+            std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_ev);
+            muSphereHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
 
             float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -773,8 +783,6 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             // BraggdQds = (*it_dQ_max)->ROISummedADC();
             // for (VecPtrHit::iterator it=vph_mu_tail.begin(); it!=it_dQ_max+1; ++it)
             //     vph_mu_bragg.push_back(*it);
-
-
 
             // BraggEndHit = GetHit(vph_mu_bragg.back());
             // for (PtrHit const& ph_mu : vph_mu_bragg)
@@ -988,6 +996,9 @@ void ana::MichelAnalysis::resetMuon() {
     muBaryAngle = util::kBogusF;
     muBaryMuonAngle = util::kBogusF;
     muSphereHasLongTrack = false;
+
+    muHitTruePoints.clear();
+    muSphereHitTruePoints.clear();
 
     truTrackID = 0;
     truPdg = 0;
