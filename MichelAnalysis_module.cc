@@ -130,8 +130,8 @@ private:
     float       muBaryMuonAngle;
     bool        muSphereHasLongTrack;
 
-    ana::Points muHitTruePoints;
-    ana::Points muSphereHitTruePoints;
+    // ana::Points muHitTruePoints;
+    // ana::Points muSphereHitTruePoints;
 
     // Truth information: Muon
     int                     truTrackID;
@@ -314,8 +314,8 @@ ana::MichelAnalysis::MichelAnalysis(fhicl::ParameterSet const& p)
     muTree->Branch("BaryAngle",             &muBaryAngle);
     muTree->Branch("BaryMuonAngle",         &muBaryMuonAngle);
 
-    SetBranches(muTree, "HitTrue",          &muHitTruePoints);
-    SetBranches(muTree, "SphereHitTrue",    &muSphereHitTruePoints);
+    // SetBranches(muTree, "HitTrue",          &muHitTruePoints);
+    // SetBranches(muTree, "SphereHitTrue",    &muSphereHitTruePoints);
 
     // Truth
     muTree->Branch("TrueTrackID",           &truTrackID);
@@ -348,6 +348,34 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
     auto const clockData = asDetClocks->DataFor(e);
     auto const detProp = asDetProp->DataFor(e,clockData);
     fTick2cm = detinfo::sampling_rate(clockData) * 1e-3 * detProp.DriftVelocity();
+
+    std::vector<std::string> mctruth_label = {
+        "th232apa",
+        "generator",
+        "k40beam",
+        "u238apaboards",
+        "k42fromar42",
+        "kr85",
+        "k40apaboards",
+        "ar42",
+        "u238cpa",
+        "u238beam",
+        "th232cpa",
+        "ar39",
+        "th232beam",
+        "cosmicgenerator",
+        "th232apaboards",
+        "u238apa",
+        "co60apa",
+        "k40cpa",
+    };
+
+    std::vector<art::Handle<std::vector<simb::MCTruth>>const&> vhs_mct;
+    for (std::string label : mctruth_label) {
+        auto const& vh_mct = e.getHandle<std::vector<simb::MCTruth>>(art::InputTag(label, ""));
+        if (!vh_mct.isValid()) { std::cout<<"MiAna: \033[1;91mNo valid recob::Hit handle\033[0m"<<std::endl; return; }
+        vhs_mct.push_back(vh_mct);
+    }
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
     if (!vh_hit.isValid()) {
@@ -595,8 +623,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ? pt_ev->LocationAtPoint(hit_track_idx).Y()
                 : util::kBogusF
             );
-            std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_mu);
-            muHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
+            // std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_mu);
+            // muHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
         }
 
         // get hits from the section of the last hit
@@ -636,8 +664,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
             ana::Hit hit = GetHit(ph_ev);
             muSphereEnergy += ph_ev->ROISummedADC();
             muSphereHits.push_back(hit);
-            std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_ev);
-            muSphereHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
+            // std::vector<double> xyz = bt_serv->HitToXYZ(clockData, ph_ev);
+            // muSphereHitTruePoints.push_back(ana::Point{xyz[0], xyz[1], xyz[2]});
 
             float da = (hit.vec(fTick2cm) - muEndHit.vec(fTick2cm)).angle() - muEndAngle;
             da = abs(da) > M_PI ? da - (da>0 ? 1 : -1) * 2 * M_PI : da;
@@ -669,6 +697,16 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 ? energyFracs_mu[index_mu]
                 : 0.F
             );
+
+            // sources: michel? muon? other muon? proton? radiologics?
+            // bool use_eve = false;
+            // for (sim::TrackIDE ide : (use_eve
+            //     ? bt_serv->HitToEveTrackIDEs(clockData, ph_ev)
+            //     : bt_serv->HitToTrackIDEs(clockData, ph_ev)
+            // )) {
+            //     simb::MCParticle const* mcp = pi_serv->TrackIdToParticle_P(ide.trackID);
+            //     float energyFrac = ide.energyFrac;
+            // }
         }
 
         // Cone
@@ -896,6 +934,22 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         // Truth Information
         LOG(mcp);
         if (mcp) {
+
+            simb::MCParticle const* mother = pi_serv->TrackIdToParticle_P(mcp->Mother());
+            while (mother->TrackId() != 0) pi_serv->TrackIdToParticle_P(mother->Mother());
+            for (size_t i=0; i<vhs_mct->size(); i++) {
+                for (simb::MCTruth const& mct : *vhs_mct[i]) {
+                    for (size_t ip=0; ip<mct.NParticles(); ip++) {
+                        if (mother == &mct.GetParticle(ip)) {
+                            std::cout << "particle match:" << mctruth_label[i] << std::endl;
+                            // truGenerator = mctruth_label[i]
+                            goto end_loops;
+                        }
+                    }
+                }
+            }
+            end_loops:
+
             truTrackID = mcp->TrackId();
             truPdg = mcp->PdgCode();
             truEndProcess = mcp->EndProcess();
@@ -923,11 +977,9 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
                 // MichelShowerLength = ps_mi ? ps_mi->Length() : util::kBogusF;
 
                 for (size_t i=0; i<vph_mi.size(); i++) {
-                    PtrHit const& ph_mi = vph_mi[i];
-                    float energyFrac = energyFracs_mi[i];
-                    if (ph_mi->View() != geo::kW) continue;
-                    miHits.push_back(GetHit(ph_mi));
-                    miHitEnergyFrac.push_back(energyFrac);
+                    if (vph_mi[i]->View() != geo::kW) continue;
+                    miHits.push_back(GetHit(vph_mi[i]));
+                    miHitEnergyFrac.push_back(energyFracs_mi[i]);
                 }
                 miHitEnergy = std::accumulate(miHits.adc.begin(), miHits.adc.end(), 0.F);
             }
@@ -997,8 +1049,8 @@ void ana::MichelAnalysis::resetMuon() {
     muBaryMuonAngle = util::kBogusF;
     muSphereHasLongTrack = false;
 
-    muHitTruePoints.clear();
-    muSphereHitTruePoints.clear();
+    // muHitTruePoints.clear();
+    // muSphereHitTruePoints.clear();
 
     truTrackID = 0;
     truPdg = 0;
