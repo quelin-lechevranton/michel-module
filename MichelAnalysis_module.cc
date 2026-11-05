@@ -370,11 +370,11 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
         "k40cpa",
     };
 
-    std::vector<art::Handle<std::vector<simb::MCTruth>>const&> vhs_mct;
+    std::vector<art::Handle<std::vector<simb::MCTruth>>const*> vhs_mct;
     for (std::string label : mctruth_label) {
         auto const& vh_mct = e.getHandle<std::vector<simb::MCTruth>>(art::InputTag(label, ""));
         if (!vh_mct.isValid()) { std::cout<<"MiAna: \033[1;91mNo valid recob::Hit handle\033[0m"<<std::endl; return; }
-        vhs_mct.push_back(vh_mct);
+        vhs_mct.push_back(&vh_mct);
     }
 
     auto const & vh_hit = e.getHandle<std::vector<recob::Hit>>(tag_hit);
@@ -937,8 +937,8 @@ void ana::MichelAnalysis::analyze(art::Event const& e) {
 
             simb::MCParticle const* mother = pi_serv->TrackIdToParticle_P(mcp->Mother());
             while (mother->TrackId() != 0) pi_serv->TrackIdToParticle_P(mother->Mother());
-            for (size_t i=0; i<vhs_mct->size(); i++) {
-                for (simb::MCTruth const& mct : *vhs_mct[i]) {
+            for (size_t i=0; i<vhs_mct.size(); i++) {
+                for (simb::MCTruth const& mct : *(*vhs_mct[i])) {
                     for (size_t ip=0; ip<mct.NParticles(); ip++) {
                         if (mother == &mct.GetParticle(ip)) {
                             std::cout << "particle match:" << mctruth_label[i] << std::endl;
